@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Mail, Lock, User, ArrowRight, ShieldCheck, Database } from 'lucide-react';
+import { BookOpenCheck, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { UserAccount, UserProgress } from '../types/learning';
 import { loginAccount, registerAccount } from '../utils/storage';
 
@@ -43,7 +43,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white">MyEnglish</h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Đăng nhập để lưu tiến độ, từ vựng và lộ trình học đồng bộ trên cơ sở dữ liệu SQLite.
+            Đăng nhập để lưu tiến độ học tập, từ vựng và lộ trình cá nhân của bạn.
           </p>
         </div>
 
@@ -100,16 +100,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
           <div>
             <label className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-1 block">
-              Địa chỉ Gmail / Email
+              {mode === 'register' ? 'Địa chỉ Gmail' : 'Tài khoản (Gmail hoặc admin)'}
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
-                type="email"
+                type={mode === 'register' ? 'email' : 'text'}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tenban@gmail.com"
+                placeholder={mode === 'register' ? 'tenban@gmail.com' : 'tenban@gmail.com hoặc admin'}
                 className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -154,17 +154,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        <div className="flex flex-col items-center gap-1 text-[11px] text-slate-400 text-center">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Mật khẩu được mã hóa an toàn (scrypt) trên server.</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Lưu trữ đồng bộ bằng cơ sở dữ liệu SQLite.</span>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { SrsCardState, UserAccount, UserProgress, WordEntry } from '../types/learning';
 
 const TOKEN_KEY = 'myenglish_token_v1';
-export const DEV_EMAIL = 'admin@hieupro.io.vn';
+export const DEV_EMAIL = 'admin';
 
 function getTodayStr(): string {
   return new Date().toISOString().slice(0, 10);

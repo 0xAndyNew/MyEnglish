@@ -26,7 +26,7 @@
 
 - **Cơ sở dữ liệu SQLite (`data/myenglish.db`)**: Chạy bằng `node:sqlite` (`DatabaseSync`) tích hợp sẵn trên Node.js v22.5+, lưu trữ chuẩn 5 bảng quan hệ (`users`, `sessions`, `user_progress`, `saved_words`, `app_settings`).
 - **Tài khoản thường (`@gmail.com`)**: Đăng ký/đăng nhập đồng bộ qua REST API (`/api/auth/*`), mật khẩu mã hóa an toàn bằng `scrypt` + salt, khóa lộ trình tuần tự từng bài và từng bước.
-- **Mục Quản trị Admin (`admin@hieupro.io.vn`)**:
+- **Mục Quản trị Admin (`admin`)**:
   - Bật/tắt chế độ Dev mở khóa nhanh để kiểm tra bài học.
   - Cấu hình & kiểm tra kết nối **Gemini API Key** lưu trực tiếp trong SQLite Server (`app_settings`) và gọi qua proxy `/api/ai/generate` (trình duyệt học viên không bao giờ thấy được API Key).
   - Quản lý danh sách tài khoản trong SQLite: Reset tiến độ học, Reset mật khẩu (`123456`) hoặc Xóa tài khoản thường.

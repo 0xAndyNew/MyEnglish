@@ -66,7 +66,7 @@ db.exec(`
   );
 `);
 
-export const DEV_EMAIL = 'admin@hieupro.io.vn';
+export const DEV_EMAIL = 'admin';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -117,8 +117,9 @@ function ensureUserProgressRow(email) {
   }
 }
 
-// Seed Admin Dev account if missing
+// Seed Admin Dev account if missing & migrate legacy admin@hieupro.io.vn
 function seedAdminAccount() {
+  db.prepare('DELETE FROM users WHERE email = ?').run('admin@hieupro.io.vn');
   const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(DEV_EMAIL);
   if (!existing) {
     const now = new Date().toISOString();
