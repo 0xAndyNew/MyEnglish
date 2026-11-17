@@ -9,13 +9,14 @@ import {
   ArrowRight,
   Filter,
 } from 'lucide-react';
-import { SENTENCE_EXERCISES, SENTENCE_TOPICS } from '../data/sentenceExercisesData';
+import { SENTENCE_EXERCISES, SentenceExercise, SENTENCE_TOPICS } from '../data/sentenceExercisesData';
 import { AccentMode, CefrLevel } from '../types/learning';
 import { speakText } from '../utils/speechEngine';
 
 interface SentenceBuilderLabProps {
   accent: AccentMode;
   onAddXp: (amount: number) => void;
+  extraExercises?: SentenceExercise[];
   savedCompletedIds?: string[];
   onCompleteId?: (id: string) => void;
   isNextUnlocked?: boolean;
@@ -25,6 +26,7 @@ interface SentenceBuilderLabProps {
 export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
   accent,
   onAddXp,
+  extraExercises = [],
   savedCompletedIds,
   onCompleteId,
   isNextUnlocked = false,
@@ -41,18 +43,23 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
 
   const completedIds = savedCompletedIds ?? localCompletedIds;
 
+  const allExercises = useMemo(
+    () => [...extraExercises, ...SENTENCE_EXERCISES],
+    [extraExercises]
+  );
+
   const filteredList = useMemo(() => {
-    const matched = SENTENCE_EXERCISES.filter((item) => {
+    const matched = allExercises.filter((item) => {
       const okLevel = levelFilter === 'ALL' || item.level === levelFilter;
       const okTopic = topicFilter === 'Tất cả' || item.topic === topicFilter;
       return okLevel && okTopic;
     });
-    const list = matched.length > 0 ? matched : SENTENCE_EXERCISES;
+    const list = matched.length > 0 ? matched : allExercises;
     return sessionLimit === 0 ? list : list.slice(0, sessionLimit);
-  }, [levelFilter, topicFilter, sessionLimit]);
+  }, [allExercises, levelFilter, topicFilter, sessionLimit]);
 
   const safeIdx = exIdx % filteredList.length;
-  const currentEx = filteredList[safeIdx] || SENTENCE_EXERCISES[0];
+  const currentEx = filteredList[safeIdx] || allExercises[0];
 
   const exWords = useMemo(() => currentEx.en.split(' '), [currentEx]);
   const shuffledExWords = useMemo(() => {
@@ -91,7 +98,7 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase text-indigo-600 dark:text-indigo-400">
-            <Puzzle className="w-4 h-4" /> Bước 2C • Kho {SENTENCE_EXERCISES.length} bài thực hành ghép câu
+            <Puzzle className="w-4 h-4" /> Bước 2C • Kho {allExercises.length} bài thực hành ghép câu
           </span>
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">
             Lab Thực Hành Ghép Câu Chuẩn (A1 → B2)
@@ -103,7 +110,7 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
 
         <div className="flex flex-col items-end gap-2">
           <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-            Đã hoàn thành: {completedIds.length}/{SENTENCE_EXERCISES.length} câu
+            Đã hoàn thành: {completedIds.length}/{allExercises.length} câu
           </div>
           {onUnlockNext && !isNextUnlocked && (
             <button
@@ -136,7 +143,7 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                 }`}
               >
-                {lv === 'ALL' ? 'Tất cả (120)' : lv}
+                {lv === 'ALL' ? `Tất cả (${allExercises.length})` : lv}
               </button>
             ))}
           </div>

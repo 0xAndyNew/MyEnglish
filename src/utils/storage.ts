@@ -219,6 +219,44 @@ export async function adminDeleteUser(email: string): Promise<void> {
   });
 }
 
+// ---------------- CUSTOM LESSONS SQLITE API ----------------
+
+export type CustomLessonKind = 'sentence' | 'listening' | 'roleplay' | 'writing';
+
+export interface CustomLessonRecord {
+  id: string;
+  kind: CustomLessonKind;
+  payload: any;
+  createdAt: string;
+}
+
+export async function fetchCustomLessons(): Promise<CustomLessonRecord[]> {
+  if (!getAuthToken()) return [];
+  try {
+    const res = await apiRequest<{ lessons: CustomLessonRecord[] }>('/api/custom-lessons');
+    return Array.isArray(res.lessons) ? res.lessons : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function adminCreateCustomLesson(
+  kind: CustomLessonKind,
+  payload: Record<string, any>
+): Promise<CustomLessonRecord> {
+  const res = await apiRequest<{ lesson: CustomLessonRecord }>('/api/admin/lessons', {
+    method: 'POST',
+    body: JSON.stringify({ kind, payload }),
+  });
+  return res.lesson;
+}
+
+export async function adminDeleteCustomLesson(id: string): Promise<void> {
+  await apiRequest(`/api/admin/lessons/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 /**
  * Thuật toán Ôn tập Ngắt quãng (SM-2)
  */

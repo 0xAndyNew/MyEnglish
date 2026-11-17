@@ -3,13 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  addCustomLesson,
   createSession,
   db,
+  deleteCustomLesson,
   DEV_EMAIL,
   getAppSetting,
   getUserBySessionToken,
   hashPassword,
   listAllUsersAdmin,
+  listCustomLessons,
   loadFullProgress,
   resetProgressInDb,
   saveFullProgress,
@@ -261,6 +264,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    if (method === 'GET' && pathname === '/api/custom-lessons') {
+      const lessons = listCustomLessons();
+      return sendJson(res, 200, { lessons });
+    }
+
     // AI PROXY (Key stays safely in SQLite on server!)
     if (method === 'POST' && pathname === '/api/ai/generate') {
       const body = await readJsonBody(req);
@@ -337,6 +345,27 @@ const server = http.createServer(async (req, res) => {
           return sendJson(res, 400, { error: 'Không thể xóa tài khoản Admin Dev.' });
         }
         db.prepare('DELETE FROM users WHERE email = ?').run(targetEmail);
+        return sendJson(res, 200, { ok: true });
+      }
+
+      if (method === 'POST' && pathname === '/api/admin/lessons') {
+        const body = await readJsonBody(req);
+        const kind = String(body.kind || '');
+        const allowed = ['sentence', 'listening', 'roleplay', 'writing'];
+        if (!allowed.includes(kind)) {
+          return sendJson(res, 400, { error: 'Loại bài học không hợp lệ.' });
+        }
+        if (!body.payload || typeof body.payload !== 'object') {
+          return sendJson(res, 400, { error: 'Thiếu nội dung bài học.' });
+        }
+        const created = addCustomLesson(kind, body.payload);
+        return sendJson(res, 201, { lesson: created });
+      }
+
+      const delLessonMatch = pathname.match(/^\/api\/admin\/lessons\/([^/]+)$/);
+      if (method === 'DELETE' && delLessonMatch) {
+        const lessonId = decodeURIComponent(delLessonMatch[1]);
+        deleteCustomLesson(lessonId);
         return sendJson(res, 200, { ok: true });
       }
     }

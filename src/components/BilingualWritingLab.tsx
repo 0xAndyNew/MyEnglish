@@ -21,6 +21,7 @@ import { speakText } from '../utils/speechEngine';
 interface BilingualWritingLabProps {
   accent: AccentMode;
   geminiApiKey?: string;
+  extraPrompts?: BilingualPrompt[];
   onAddXp: (amount: number) => void;
 }
 
@@ -101,6 +102,7 @@ function gradeOffline(
 export const BilingualWritingLab: React.FC<BilingualWritingLabProps> = ({
   accent,
   geminiApiKey,
+  extraPrompts = [],
   onAddXp,
 }) => {
   const [direction, setDirection] = useState<'vi2en' | 'en2vi'>('vi2en');
@@ -119,8 +121,8 @@ export const BilingualWritingLab: React.FC<BilingualWritingLabProps> = ({
   const [aiError, setAiError] = useState<string | null>(null);
 
   const allPrompts = useMemo(
-    () => [...customPrompts, ...BILINGUAL_WRITING_PROMPTS],
-    [customPrompts]
+    () => [...customPrompts, ...extraPrompts, ...BILINGUAL_WRITING_PROMPTS],
+    [customPrompts, extraPrompts]
   );
 
   const filteredPrompts = useMemo(() => {

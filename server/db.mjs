@@ -64,6 +64,13 @@ db.exec(`
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS custom_lessons (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 export const DEV_EMAIL = 'admin';
@@ -338,4 +345,28 @@ export function resetProgressInDb(emailRaw) {
     throw err;
   }
   return loadFullProgress(email);
+}
+
+export function listCustomLessons() {
+  const rows = db.prepare('SELECT id, kind, payload_json, created_at FROM custom_lessons ORDER BY created_at DESC').all();
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    payload: parseJsonSafe(r.payload_json, {}),
+    createdAt: r.created_at,
+  }));
+}
+
+export function addCustomLesson(kind, payload) {
+  const id = `cl-${kind}-${Date.now()}`;
+  const createdAt = new Date().toISOString();
+  const payloadWithId = { ...payload, id };
+  db.prepare('INSERT INTO custom_lessons (id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, kind, JSON.stringify(payloadWithId), createdAt);
+  return { id, kind, payload: payloadWithId, createdAt };
+}
+
+export function deleteCustomLesson(id) {
+  const res = db.prepare('DELETE FROM custom_lessons WHERE id = ?').run(id);
+  return res.changes > 0;
 }

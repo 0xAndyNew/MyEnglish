@@ -18,6 +18,8 @@ import {
 import { UserAccount, UserProgress, WordEntry } from './types/learning';
 import {
   addWordToNotebook,
+  CustomLessonRecord,
+  fetchCustomLessons,
   fetchSessionState,
   getAuthToken,
   getDefaultProgress,
@@ -61,6 +63,7 @@ export function App() {
   const [devUnlockAll, setDevUnlockAll] = useState(false);
   const [hasServerApiKey, setHasServerApiKey] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [customLessons, setCustomLessons] = useState<CustomLessonRecord[]>([]);
   const effectiveApiKey = hasServerApiKey ? 'SERVER_CONFIGURED' : '';
   const hydratedEmailRef = useRef<string | null>(null);
 
@@ -89,6 +92,8 @@ export function App() {
         setActiveStepIdx(state.progress.unlockedStepIndex || 0);
         setDevUnlockAll(state.user.role === 'admin' || isDevAccount(state.user.email));
         setHasServerApiKey(state.hasApiKey);
+        const lessons = await fetchCustomLessons();
+        if (active) setCustomLessons(lessons);
       }
       setAuthChecking(false);
     })();
@@ -115,10 +120,11 @@ export function App() {
     setActiveStepIdx(loadedProg.unlockedStepIndex || 0);
     setDevUnlockAll(user.role === 'admin' || isDevAccount(user.email));
     setSearchedWord(null);
-    const state = await fetchSessionState();
+    const [state, lessons] = await Promise.all([fetchSessionState(), fetchCustomLessons()]);
     if (state) {
       setHasServerApiKey(state.hasApiKey);
     }
+    setCustomLessons(lessons);
   };
 
   const handleLogout = async () => {
@@ -127,6 +133,7 @@ export function App() {
     setCurrentUser(null);
     setDevUnlockAll(false);
     setHasServerApiKey(false);
+    setCustomLessons([]);
     setSearchedWord(null);
   };
 
@@ -489,11 +496,12 @@ export function App() {
           />
         )}
 
-        {/* B2C: Lab Ghép Câu (120 bài A1 -> B2) */}
+        {/* B2C: Lab Ghép Câu (160+ bài A1 -> B2) */}
         {activeStepIdx === 4 && (
           <SentenceBuilderLab
             accent={progress.accent}
             onAddXp={(amount) => setProgress((p) => ({ ...p, xp: p.xp + amount }))}
+            extraExercises={customLessons.filter((l) => l.kind === 'sentence').map((l) => l.payload)}
             savedCompletedIds={progress.completedSentenceIds ?? []}
             onCompleteId={(id) =>
               setProgress((p) => {
@@ -511,6 +519,8 @@ export function App() {
           <ListeningSpeakingLab
             accent={progress.accent}
             geminiApiKey={effectiveApiKey}
+            extraLessons={customLessons.filter((l) => l.kind === 'listening').map((l) => l.payload)}
+            extraScenarios={customLessons.filter((l) => l.kind === 'roleplay').map((l) => l.payload)}
             savedWords={progress.savedWords}
             onSaveWord={handleSaveWord}
             onPronunciationScore={handlePronunciationScore}
@@ -546,6 +556,7 @@ export function App() {
               <BilingualWritingLab
                 accent={progress.accent}
                 geminiApiKey={effectiveApiKey}
+                extraPrompts={customLessons.filter((l) => l.kind === 'writing').map((l) => l.payload)}
                 onAddXp={(amount) => setProgress((p) => ({ ...p, xp: p.xp + amount }))}
               />
             )}
@@ -585,6 +596,7 @@ export function App() {
           hasApiKey={hasServerApiKey}
           onApiKeyStatusChange={setHasServerApiKey}
           currentEmail={currentUser.email}
+          onCustomLessonsChange={setCustomLessons}
           onResetCurrentProgress={() => {
             setProgress(getDefaultProgress());
             setActiveStepIdx(0);

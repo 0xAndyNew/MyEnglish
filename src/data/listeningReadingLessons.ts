@@ -647,4 +647,214 @@ export const LISTENING_READING_LESSONS: ListeningReadingLesson[] = [
       correctIdx: 1,
     },
   },
+  {
+    id: 'lr-31',
+    level: 'A2',
+    category: 'Hội thoại đời sống',
+    title: 'Bài 31: Đặt vé Máy bay & Chọn chỗ ngồi',
+    sourceStyle: 'British Council • Travel & Booking',
+    transcript:
+      'Hello, I would like to book a round-trip ticket from Hanoi to Bangkok next Friday. Would you prefer a morning or an evening flight? A morning flight, please. And may I have a window seat? Sure, flight VN six-one-one departs at nine fifteen AM, seat twelve A is available.',
+    translation:
+      'Xin chào, tôi muốn đặt vé khứ hồi từ Hà Nội đi Bangkok vào thứ Sáu tới. Quý khách thích chuyến bay buổi sáng hay buổi tối? Cho tôi chuyến buổi sáng nhé. Và tôi có thể ngồi ghế cạnh cửa sổ không? Chắc chắn rồi, chuyến VN611 khởi hành lúc 9:15 sáng, ghế 12A hiện còn trống.',
+    keyPhrases: [
+      { en: 'round-trip ticket', vi: 'vé khứ hồi' },
+      { en: 'window seat', vi: 'ghế cạnh cửa sổ' },
+      { en: 'departs at...', vi: 'khởi hành lúc...' },
+    ],
+    question: {
+      q: 'What kind of seat does the passenger ask for?',
+      options: ['An aisle seat', 'A window seat', 'A business seat'],
+      correctIdx: 1,
+    },
+  },
+  {
+    id: 'lr-32',
+    level: 'A2',
+    category: 'Hội thoại đời sống',
+    title: 'Bài 32: Đổi trả sản phẩm lỗi tại Cửa hàng',
+    sourceStyle: 'VOA Learning English • Consumer Skills',
+    transcript:
+      'Excuse me, I bought these headphones yesterday, but the left side does not work. May I exchange them or get a refund? Of course, let me check your receipt. Everything looks fine. Would you like a brand new replacement? Yes, please, let me test it before I leave.',
+    translation:
+      'Xin lỗi, hôm qua tôi mua chiếc tai nghe này nhưng bên trái không nghe được. Tôi có thể đổi chiếc mới hoặc hoàn tiền không? Tất nhiên rồi, cho tôi xem hóa đơn của bạn. Mọi thứ đều hợp lệ. Bạn muốn đổi lấy một chiếc mới nguyên hộp chứ? Vâng, cho tôi kiểm tra thử trước khi về nhé.',
+    keyPhrases: [
+      { en: 'get a refund', vi: 'được hoàn tiền' },
+      { en: 'check your receipt', vi: 'kiểm tra hóa đơn' },
+      { en: 'brand new replacement', vi: 'sản phẩm thay thế mới' },
+    ],
+    question: {
+      q: 'What is wrong with the headphones?',
+      options: ['The color is wrong', 'The left side does not work', 'The box is missing'],
+      correctIdx: 1,
+    },
+  },
+  {
+    id: 'lr-33',
+    level: 'A2',
+    category: 'Hội thoại đời sống',
+    title: 'Bài 33: Đi xem & Thuê Căn hộ mới',
+    sourceStyle: 'BBC Learning English • Everyday Accommodation',
+    transcript:
+      'Welcome! This one-bedroom apartment gets plenty of natural light and comes with a washing machine and air conditioning. How much is the monthly rent? It is five hundred dollars per month, excluding electricity and internet. Are pets allowed in the building? Small cats are fine, as long as neighbors are not disturbed.',
+    translation:
+      'Chào mừng bạn! Căn hộ một phòng ngủ này có rất nhiều ánh sáng tự nhiên và trang bị sẵn máy giặt, điều hòa. Tiền thuê hàng tháng là bao nhiêu? Giá là 500 đô la mỗi tháng, chưa tính tiền điện và internet. Tòa nhà có cho nuôi thú cưng không? Mèo nhỏ thì được, miễn là không làm phiền hàng xóm.',
+    keyPhrases: [
+      { en: 'monthly rent', vi: 'tiền thuê hàng tháng' },
+      { en: 'excluding electricity', vi: 'không bao gồm tiền điện' },
+      { en: 'pets allowed', vi: 'cho phép thú cưng' },
+    ],
+    question: {
+      q: 'What is excluded from the monthly rent?',
+      options: ['Washing machine', 'Electricity and internet', 'Air conditioning'],
+      correctIdx: 1,
+    },
+  },
+  {
+    id: 'lr-34',
+    level: 'B1',
+    category: 'Giao tiếp công việc',
+    title: 'Bài 34: Họp Trực tuyến — Kiểm tra Âm thanh & Màn hình',
+    sourceStyle: 'BBC • Remote Work English',
+    transcript:
+      'Hi everyone, can you hear me clearly? Yes, your audio is crisp! Let me share my screen so we can walk through the quarterly roadmap together. Oh, sorry, I think someone is muted while speaking—Lan, could you unmute your microphone? Thanks, now we can hear you loud and clear.',
+    translation:
+      'Chào mọi người, mọi người có nghe rõ tôi nói không? Có, âm thanh rất nét! Để tôi chia sẻ màn hình để chúng ta cùng xem lộ trình quý nhé. Ôi xin lỗi, hình như có ai đang tắt tiếng khi nói — Lan ơi, bạn bật mic lên nhé? Cảm ơn, giờ nghe rõ ràng rồi.',
+    keyPhrases: [
+      { en: 'share my screen', vi: 'chia sẻ màn hình' },
+      { en: 'walk through', vi: 'đi qua từng phần' },
+      { en: 'unmute your microphone', vi: 'bật lại micro' },
+    ],
+    question: {
+      q: 'Why could they not hear Lan at first?',
+      options: ['Her internet dropped', 'Her microphone was muted', 'She joined the wrong link'],
+      correctIdx: 1,
+    },
+  },
+  {
+    id: 'lr-35',
+    level: 'B1',
+    category: 'Hội thoại đời sống',
+    title: 'Bài 35: Đặt lịch Khám Nha khoa & Tư vấn',
+    sourceStyle: 'British Council • Medical Appointments',
+    transcript:
+      'Good morning, Smile Dental Clinic. How can I help you? I have had a mild toothache on the right side for two days, and I would like to see a dentist. Can you come in at four PM today for an X-ray and check-up? Yes, four PM works well. Please arrive ten minutes early to fill out a patient form.',
+    translation:
+      'Chào buổi sáng, Phòng khám Nha khoa Smile xin nghe. Tôi giúp gì được bạn? Tôi bị đau răng nhẹ ở bên phải 2 ngày nay và muốn đặt lịch khám bác sĩ. Bạn đến lúc 4 giờ chiều nay để chụp X-quang và kiểm tra được không? Vâng, 4 giờ chiều rất ổn. Vui lòng đến sớm 10 phút để điền phiếu bệnh nhân nhé.',
+    keyPhrases: [
+      { en: 'mild toothache', vi: 'đau răng nhẹ' },
+      { en: 'arrive ten minutes early', vi: 'đến sớm 10 phút' },
+      { en: 'patient form', vi: 'phiếu thông tin bệnh nhân' },
+    ],
+    question: {
+      q: 'Why should the patient arrive ten minutes early?',
+      options: ['To pay in cash', 'To fill out a patient form', 'To pick up medicine'],
+      correctIdx: 1,
+    },
+  },
+  {
+    id: 'lr-36',
+    level: 'B1',
+    category: 'Hội thoại đời sống',
+    title: 'Bài 36: Kiểm tra An ninh & Hải quan Sân bay',
+    sourceStyle: 'VOA Special English • International Travel',
+    transcript:
+      'Good afternoon, may I see your passport and customs declaration form? Here you go. What is the purpose of your visit? I am attending a five-day technology conference and doing a little sightseeing. Where will you be staying? At the Central Plaza Hotel downtown. Enjoy your stay!',
+    translation:
+      'Chào buổi chiều, cho tôi xem hộ chiếu và tờ khai hải quan của bạn? Đây ạ. Mục đích chuyến đi của bạn là gì? Tôi tham dự hội nghị công nghệ 5 ngày và đi tham quan một chút. Bạn sẽ lưu trú ở đâu? Tại khách sạn Central Plaza ở trung tâm thành phố. Chúc bạn có kỳ nghỉ vui vẻ!',
+    keyPhrases: [
+      { en: 'purpose of your visit', vi: 'mục đích chuyến đi' },
+      { en: 'technology conference', vi: 'hội nghị công nghệ' },
+      { en: 'Enjoy your stay', vi: 'Chúc lưu trú vui vẻ' },
+    ],
+    question: {
+      q: 'Why is the traveler visiting?',
+      options: ['For a conference and sightseeing', 'To start a university degree', 'To visit relatives'],
+      correctIdx: 0,
+    },
+  },
+  {
+    id: 'lr-37',
+    level: 'B1',
+    category: 'Bài đọc cơ bản',
+    title: 'Bài 37: Quản lý Tài chính Cá nhân thông minh',
+    sourceStyle: 'VOA Learning English • Smart Money Habits',
+    transcript:
+      'Managing personal finances becomes much easier when you follow the fifty-thirty-twenty rule. Spend fifty percent of your income on essential needs like housing and food, thirty percent on personal lifestyle choices, and save or invest the remaining twenty percent every month. Small consistent savings build strong financial security over time.',
+    translation:
+      'Quản lý tài chính cá nhân trở nên dễ dàng hơn nhiều khi bạn áp dụng quy tắc 50-30-20. Chi 50% thu nhập cho nhu cầu thiết yếu như nhà ở và ăn uống, 30% cho phong cách sống cá nhân, và tiết kiệm hoặc đầu tư 20% còn lại mỗi tháng. Những khoản tiết kiệm nhỏ đều đặn tạo nên nền tảng tài chính vững chắc theo thời gian.',
+    keyPhrases: [
+      { en: 'essential needs', vi: 'nhu cầu thiết yếu' },
+      { en: 'save or invest', vi: 'tiết kiệm hoặc đầu tư' },
+      { en: 'financial security', vi: 'an toàn tài chính' },
+    ],
+    question: {
+      q: 'What percentage should be saved or invested under this rule?',
+      options: ['Fifty percent', 'Thirty percent', 'Twenty percent'],
+      correctIdx: 2,
+    },
+  },
+  {
+    id: 'lr-38',
+    level: 'B1',
+    category: 'Giao tiếp công việc',
+    title: 'Bài 38: Tổng kết Cuộc họp & Phân công Việc',
+    sourceStyle: 'BBC • Business Meetings',
+    transcript:
+      'Before we wrap up today’s meeting, let’s quickly confirm our action items. Minh will finalize the user interface mockups by Wednesday afternoon, while Lan will prepare the client presentation deck by Thursday morning. I will send everyone the meeting notes right after this call. Any questions before we finish?',
+    translation:
+      'Trước khi kết thúc cuộc họp hôm nay, hãy chốt nhanh các đầu việc cần làm. Minh sẽ hoàn thiện bản mẫu giao diện vào chiều thứ Tư, còn Lan chuẩn bị bộ slide thuyết trình khách hàng trước sáng thứ Năm. Tôi sẽ gửi biên bản cuộc họp cho mọi người ngay sau buổi gọi này. Có câu hỏi nào trước khi nghỉ không?',
+    keyPhrases: [
+      { en: 'wrap up the meeting', vi: 'kết thúc cuộc họp' },
+      { en: 'action items', vi: 'các đầu việc cần triển khai' },
+      { en: 'meeting notes', vi: 'biên bản cuộc họp' },
+    ],
+    question: {
+      q: 'When will Lan finish the client presentation deck?',
+      options: ['Wednesday afternoon', 'Thursday morning', 'Friday evening'],
+      correctIdx: 1,
+    },
+  },
+  {
+    id: 'lr-39',
+    level: 'B2',
+    category: 'Giao tiếp công việc',
+    title: 'Bài 39: Đàm phán Mức lương & Phúc lợi Khi Nhận Việc',
+    sourceStyle: 'British Council • Career Negotiation',
+    transcript:
+      'We are delighted to offer you the Senior Analyst position with a starting salary of two thousand dollars per month. Thank you very much for the offer! Given my five years of relevant experience and analytics certification, would there be flexibility to adjust the base salary to two thousand three hundred dollars, or include a quarterly performance bonus?',
+    translation:
+      'Chúng tôi rất vui được mời bạn vào vị trí Chuyên viên Phân tích Cấp cao với mức lương khởi điểm 2.000 đô la mỗi tháng. Cảm ơn quý công ty rất nhiều vì lời mời! Với 5 năm kinh nghiệm liên quan và chứng chỉ phân tích dữ liệu, công ty có thể linh hoạt điều chỉnh lương cơ bản lên 2.300 đô la hoặc bổ sung thưởng hiệu suất hàng quý không ạ?',
+    keyPhrases: [
+      { en: 'starting salary', vi: 'mức lương khởi điểm' },
+      { en: 'relevant experience', vi: 'kinh nghiệm liên quan' },
+      { en: 'performance bonus', vi: 'thưởng theo hiệu suất' },
+    ],
+    question: {
+      q: 'How does the candidate support the salary request?',
+      options: ['By mentioning five years of experience', 'By refusing the offer immediately', 'By asking for extra vacation'],
+      correctIdx: 0,
+    },
+  },
+  {
+    id: 'lr-40',
+    level: 'B2',
+    category: 'Bài đọc cơ bản',
+    title: 'Bài 40: Kỹ năng Giao tiếp Thuyết phục Đa văn hóa',
+    sourceStyle: 'BBC & VOA • Global Communication',
+    transcript:
+      'Working in an international team requires more than just accurate grammar. Cultural awareness plays a vital role in building mutual respect. For instance, while direct feedback is appreciated in some countries, softer diplomatic phrasing works better in others. Listening attentively and asking clarifying questions prevents costly misunderstandings.',
+    translation:
+      'Làm việc trong một đội ngũ quốc tế đòi hỏi nhiều hơn là chỉ đúng ngữ pháp. Sự thấu hiểu văn hóa đóng vai trò thiết yếu trong việc xây dựng sự tôn trọng lẫn nhau. Ví dụ, trong khi góp ý thẳng thắn được đánh giá cao ở một số nước, cách diễn đạt khéo léo mềm mỏng lại hiệu quả hơn ở nơi khác. Lắng nghe chăm chú và đặt câu hỏi làm rõ giúp tránh những hiểu lầm tốn kém.',
+    keyPhrases: [
+      { en: 'cultural awareness', vi: 'nhận thức đa văn hóa' },
+      { en: 'diplomatic phrasing', vi: 'cách diễn đạt khéo léo' },
+      { en: 'clarifying questions', vi: 'câu hỏi làm rõ' },
+    ],
+    question: {
+      q: 'What prevents costly misunderstandings in international teams?',
+      options: ['Speaking as fast as possible', 'Listening attentively and asking clarifying questions', 'Avoiding all feedback'],
+      correctIdx: 1,
+    },
+  },
 ];

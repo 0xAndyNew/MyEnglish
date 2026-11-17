@@ -921,4 +921,160 @@ export const ROLEPLAY_SCENARIOS: RoleplayScenario[] = [
       },
     ],
   },
+  {
+    id: 'rp-hotel',
+    title: 'Nhận Phòng Khách Sạn Du Lịch',
+    level: 'A2',
+    context: 'Bạn vừa tới quầy lễ tân khách sạn sau chuyến bay và muốn làm thủ tục check-in.',
+    turns: [
+      {
+        speaker: 'AI',
+        en: 'Good evening! Welcome to Ocean View Hotel. Do you have a reservation?',
+        ipa: '',
+        vi: 'Chào buổi tối! Chào mừng tới khách sạn Ocean View. Quý khách đã đặt phòng trước chưa ạ?',
+        suggestedReplies: [
+          { en: 'Yes, I have a reservation under the name Minh Nguyen for three nights.', ipa: '', vi: 'Vâng, tôi có đặt phòng dưới tên Minh Nguyễn trong 3 đêm.' },
+        ],
+      },
+      {
+        speaker: 'AI',
+        en: 'Thank you. Here is your key card for room 405. Breakfast is served from 6:30 to 9:30.',
+        ipa: '',
+        vi: 'Cảm ơn quý khách. Đây là thẻ phòng 405. Bữa sáng phục vụ từ 6:30 đến 9:30.',
+        suggestedReplies: [
+          { en: 'Thank you! Could you also tell me the Wi-Fi password, please?', ipa: '', vi: 'Cảm ơn! Bạn cho mình xin mật khẩu Wi-Fi nhé?' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rp-directions',
+    title: 'Hỏi Đường & Bắt Xe Công Cộng',
+    level: 'A2',
+    context: 'Bạn đang đứng ở trung tâm thành phố và muốn hỏi người bản xứ đường tới ga tàu.',
+    turns: [
+      {
+        speaker: 'AI',
+        en: 'Hi there! You look a bit lost. Can I help you find somewhere?',
+        ipa: '',
+        vi: 'Chào bạn! Trông bạn có vẻ đang lạc đường. Tôi có thể giúp tìm chỗ nào không?',
+        suggestedReplies: [
+          { en: 'Excuse me, could you show me the way to the central train station?', ipa: '', vi: 'Xin lỗi, bạn có thể chỉ cho tôi đường ra ga tàu trung tâm không?' },
+        ],
+      },
+      {
+        speaker: 'AI',
+        en: 'Sure! Go straight two blocks and turn right at the traffic light. It takes five minutes on foot.',
+        ipa: '',
+        vi: 'Chắc chắn rồi! Đi thẳng 2 dãy nhà rồi rẽ phải ở đèn giao thông. Đi bộ mất 5 phút.',
+        suggestedReplies: [
+          { en: 'Five minutes on foot? That is very close. Thank you so much!', ipa: '', vi: 'Đi bộ 5 phút thôi à? Rất gần. Cảm ơn bạn nhiều lắm!' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rp-shopping',
+    title: 'Mua Sắm Quần Áo & Đổi Cỡ',
+    level: 'A2',
+    context: 'Bạn đang chọn áo khoác tại một cửa hàng thời trang và cần thử cỡ phù hợp.',
+    turns: [
+      {
+        speaker: 'AI',
+        en: 'Hello! Let me know if you need any help or a different size.',
+        ipa: '',
+        vi: 'Xin chào! Hãy báo mình nếu bạn cần hỗ trợ hoặc tìm cỡ khác nhé.',
+        suggestedReplies: [
+          { en: 'How much is this blue jacket, and do you have it in a medium size?', ipa: '', vi: 'Chiếc áo khoác xanh này giá bao nhiêu và có cỡ vừa (M) không ạ?' },
+        ],
+      },
+      {
+        speaker: 'AI',
+        en: 'It is forty-five dollars. Yes, here is a medium! The fitting room is on the left.',
+        ipa: '',
+        vi: 'Áo giá 45 đô la. Vâng, đây là cỡ vừa! Phòng thử đồ ở bên tay trái nhé.',
+        suggestedReplies: [
+          { en: 'It fits great! I will take it and pay by card, please.', ipa: '', vi: 'Mặc rất vừa! Tôi lấy chiếc này và thanh toán bằng thẻ nhé.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rp-clinic',
+    title: 'Khám Sức Khỏe Tại Phòng Khám',
+    level: 'B1',
+    context: 'Bạn bị cảm nhẹ và đang trao đổi triệu chứng với bác sĩ hoặc dược sĩ.',
+    turns: [
+      {
+        speaker: 'AI',
+        en: 'Good afternoon. What seems to be the problem today?',
+        ipa: '',
+        vi: 'Chào buổi chiều. Hôm nay bạn gặp vấn đề sức khỏe gì vậy?',
+        suggestedReplies: [
+          { en: 'I have had a sore throat and a mild headache since yesterday morning.', ipa: '', vi: 'Tôi bị đau họng và đau đầu nhẹ từ sáng hôm qua ạ.' },
+        ],
+      },
+      {
+        speaker: 'AI',
+        en: 'Do you have any allergies to medicine? Take one tablet every eight hours after meals.',
+        ipa: '',
+        vi: 'Bạn có bị dị ứng thuốc gì không? Hãy uống 1 viên mỗi 8 tiếng sau bữa ăn nhé.',
+        suggestedReplies: [
+          { en: 'No allergies at all. Thank you, doctor. I will rest and drink warm water.', ipa: '', vi: 'Tôi không dị ứng gì ạ. Cảm ơn bác sĩ, tôi sẽ nghỉ ngơi và uống nước ấm.' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rp-meeting',
+    title: 'Họp Cập Nhật Tiến Độ Dự Án',
+    level: 'B1',
+    context: 'Bạn đang báo cáo tiến độ công việc trong cuộc họp nhóm buổi sáng bằng tiếng Anh.',
+    turns: [
+      {
+        speaker: 'AI',
+        en: 'Good morning! Could you give us a quick update on your team progress?',
+        ipa: '',
+        vi: 'Chào buổi sáng! Bạn có thể cập nhật nhanh tiến độ nhóm của bạn không?',
+        suggestedReplies: [
+          { en: 'Sure! We have finished the first stage on schedule and are testing the new features.', ipa: '', vi: 'Chắc chắn rồi! Chúng tôi đã hoàn thành giai đoạn 1 đúng tiến độ và đang kiểm thử tính năng mới.' },
+        ],
+      },
+      {
+        speaker: 'AI',
+        en: 'Awesome work. Are there any blockers or things you need help with?',
+        ipa: '',
+        vi: 'Làm tốt lắm. Có vướng mắc nào cần mọi người hỗ trợ không?',
+        suggestedReplies: [
+          { en: 'Could we reschedule our client review meeting to tomorrow morning at ten?', ipa: '', vi: 'Chúng ta có thể dời lịch họp review với khách sang 10 giờ sáng mai được không?' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'rp-support',
+    title: 'Hỗ Trợ Khách Hàng Qua Điện Thoại',
+    level: 'B2',
+    context: 'Bạn là nhân viên CSKH xử lý khiếu nại đơn hàng giao chậm cho khách hàng.',
+    turns: [
+      {
+        speaker: 'AI',
+        en: 'Hi, I placed an order five days ago, and I still have not received my package.',
+        ipa: '',
+        vi: 'Chào bạn, tôi đặt hàng cách đây 5 ngày rồi mà vẫn chưa nhận được kiện hàng.',
+        suggestedReplies: [
+          { en: 'I sincerely apologize for the delay. Could you share your order number so I can check right away?', ipa: '', vi: 'Tôi thành thật xin lỗi vì sự chậm trễ. Bạn cho tôi xin mã đơn hàng để kiểm tra ngay nhé?' },
+        ],
+      },
+      {
+        speaker: 'AI',
+        en: 'Sure, it is order #8821. I really need it before Friday.',
+        ipa: '',
+        vi: 'Mã đơn là #8821. Tôi rất cần nhận được trước thứ Sáu.',
+        suggestedReplies: [
+          { en: 'I have upgraded your shipping to express delivery at no extra cost, and you will receive a voucher.', ipa: '', vi: 'Tôi đã nâng cấp đơn sang giao nhanh miễn phí và gửi tặng bạn một mã giảm giá ạ.' },
+        ],
+      },
+    ],
+  },
 ];

@@ -34,6 +34,8 @@ import { WordAnatomyCard } from './WordAnatomyCard';
 interface ListeningSpeakingLabProps {
   accent: AccentMode;
   geminiApiKey?: string;
+  extraLessons?: ListeningReadingLesson[];
+  extraScenarios?: RoleplayScenario[];
   savedWords: WordEntry[];
   onSaveWord: (word: WordEntry) => void;
   onPronunciationScore: (score: number) => void;
@@ -58,11 +60,23 @@ const PRACTICE_SENTENCES = [
   { en: 'Thank you for your patience while we checked the new system.', vi: 'Cảm ơn sự kiên nhẫn của bạn trong lúc chúng tôi kiểm tra hệ thống mới.' },
   { en: 'Clear communication builds trust and opens new opportunities.', vi: 'Giao tiếp rõ ràng xây dựng niềm tin và mở ra nhiều cơ hội mới.' },
   { en: 'Consistency leads to a major breakthrough in fluency.', vi: 'Sự đều đặn dẫn đến bước đột phá lớn về độ trôi chảy.' },
+  { en: 'Would you like to pay by card or in cash today?', vi: 'Hôm nay bạn muốn thanh toán bằng thẻ hay tiền mặt ạ?' },
+  { en: 'Sorry, I think you are muted. Could you unmute your microphone?', vi: 'Xin lỗi, hình như bạn đang tắt mic. Bạn bật lại micro nhé?' },
+  { en: 'May I exchange this shirt for a larger size, please?', vi: 'Tôi có thể đổi chiếc áo sơ mi này sang cỡ lớn hơn không ạ?' },
+  { en: 'Let me share my screen so we can walk through the project plan.', vi: 'Để tôi chia sẻ màn hình để chúng ta cùng xem kế hoạch dự án.' },
+  { en: 'I sincerely apologize for the delay in delivering your package.', vi: 'Tôi thành thật xin lỗi vì sự chậm trễ trong việc giao kiện hàng của bạn.' },
+  { en: 'What is the purpose of your visit and how long will you stay?', vi: 'Mục đích chuyến đi của bạn là gì và bạn sẽ lưu trú bao lâu?' },
+  { en: 'Please arrive ten minutes early to complete the registration form.', vi: 'Vui lòng đến sớm 10 phút để hoàn tất phiếu đăng ký.' },
+  { en: 'Listening carefully helps prevent unnecessary misunderstandings at work.', vi: 'Lắng nghe kỹ giúp tránh những hiểu lầm không đáng có trong công việc.' },
+  { en: 'Given my five years of experience, could we discuss the salary package?', vi: 'Với 5 năm kinh nghiệm, chúng ta có thể trao đổi thêm về gói lương không?' },
+  { en: 'We look forward to building a successful long-term partnership.', vi: 'Chúng tôi mong muốn xây dựng mối quan hệ hợp tác lâu dài thành công.' },
 ];
 
 export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   accent,
   geminiApiKey,
+  extraLessons = [],
+  extraScenarios = [],
   savedWords,
   onSaveWord,
   onPronunciationScore,
@@ -109,16 +123,16 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   // Tab 3: Roleplay
   const allScenarios = useMemo(
-    () => [...customScenarios, ...ROLEPLAY_SCENARIOS],
-    [customScenarios]
+    () => [...customScenarios, ...extraScenarios, ...ROLEPLAY_SCENARIOS],
+    [customScenarios, extraScenarios]
   );
   const [scenarioIdx, setScenarioIdx] = useState(0);
   const [turnIdx, setTurnIdx] = useState(0);
   const [roleplayFeedback, setRoleplayFeedback] = useState<PronunciationScoreResult | null>(null);
 
   const allLessons = useMemo(
-    () => [...customLessons, ...LISTENING_READING_LESSONS],
-    [customLessons]
+    () => [...customLessons, ...extraLessons, ...LISTENING_READING_LESSONS],
+    [customLessons, extraLessons]
   );
 
   const filteredLessons = useMemo(() => {
@@ -306,8 +320,8 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           {[
             { id: 'listen_read', label: `🎧 Nghe & Đọc Cơ Bản (${allLessons.length} bài)` },
-            { id: 'shadowing', label: '🎙️ Luyện Nói & Chấm Điểm' },
-            { id: 'roleplay', label: '💬 Hội Thoại Tình Huống' },
+            { id: 'shadowing', label: `🎙️ Luyện Nói & Chấm Điểm (${allSentences.length})` },
+            { id: 'roleplay', label: `💬 Hội Thoại Tình Huống (${allScenarios.length})` },
           ].map((t) => (
             <button
               key={t.id}

@@ -16,9 +16,9 @@
 | **B1B** | **44 Âm IPA** | 20 Nguyên âm + 24 Phụ âm & Âm cuối, cặp âm dễ nhầm lẫn, kiểm tra từng cặp IPA. |
 | **B2A** | **Nạp Từ vựng** | 133 bài khóa tuần tự kèm thẻ phân tích giải phẫu từ (tô màu âm tiết, âm câm, Phonics, Mnemonic) & đọc thử chấm điểm. |
 | **B2B** | **Ngữ pháp** | 14 bài ngữ pháp trọng tâm (Danh từ, Động từ, Tính từ, Trạng từ, Mạo từ `a/an/the`, `S+V+O`, 6 Thì, Câu hỏi, Câu nối/Điều kiện) kèm phân tích ví dụ theo màu, bảng so sánh 6 thì trong 1 nháy mắt & **Bài 15 Thi Tổng Hợp**. Hoàn thành B2B sẽ mở khóa toàn bộ các bước thực hành phía sau. |
-| **B2C** | **Lab Ghép Câu (120 bài)** | Kho 120 bài ghép câu từ A1 → B2 lọc theo cấp độ, chủ đề ngữ pháp & số lượng bài tùy chọn (`10 / 20 / 50 / Tất cả`), tự phát âm khi bấm từng thẻ từ. |
-| **B3** | **Luyện Nghe & Nói** | • **30 bài Nghe & Đọc Cơ Bản** (chuẩn chủ đề British Council / VOA / BBC) kèm tốc độ `0.75x / 0.9x / 1.0x`, tra từ trực tiếp trên bài đọc, câu hỏi hiểu bài & **Đọc nhại Shadowing**.<br>• **15+ câu mẫu Luyện Nói** + tự nhập câu + thu âm tự nghe lại.<br>• **Hội thoại tình huống**.<br>• Tích hợp **AI tạo thêm bài nghe, câu nói & hội thoại mới**. |
-| **B4** | **Đọc, Viết & SRS** | • **Luyện Viết Song Ngữ (`Việt ↔ Anh`)**: 16 bài mẫu đa dạng công việc + AI tạo đề theo nghề nghiệp + chấm điểm 0–100 (Offline & Gemini AI).<br>• **Đọc & Quét ảnh OCR (`Tesseract.js`)**: Quét ảnh sách/tài liệu tiếng Anh để dịch & tra từ.<br>• **Kho 980+ Từ Cốt Lõi** & **Ôn tập SRS (1-3-7-30 ngày)**. |
+| **B2C** | **Lab Ghép Câu (160 bài)** | Kho **160 bài ghép câu** từ A1 → B2 lọc theo cấp độ, chủ đề ngữ pháp & số lượng bài tùy chọn (`10 / 20 / 50 / Tất cả`), tự phát âm khi bấm từng thẻ từ. |
+| **B3** | **Luyện Nghe & Nói** | • **40 bài Nghe & Đọc Cơ Bản** (chuẩn chủ đề British Council / VOA / BBC) kèm tốc độ `0.75x / 0.9x / 1.0x`, tra từ trực tiếp trên bài đọc, câu hỏi hiểu bài & **Đọc nhại Shadowing**.<br>• **25+ câu mẫu Luyện Nói** + tự nhập câu + thu âm tự nghe lại.<br>• **8+ kịch bản Hội thoại tình huống**.<br>• Tích hợp **AI tạo thêm bài nghe, câu nói & hội thoại mới**. |
+| **B4** | **Đọc, Viết & SRS** | • **Luyện Viết Song Ngữ (`Việt ↔ Anh`)**: **24 bài mẫu** đa dạng công việc + AI tạo đề theo nghề nghiệp + chấm điểm 0–100 (Offline & Gemini AI).<br>• **Đọc & Quét ảnh OCR (`Tesseract.js`)**: Quét ảnh sách/tài liệu tiếng Anh để dịch & tra từ.<br>• **Kho 980+ Từ Cốt Lõi** & **Ôn tập SRS (1-3-7-30 ngày)**. |
 
 ---
 
@@ -29,6 +29,7 @@
 - **Mục Quản trị Admin (`admin`)**:
   - Bật/tắt chế độ Dev mở khóa nhanh để kiểm tra bài học.
   - Cấu hình & kiểm tra kết nối **Gemini API Key** lưu trực tiếp trong SQLite Server (`app_settings`) và gọi qua proxy `/api/ai/generate` (trình duyệt học viên không bao giờ thấy được API Key).
+  - Thêm mới & quản lý trực tiếp các bài **Ghép câu, Nghe & Đọc, Hội thoại, Viết song ngữ** lưu trong bảng `custom_lessons` của SQLite (hỗ trợ cả **AI Soạn Nhanh**).
   - Quản lý danh sách tài khoản trong SQLite: Reset tiến độ học, Reset mật khẩu (`123456`) hoặc Xóa tài khoản thường.
 
 ---
