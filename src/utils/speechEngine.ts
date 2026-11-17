@@ -238,7 +238,7 @@ export function startSpeechRecognition(
 
     const res = event.results?.[0];
     const transcript = res?.[0]?.transcript || '';
-    if (res && !res.isFinal) {
+    if (recognition.interimResults && res && res.isFinal === false) {
       options?.onInterim?.(transcript);
       return;
     }

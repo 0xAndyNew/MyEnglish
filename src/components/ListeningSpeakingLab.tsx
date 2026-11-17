@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { LISTENING_READING_LESSONS, ListeningReadingLesson } from '../data/listeningReadingLessons';
 import { ROLEPLAY_SCENARIOS } from '../data/curriculumData';
-import { AccentMode, RoleplayScenario, WordEntry } from '../types/learning';
+import { AccentMode, CefrLevel, RoleplayScenario, WordEntry } from '../types/learning';
 import { analyzeWordFull } from '../utils/wordAnalyzer';
 import { callGeminiText } from '../utils/geminiClient';
 import {
@@ -46,32 +46,47 @@ interface ListeningSpeakingLabProps {
   onUnlockNext?: () => void;
 }
 
-const PRACTICE_SENTENCES = [
-  { en: 'Hello, my name is Minh and I am learning English every day.', vi: 'Xin chào, tên tôi là Minh và tôi đang học tiếng Anh mỗi ngày.' },
-  { en: 'Could you please speak a little bit more slowly?', vi: 'Bạn có thể nói chậm hơn một chút được không?' },
-  { en: 'I would like a medium iced coffee and a cheese sandwich, please.', vi: 'Cho tôi một ly cà phê đá cỡ vừa và một bánh mì kẹp phô mai.' },
-  { en: 'Excuse me, could you show me the way to the train station?', vi: 'Xin lỗi, bạn có thể chỉ cho tôi đường ra ga tàu không?' },
-  { en: 'How much is this blue jacket, and do you have a medium size?', vi: 'Chiếc áo khoác xanh này bao nhiêu tiền và bạn có cỡ vừa không?' },
-  { en: 'I have a reservation under the name Tuan Nguyen for three nights.', vi: 'Tôi có đặt phòng dưới tên Tuấn Nguyễn trong 3 đêm.' },
-  { en: 'I have had a sore throat and a mild headache since yesterday.', vi: 'Tôi bị đau họng và đau đầu nhẹ từ hôm qua.' },
-  { en: 'I need more information about the flight schedule and departure gate.', vi: 'Tôi cần thêm thông tin về lịch trình chuyến bay và cổng khởi hành.' },
-  { en: 'Could we reschedule our meeting to tomorrow morning at ten AM?', vi: 'Chúng ta có thể dời lịch họp sang 10 giờ sáng mai được không?' },
-  { en: 'We have finished the first stage on schedule and are ready for review.', vi: 'Chúng tôi đã hoàn thành giai đoạn đầu đúng tiến độ và sẵn sàng kiểm tra.' },
-  { en: 'I worked as a customer support specialist for three years.', vi: 'Tôi đã làm chuyên viên hỗ trợ khách hàng trong 3 năm.' },
-  { en: 'My greatest strength is communicating clearly under high pressure.', vi: 'Điểm mạnh lớn nhất của tôi là giao tiếp rõ ràng dưới áp lực cao.' },
-  { en: 'Thank you for your patience while we checked the new system.', vi: 'Cảm ơn sự kiên nhẫn của bạn trong lúc chúng tôi kiểm tra hệ thống mới.' },
-  { en: 'Clear communication builds trust and opens new opportunities.', vi: 'Giao tiếp rõ ràng xây dựng niềm tin và mở ra nhiều cơ hội mới.' },
-  { en: 'Consistency leads to a major breakthrough in fluency.', vi: 'Sự đều đặn dẫn đến bước đột phá lớn về độ trôi chảy.' },
-  { en: 'Would you like to pay by card or in cash today?', vi: 'Hôm nay bạn muốn thanh toán bằng thẻ hay tiền mặt ạ?' },
-  { en: 'Sorry, I think you are muted. Could you unmute your microphone?', vi: 'Xin lỗi, hình như bạn đang tắt mic. Bạn bật lại micro nhé?' },
-  { en: 'May I exchange this shirt for a larger size, please?', vi: 'Tôi có thể đổi chiếc áo sơ mi này sang cỡ lớn hơn không ạ?' },
-  { en: 'Let me share my screen so we can walk through the project plan.', vi: 'Để tôi chia sẻ màn hình để chúng ta cùng xem kế hoạch dự án.' },
-  { en: 'I sincerely apologize for the delay in delivering your package.', vi: 'Tôi thành thật xin lỗi vì sự chậm trễ trong việc giao kiện hàng của bạn.' },
-  { en: 'What is the purpose of your visit and how long will you stay?', vi: 'Mục đích chuyến đi của bạn là gì và bạn sẽ lưu trú bao lâu?' },
-  { en: 'Please arrive ten minutes early to complete the registration form.', vi: 'Vui lòng đến sớm 10 phút để hoàn tất phiếu đăng ký.' },
-  { en: 'Listening carefully helps prevent unnecessary misunderstandings at work.', vi: 'Lắng nghe kỹ giúp tránh những hiểu lầm không đáng có trong công việc.' },
-  { en: 'Given my five years of experience, could we discuss the salary package?', vi: 'Với 5 năm kinh nghiệm, chúng ta có thể trao đổi thêm về gói lương không?' },
-  { en: 'We look forward to building a successful long-term partnership.', vi: 'Chúng tôi mong muốn xây dựng mối quan hệ hợp tác lâu dài thành công.' },
+interface SpeakingPracticeItem {
+  id: string;
+  level: CefrLevel;
+  topic: string;
+  en: string;
+  vi: string;
+}
+
+const SPEAKING_TOPICS = [
+  'Tất cả',
+  'Giao tiếp cơ bản',
+  'Đời sống & Du lịch',
+  'Công việc & Phỏng vấn',
+] as const;
+
+const PRACTICE_SENTENCES: SpeakingPracticeItem[] = [
+  { id: 'sp-1', level: 'A1', topic: 'Giao tiếp cơ bản', en: 'Hello, my name is Minh and I am learning English every day.', vi: 'Xin chào, tên tôi là Minh và tôi đang học tiếng Anh mỗi ngày.' },
+  { id: 'sp-2', level: 'A1', topic: 'Giao tiếp cơ bản', en: 'Could you please speak a little bit more slowly?', vi: 'Bạn có thể nói chậm hơn một chút được không?' },
+  { id: 'sp-3', level: 'A1', topic: 'Đời sống & Du lịch', en: 'I would like a medium iced coffee and a cheese sandwich, please.', vi: 'Cho tôi một ly cà phê đá cỡ vừa và một bánh mì kẹp phô mai.' },
+  { id: 'sp-4', level: 'A2', topic: 'Đời sống & Du lịch', en: 'Excuse me, could you show me the way to the train station?', vi: 'Xin lỗi, bạn có thể chỉ cho tôi đường ra ga tàu không?' },
+  { id: 'sp-5', level: 'A2', topic: 'Đời sống & Du lịch', en: 'How much is this blue jacket, and do you have a medium size?', vi: 'Chiếc áo khoác xanh này bao nhiêu tiền và bạn có cỡ vừa không?' },
+  { id: 'sp-6', level: 'A2', topic: 'Đời sống & Du lịch', en: 'I have a reservation under the name Tuan Nguyen for three nights.', vi: 'Tôi có đặt phòng dưới tên Tuấn Nguyễn trong 3 đêm.' },
+  { id: 'sp-7', level: 'A2', topic: 'Đời sống & Du lịch', en: 'I have had a sore throat and a mild headache since yesterday.', vi: 'Tôi bị đau họng và đau đầu nhẹ từ hôm qua.' },
+  { id: 'sp-8', level: 'A2', topic: 'Đời sống & Du lịch', en: 'I need more information about the flight schedule and departure gate.', vi: 'Tôi cần thêm thông tin về lịch trình chuyến bay và cổng khởi hành.' },
+  { id: 'sp-9', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Could we reschedule our meeting to tomorrow morning at ten AM?', vi: 'Chúng ta có thể dời lịch họp sang 10 giờ sáng mai được không?' },
+  { id: 'sp-10', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'We have finished the first stage on schedule and are ready for review.', vi: 'Chúng tôi đã hoàn thành giai đoạn đầu đúng tiến độ và sẵn sàng kiểm tra.' },
+  { id: 'sp-11', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'I worked as a customer support specialist for three years.', vi: 'Tôi đã làm chuyên viên hỗ trợ khách hàng trong 3 năm.' },
+  { id: 'sp-12', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'My greatest strength is communicating clearly under high pressure.', vi: 'Điểm mạnh lớn nhất của tôi là giao tiếp rõ ràng dưới áp lực cao.' },
+  { id: 'sp-13', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Thank you for your patience while we checked the new system.', vi: 'Cảm ơn sự kiên nhẫn của bạn trong lúc chúng tôi kiểm tra hệ thống mới.' },
+  { id: 'sp-14', level: 'B1', topic: 'Giao tiếp cơ bản', en: 'Clear communication builds trust and opens new opportunities.', vi: 'Giao tiếp rõ ràng xây dựng niềm tin và mở ra nhiều cơ hội mới.' },
+  { id: 'sp-15', level: 'B2', topic: 'Giao tiếp cơ bản', en: 'Consistency leads to a major breakthrough in fluency.', vi: 'Sự đều đặn dẫn đến bước đột phá lớn về độ trôi chảy.' },
+  { id: 'sp-16', level: 'A2', topic: 'Đời sống & Du lịch', en: 'Would you like to pay by card or in cash today?', vi: 'Hôm nay bạn muốn thanh toán bằng thẻ hay tiền mặt ạ?' },
+  { id: 'sp-17', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Sorry, I think you are muted. Could you unmute your microphone?', vi: 'Xin lỗi, hình như bạn đang tắt mic. Bạn bật lại micro nhé?' },
+  { id: 'sp-18', level: 'A2', topic: 'Đời sống & Du lịch', en: 'May I exchange this shirt for a larger size, please?', vi: 'Tôi có thể đổi chiếc áo sơ mi này sang cỡ lớn hơn không ạ?' },
+  { id: 'sp-19', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Let me share my screen so we can walk through the project plan.', vi: 'Để tôi chia sẻ màn hình để chúng ta cùng xem kế hoạch dự án.' },
+  { id: 'sp-20', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'I sincerely apologize for the delay in delivering your package.', vi: 'Tôi thành thật xin lỗi vì sự chậm trễ trong việc giao kiện hàng của bạn.' },
+  { id: 'sp-21', level: 'A2', topic: 'Đời sống & Du lịch', en: 'What is the purpose of your visit and how long will you stay?', vi: 'Mục đích chuyến đi của bạn là gì và bạn sẽ lưu trú bao lâu?' },
+  { id: 'sp-22', level: 'A2', topic: 'Giao tiếp cơ bản', en: 'Please arrive ten minutes early to complete the registration form.', vi: 'Vui lòng đến sớm 10 phút để hoàn tất phiếu đăng ký.' },
+  { id: 'sp-23', level: 'B2', topic: 'Công việc & Phỏng vấn', en: 'Listening carefully helps prevent unnecessary misunderstandings at work.', vi: 'Lắng nghe kỹ giúp tránh những hiểu lầm không đáng có trong công việc.' },
+  { id: 'sp-24', level: 'B2', topic: 'Công việc & Phỏng vấn', en: 'Given my five years of experience, could we discuss the salary package?', vi: 'Với 5 năm kinh nghiệm, chúng ta có thể trao đổi thêm về gói lương không?' },
+  { id: 'sp-25', level: 'B2', topic: 'Công việc & Phỏng vấn', en: 'We look forward to building a successful long-term partnership.', vi: 'Chúng tôi mong muốn xây dựng mối quan hệ hợp tác lâu dài thành công.' },
 ];
 
 export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
@@ -90,7 +105,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   // AI generated custom items
   const [customLessons, setCustomLessons] = useState<ListeningReadingLesson[]>([]);
-  const [customSentences, setCustomSentences] = useState<{ en: string; vi: string }[]>([]);
+  const [customSentences, setCustomSentences] = useState<SpeakingPracticeItem[]>([]);
   const [customScenarios, setCustomScenarios] = useState<RoleplayScenario[]>([]);
   const [aiTopicInput, setAiTopicInput] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -126,14 +141,27 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   const [recordingSelf, setRecordingSelf] = useState(false);
   const [selfAudioUrl, setSelfAudioUrl] = useState<string | null>(null);
 
-  // Tab 2: Standalone Speaking sentences
+  // Tab 2: Standalone Speaking sentences (Focus Mode 1-by-1)
   const allSentences = useMemo(
     () => [...customSentences, ...PRACTICE_SENTENCES],
     [customSentences]
   );
-  const [targetSentence, setTargetSentence] = useState(PRACTICE_SENTENCES[0].en);
+  const [speakingTopicFilter, setSpeakingTopicFilter] = useState<string>('Tất cả');
+  const [speakingStatusFilter, setSpeakingStatusFilter] = useState<'ALL' | 'passed' | 'need_fix' | 'todo'>('ALL');
+  const [speakingIdx, setSpeakingIdx] = useState(0);
+  const [customPracticeText, setCustomPracticeText] = useState<string | null>(null);
   const [sentenceScores, setSentenceScores] = useState<Record<string, number>>({});
   const [customInput, setCustomInput] = useState('');
+
+  const filteredSpeakingList = useMemo(() => {
+    if (speakingTopicFilter === 'Tất cả') return allSentences;
+    const matched = allSentences.filter((item) => item.topic === speakingTopicFilter);
+    return matched.length > 0 ? matched : allSentences;
+  }, [allSentences, speakingTopicFilter]);
+
+  const safeSpeakingIdx = speakingIdx % Math.max(1, filteredSpeakingList.length);
+  const currentSpeakingItem = filteredSpeakingList[safeSpeakingIdx] || allSentences[0];
+  const activeTargetSentence = customPracticeText ?? currentSpeakingItem.en;
 
   useEffect(() => {
     return () => {
@@ -277,6 +305,17 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     }
   };
 
+  const selectSpeakingLesson = (idx: number) => {
+    window.speechSynthesis?.cancel();
+    stopActiveMic();
+    const len = Math.max(1, filteredSpeakingList.length);
+    setSpeakingIdx(((idx % len) + len) % len);
+    setCustomPracticeText(null);
+    setScoreResult(null);
+    setSpeechError(null);
+    setSelfAudioUrl(null);
+  };
+
   const runMicCheck = (expectedText: string, onSuccess?: (res: PronunciationScoreResult) => void) => {
     if (!isSpeechRecognitionSupported()) {
       setSpeechError('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome hoặc Edge.');
@@ -295,11 +334,13 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
           onSuccess(res);
         } else {
           setScoreResult(res);
-          if (expectedText === targetSentence) {
-            setSentenceScores((prev) => ({
-              ...prev,
-              [expectedText]: Math.max(prev[expectedText] ?? 0, res.score),
-            }));
+          const prevBest = sentenceScores[expectedText];
+          setSentenceScores((prev) => ({
+            ...prev,
+            [expectedText]: Math.max(prev[expectedText] ?? 0, res.score),
+          }));
+          if (res.score >= 80 && (prevBest === undefined || prevBest < 80)) {
+            onAddXp(15);
           }
         }
         onPronunciationScore(res.score);
@@ -379,11 +420,23 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
       `Tạo 3 câu tiếng Anh thực tế để luyện nói theo chủ đề "${topic}" (trình độ A2-B1). Trả về mảng JSON thuần: [{"en":"English sentence","vi":"Nghĩa tiếng Việt"}]`
     );
     if (!Array.isArray(parsed) || parsed.length === 0) return;
-    const valid = parsed.filter((x) => x?.en && x?.vi);
+    const now = Date.now();
+    const valid: SpeakingPracticeItem[] = parsed
+      .filter((x) => x?.en && x?.vi)
+      .map((x, idx) => ({
+        id: `ai-sp-${now}-${idx}`,
+        level: 'B1',
+        topic: 'Giao tiếp cơ bản',
+        en: String(x.en).trim(),
+        vi: String(x.vi).trim(),
+      }));
     if (valid.length === 0) return;
     setCustomSentences((prev) => [...valid, ...prev]);
-    setTargetSentence(valid[0].en);
+    setSpeakingTopicFilter('Tất cả');
+    setSpeakingIdx(0);
+    setCustomPracticeText(null);
     setScoreResult(null);
+    setSpeechError(null);
     setAiTopicInput('');
   };
 
@@ -896,138 +949,334 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
         </div>
       )}
 
-      {/* TAB 2: STANDALONE SHADOWING & MIC SCORING */}
+      {/* TAB 2: STANDALONE SHADOWING & MIC SCORING (1-BY-1 FOCUS MODE) */}
       {subTab === 'shadowing' && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
-          {/* AI Create Speaking Sentences Bar */}
-          <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 space-y-2">
-            <div className="flex flex-wrap gap-2">
-              <input
-                value={aiTopicInput}
-                onChange={(e) => setAiTopicInput(e.target.value)}
-                placeholder="Nhập công việc / tình huống để AI tạo thêm câu luyện nói (vd: Kế toán, Y tá, Bán hàng)..."
-                className="w-full sm:flex-1 sm:min-w-[220px] px-3 py-1.5 rounded-xl border border-purple-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-              />
-              <button
-                onClick={handleAiCreateSentences}
-                disabled={aiGenerating}
-                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {aiGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlusCircle className="w-3.5 h-3.5" />}
-                ✨ AI Tạo Câu Nói Mới
-              </button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Left Main Column: Single-Sentence Practice & Grading Studio */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-5">
+              {/* Top Meta + Score Status */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {customPracticeText ? (
+                    <>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
+                        Câu tự nhập tùy chỉnh
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCustomPracticeText(null)}
+                        className="text-xs font-bold text-indigo-600 hover:underline"
+                      >
+                        ← Quay lại Bài {safeSpeakingIdx + 1}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
+                        Bài {safeSpeakingIdx + 1}/{filteredSpeakingList.length} • Cấp {currentSpeakingItem.level}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {currentSpeakingItem.topic}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {sentenceScores[activeTargetSentence] !== undefined ? (
+                  <span
+                    className={`px-2.5 py-1 rounded-xl text-xs font-black border ${
+                      sentenceScores[activeTargetSentence] >= 80
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : sentenceScores[activeTargetSentence] >= 55
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
+                    }`}
+                  >
+                    {sentenceScores[activeTargetSentence] >= 80 ? '✓ Đạt chuẩn: ' : 'Điểm cao nhất: '}
+                    {sentenceScores[activeTargetSentence]}/100
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                    Chưa luyện nói bài này
+                  </span>
+                )}
+              </div>
+
+              {/* Single Focused Prompt */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-3">
+                <div className="text-lg sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
+                  "{activeTargetSentence}"
+                </div>
+                {!customPracticeText && (
+                  <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+                    <strong>Nghĩa:</strong> {currentSpeakingItem.vi}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    onClick={() => speakText(activeTargetSentence, accent, 0.8)}
+                    className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5 hover:border-indigo-400"
+                  >
+                    <Turtle className="w-4 h-4 text-indigo-500" /> Nghe chậm (0.8x)
+                  </button>
+                  <button
+                    onClick={() => speakText(activeTargetSentence, accent, 1.0)}
+                    className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5 hover:border-indigo-400"
+                  >
+                    <Volume2 className="w-4 h-4 text-indigo-500" /> Nghe chuẩn (1.0x)
+                  </button>
+                  <button
+                    onClick={() => runMicCheck(activeTargetSentence)}
+                    disabled={isListening}
+                    className={`px-5 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 ${
+                      isListening ? 'bg-rose-500 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
+                    }`}
+                  >
+                    <Mic className="w-4 h-4" /> {isListening ? 'Đang nghe...' : 'Bấm Mic & Đọc to'}
+                  </button>
+                  <button
+                    onClick={handleRecordSelf}
+                    disabled={recordingSelf}
+                    className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold inline-flex items-center gap-1.5"
+                  >
+                    <Mic className="w-4 h-4" /> {recordingSelf ? 'Đang ghi 4s...' : 'Thu âm tự nghe lại'}
+                  </button>
+                  {selfAudioUrl && (
+                    <button
+                      onClick={() => new Audio(selfAudioUrl).play()}
+                      className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-300 text-indigo-700 text-xs font-bold inline-flex items-center gap-1.5"
+                    >
+                      <Volume2 className="w-4 h-4" /> Nghe lại giọng bạn
+                    </button>
+                  )}
+                </div>
+
+                {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
+                {scoreResult && (
+                  <PronunciationReportCard
+                    result={scoreResult}
+                    accent={accent}
+                    title={`Chấm điểm Bài ${safeSpeakingIdx + 1} từng chữ`}
+                    onRetry={() => runMicCheck(activeTargetSentence)}
+                  />
+                )}
+              </div>
+
+              {/* Prev / Next Lesson Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => selectSpeakingLesson(safeSpeakingIdx - 1)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 hover:border-indigo-400"
+                >
+                  ← Bài trước
+                </button>
+                <span className="text-xs font-bold text-slate-500">
+                  Bài {safeSpeakingIdx + 1} / {filteredSpeakingList.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => selectSpeakingLesson(safeSpeakingIdx + 1)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-700 hover:bg-indigo-600 text-white text-xs sm:text-sm font-bold transition"
+                >
+                  Bài tiếp theo →
+                </button>
+              </div>
             </div>
-            {aiGenError && <p className="text-xs text-rose-600 font-semibold">{aiGenError}</p>}
+
+            {/* Compact Custom Sentence & AI Generator below main lesson */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  placeholder="Hoặc tự nhập một câu tiếng Anh bất kỳ để luyện đọc ngay..."
+                  className="w-full sm:flex-1 sm:min-w-[220px] px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customInput.trim()) {
+                      setCustomPracticeText(customInput.trim());
+                      setScoreResult(null);
+                      setSpeechError(null);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold"
+                >
+                  Dùng câu này
+                </button>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    value={aiTopicInput}
+                    onChange={(e) => setAiTopicInput(e.target.value)}
+                    placeholder="Nhập công việc / tình huống để AI tạo thêm câu luyện nói (vd: Kế toán, Y tá, Bán hàng)..."
+                    className="w-full sm:flex-1 sm:min-w-[220px] px-3 py-1.5 rounded-xl border border-purple-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAiCreateSentences}
+                    disabled={aiGenerating}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {aiGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlusCircle className="w-3.5 h-3.5" />}
+                    ✨ AI Tạo Câu Nói Mới
+                  </button>
+                </div>
+                {aiGenError && <p className="text-xs text-rose-600 font-semibold">{aiGenError}</p>}
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {allSentences.map((item, idx) => {
-              const best = sentenceScores[item.en];
+          {/* Right Sidebar: Compact Lesson List (Bài 1 .. Bài 25) */}
+          <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 h-fit">
+            {(() => {
+              const passedCount = filteredSpeakingList.filter(
+                (it) => (sentenceScores[it.en] ?? -1) >= 80
+              ).length;
+              const needFixCount = filteredSpeakingList.filter((it) => {
+                const sc = sentenceScores[it.en];
+                return sc !== undefined && sc < 80;
+              }).length;
+              const todoCount = filteredSpeakingList.length - passedCount - needFixCount;
+
               return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setTargetSentence(item.en);
-                    setScoreResult(null);
-                    setSpeechError(null);
-                  }}
-                  className={`text-left p-3 rounded-xl border transition ${
-                    targetSentence === item.en
-                      ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-400'
-                      : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="text-xs font-bold text-slate-900 dark:text-white">{item.en}</div>
-                    {best !== undefined && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-extrabold uppercase text-slate-500">
+                      Danh sách bài luyện nói ({filteredSpeakingList.length})
+                    </h4>
+                    <span className="text-[11px] font-bold text-emerald-600">
+                      ✓ {passedCount}/{filteredSpeakingList.length}
+                    </span>
+                  </div>
+
+                  {/* Summary Pills */}
+                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
+                    <div className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-center">
+                      ✓ Đạt: {passedCount}
+                    </div>
+                    <div className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-center">
+                      ! Sửa: {needFixCount}
+                    </div>
+                    <div className="px-2 py-1 rounded-lg bg-slate-50 text-slate-600 border border-slate-200 text-center">
+                      Chưa: {todoCount}
+                    </div>
+                  </div>
+
+                  {/* Topic filter */}
+                  <div className="flex flex-wrap gap-1">
+                    {SPEAKING_TOPICS.map((tp) => (
+                      <button
+                        key={tp}
+                        type="button"
+                        onClick={() => {
+                          setSpeakingTopicFilter(tp);
+                          selectSpeakingLesson(0);
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
+                          speakingTopicFilter === tp
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                        }`}
+                      >
+                        {tp}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Status filter */}
+                  <div className="flex flex-wrap gap-1 text-[11px] font-bold pt-1 border-t border-slate-100 dark:border-slate-800">
+                    {[
+                      { id: 'ALL', label: 'Tất cả bài' },
+                      { id: 'need_fix', label: `Cần sửa (${needFixCount})` },
+                      { id: 'passed', label: `✓ Đạt (${passedCount})` },
+                      { id: 'todo', label: `Chưa đọc (${todoCount})` },
+                    ].map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => setSpeakingStatusFilter(st.id as any)}
+                        className={`px-2 py-1 rounded-lg border transition ${
+                          speakingStatusFilter === st.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {st.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* Compact Scrollable Single-Line Lesson Picker */}
+            <div className="space-y-1.5 max-h-60 lg:max-h-[380px] overflow-y-auto pr-1">
+              {filteredSpeakingList.map((item, idx) => {
+                const sc = sentenceScores[item.en];
+                const isPassed = sc !== undefined && sc >= 80;
+                const isNeedFix = sc !== undefined && sc < 80;
+                if (
+                  (speakingStatusFilter === 'passed' && !isPassed) ||
+                  (speakingStatusFilter === 'need_fix' && !isNeedFix) ||
+                  (speakingStatusFilter === 'todo' && sc !== undefined)
+                ) {
+                  return null;
+                }
+                const active = !customPracticeText && idx === safeSpeakingIdx;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectSpeakingLesson(idx)}
+                    className={`w-full text-left px-3 py-2 rounded-xl border transition flex items-center justify-between gap-2 ${
+                      active
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : isPassed
+                        ? 'bg-emerald-50/70 border-emerald-300 text-slate-800 dark:bg-emerald-950/30 dark:text-slate-100'
+                        : isNeedFix
+                        ? 'bg-rose-50/70 border-rose-300 text-slate-800 dark:bg-rose-950/30 dark:text-slate-100'
+                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-400'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-extrabold flex items-center gap-1.5">
+                        <span>Bài {idx + 1}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded ${
+                            active ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {item.level}
+                        </span>
+                      </div>
+                      <div className={`text-[11px] truncate mt-0.5 ${active ? 'text-indigo-100' : 'text-slate-500'}`}>
+                        {item.en}
+                      </div>
+                    </div>
+                    {sc !== undefined && (
                       <span
                         className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-black ${
-                          best >= 80
+                          active
+                            ? 'bg-white text-indigo-700'
+                            : isPassed
                             ? 'bg-emerald-100 text-emerald-700'
-                            : best >= 55
-                            ? 'bg-amber-100 text-amber-800'
                             : 'bg-rose-100 text-rose-700'
                         }`}
                       >
-                        {best}đ
+                        {isPassed ? `✓ ${sc}đ` : `${sc}đ`}
                       </span>
                     )}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">{item.vi}</div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <input
-              value={customInput}
-              onChange={(e) => setCustomInput(e.target.value)}
-              placeholder="Hoặc tự nhập một câu tiếng Anh bất kỳ để luyện đọc..."
-              className="w-full sm:flex-1 sm:min-w-[220px] px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm"
-            />
-            <button
-              onClick={() => {
-                if (customInput.trim()) {
-                  setTargetSentence(customInput.trim());
-                  setScoreResult(null);
-                }
-              }}
-              className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold"
-            >
-              Dùng câu này
-            </button>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-3">
-            <div className="text-lg font-extrabold text-slate-900 dark:text-white">"{targetSentence}"</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => speakText(targetSentence, accent, 0.8)}
-                className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5"
-              >
-                <Turtle className="w-4 h-4 text-indigo-500" /> Nghe chậm (0.8x)
-              </button>
-              <button
-                onClick={() => speakText(targetSentence, accent, 1.0)}
-                className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5"
-              >
-                <Volume2 className="w-4 h-4 text-indigo-500" /> Nghe chuẩn (1.0x)
-              </button>
-              <button
-                onClick={() => runMicCheck(targetSentence)}
-                disabled={isListening}
-                className={`px-5 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 ${
-                  isListening ? 'bg-rose-500 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
-                }`}
-              >
-                <Mic className="w-4 h-4" /> {isListening ? 'Đang nghe...' : 'Bấm Mic & Đọc to'}
-              </button>
-              <button
-                onClick={handleRecordSelf}
-                disabled={recordingSelf}
-                className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold inline-flex items-center gap-1.5"
-              >
-                <Mic className="w-4 h-4" /> {recordingSelf ? 'Đang ghi 4s...' : 'Thu âm tự nghe lại'}
-              </button>
-              {selfAudioUrl && (
-                <button
-                  onClick={() => new Audio(selfAudioUrl).play()}
-                  className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-300 text-indigo-700 text-xs font-bold inline-flex items-center gap-1.5"
-                >
-                  <Volume2 className="w-4 h-4" /> Nghe lại giọng bạn
-                </button>
-              )}
+                  </button>
+                );
+              })}
             </div>
-            {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
-            {scoreResult && (
-              <PronunciationReportCard
-                result={scoreResult}
-                accent={accent}
-                title="Kết quả chấm phát âm từng chữ"
-                onRetry={() => runMicCheck(targetSentence)}
-              />
-            )}
           </div>
         </div>
       )}
