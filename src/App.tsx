@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Search,
   Flame,
@@ -18,15 +18,15 @@ import {
 import { UserAccount, UserProgress, WordEntry } from './types/learning';
 import {
   addWordToNotebook,
-  getCurrentUser,
+  fetchSessionState,
+  getAuthToken,
   getDefaultProgress,
-  getGlobalApiKey,
   isDevAccount,
-  loadProgress,
   logoutAccount,
-  saveProgress,
+  saveProgressToDb,
   updateSrsCard,
 } from './utils/storage';
+import { setServerHasGeminiKey } from './utils/speechEngine';
 import { analyzeWordFull } from './utils/wordAnalyzer';
 import { AuthScreen } from './components/AuthScreen';
 import { AlphabetFoundation } from './components/AlphabetFoundation';
@@ -53,20 +53,16 @@ const ROADMAP_STEPS = [
 ];
 
 export function App() {
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentUser());
-  const [progress, setProgress] = useState<UserProgress>(() =>
-    loadProgress(getCurrentUser()?.email)
-  );
-  const [activeStepIdx, setActiveStepIdx] = useState<number>(() =>
-    loadProgress(getCurrentUser()?.email).unlockedStepIndex
-  );
+  const [authChecking, setAuthChecking] = useState(() => Boolean(getAuthToken()));
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+  const [progress, setProgress] = useState<UserProgress>(() => getDefaultProgress());
+  const [activeStepIdx, setActiveStepIdx] = useState<number>(0);
   const [darkMode, setDarkMode] = useState(false);
-  const [devUnlockAll, setDevUnlockAll] = useState(() =>
-    isDevAccount(getCurrentUser()?.email)
-  );
-  const [globalApiKey, setGlobalApiKey] = useState(() => getGlobalApiKey());
+  const [devUnlockAll, setDevUnlockAll] = useState(false);
+  const [hasServerApiKey, setHasServerApiKey] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const effectiveApiKey = globalApiKey || progress.geminiApiKey;
+  const effectiveApiKey = hasServerApiKey ? 'SERVER_CONFIGURED' : '';
+  const hydratedEmailRef = useRef<string | null>(null);
 
   // Step 6 (B5) sub-view
   const [step5Sub, setStep5Sub] = useState<'write' | 'read' | 'vocab' | 'srs'>('write');
@@ -78,8 +74,32 @@ export function App() {
   const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (currentUser?.email) {
-      saveProgress(progress, currentUser.email);
+    setServerHasGeminiKey(hasServerApiKey);
+  }, [hasServerApiKey]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const state = await fetchSessionState();
+      if (!active) return;
+      if (state) {
+        hydratedEmailRef.current = state.user.email;
+        setCurrentUser(state.user);
+        setProgress(state.progress);
+        setActiveStepIdx(state.progress.unlockedStepIndex || 0);
+        setDevUnlockAll(state.user.role === 'admin' || isDevAccount(state.user.email));
+        setHasServerApiKey(state.hasApiKey);
+      }
+      setAuthChecking(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.email && hydratedEmailRef.current === currentUser.email) {
+      saveProgressToDb(progress);
     }
   }, [progress, currentUser]);
 
@@ -88,19 +108,25 @@ export function App() {
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
 
-  const handleAuthSuccess = (user: UserAccount) => {
+  const handleAuthSuccess = async (user: UserAccount, loadedProg: UserProgress) => {
+    hydratedEmailRef.current = user.email;
     setCurrentUser(user);
-    const userProg = loadProgress(user.email);
-    setProgress(userProg);
-    setActiveStepIdx(userProg.unlockedStepIndex || 0);
-    setDevUnlockAll(isDevAccount(user.email));
+    setProgress(loadedProg);
+    setActiveStepIdx(loadedProg.unlockedStepIndex || 0);
+    setDevUnlockAll(user.role === 'admin' || isDevAccount(user.email));
     setSearchedWord(null);
+    const state = await fetchSessionState();
+    if (state) {
+      setHasServerApiKey(state.hasApiKey);
+    }
   };
 
-  const handleLogout = () => {
-    logoutAccount();
+  const handleLogout = async () => {
+    hydratedEmailRef.current = null;
+    await logoutAccount();
     setCurrentUser(null);
     setDevUnlockAll(false);
+    setHasServerApiKey(false);
     setSearchedWord(null);
   };
 
@@ -113,6 +139,15 @@ export function App() {
     }));
     setActiveStepIdx(targetIdx);
   };
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 gap-3 text-slate-600 dark:text-slate-300">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <p className="text-sm font-semibold">Đang đồng bộ dữ liệu từ SQLite...</p>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
@@ -547,8 +582,8 @@ export function App() {
         <AdminPanelModal
           isOpen={showAdminModal}
           onClose={() => setShowAdminModal(false)}
-          globalApiKey={globalApiKey}
-          onApiKeyChange={setGlobalApiKey}
+          hasApiKey={hasServerApiKey}
+          onApiKeyStatusChange={setHasServerApiKey}
           currentEmail={currentUser.email}
           onResetCurrentProgress={() => {
             setProgress(getDefaultProgress());

@@ -1,5 +1,9 @@
-# Dependencies & Build outputs
+# Dependencies, DB & Build outputs
 node_modules/
+data/
+*.db
+*.db-wal
+*.db-shm
 dist/
 dist-ssr/
 *.local

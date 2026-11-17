@@ -1,6 +1,10 @@
 import { AccentMode } from '../types/learning';
 import { transcribeAudioWithGemini } from './geminiClient';
-import { getGlobalApiKey } from './storage';
+
+let serverHasGeminiKey = false;
+export function setServerHasGeminiKey(flag: boolean): void {
+  serverHasGeminiKey = flag;
+}
 
 export interface WordMatchResult {
   word: string;
@@ -117,13 +121,11 @@ export function startSpeechRecognition(
   onError: (msg: string) => void,
   onEnd?: () => void
 ): () => void {
-  const apiKey = getGlobalApiKey().trim();
-
   const runGeminiVoiceFallback = async () => {
     try {
       const { blob, mimeType } = await recordAudioClip(4200);
       const base64 = await blobToBase64(blob);
-      const text = await transcribeAudioWithGemini(apiKey, base64, mimeType);
+      const text = await transcribeAudioWithGemini('SERVER', base64, mimeType);
       if (!text) {
         onError('Không nghe thấy giọng nói rõ ràng. Hãy nói to và rõ hơn gần Micro nhé!');
       } else {
@@ -138,7 +140,7 @@ export function startSpeechRecognition(
 
   const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   if (!SpeechRec) {
-    if (apiKey && Boolean(navigator.mediaDevices?.getUserMedia)) {
+    if (serverHasGeminiKey && Boolean(navigator.mediaDevices?.getUserMedia)) {
       runGeminiVoiceFallback();
       return () => {};
     }
@@ -164,13 +166,13 @@ export function startSpeechRecognition(
     } else if (event.error === 'no-speech') {
       onError('Không nghe thấy giọng nói. Hãy nói to và rõ hơn gần Micro nhé!');
     } else if (event.error === 'network') {
-      if (apiKey && Boolean(navigator.mediaDevices?.getUserMedia)) {
+      if (serverHasGeminiKey && Boolean(navigator.mediaDevices?.getUserMedia)) {
         handedOffToFallback = true;
         runGeminiVoiceFallback();
         return;
       }
       onError(
-        'Lỗi kết nối máy chủ nhận diện giọng nói (network — hay gặp trên Edge/Brave/trình duyệt nhúng hoặc mạng chặn Web Speech). Hãy mở bằng Google Chrome hoặc nhờ Admin gán Gemini API Key để tự động chấm phát âm qua AI!'
+        'Lỗi kết nối máy chủ nhận diện giọng nói (network — hay gặp trên Edge/Brave/trình duyệt nhúng). Hãy mở bằng Google Chrome hoặc bấm "Thu âm tự nghe lại" (hoặc nhờ Admin gán Gemini API Key)!'
       );
     } else {
       onError(`Lỗi nhận diện giọng nói: ${event.error}`);

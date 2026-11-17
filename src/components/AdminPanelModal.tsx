@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CheckCircle2,
+  Database,
   Eye,
   EyeOff,
   KeyRound,
@@ -13,23 +14,22 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { UserAccount } from '../types/learning';
-import { callGeminiTextWithMeta } from '../utils/geminiClient';
 import {
-  deleteUserAccount,
-  getAccounts,
+  adminDeleteUser,
+  adminResetUserPassword,
+  adminResetUserProgress,
+  AdminUserSummary,
+  fetchAdminOverview,
   isDevAccount,
-  loadProgress,
-  resetUserPassword,
-  resetUserProgress,
-  saveGlobalApiKey,
+  saveAdminApiKey,
+  testAdminApiKey,
 } from '../utils/storage';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  globalApiKey: string;
-  onApiKeyChange: (key: string) => void;
+  hasApiKey: boolean;
+  onApiKeyStatusChange: (hasKey: boolean) => void;
   currentEmail: string;
   onResetCurrentProgress: () => void;
 }
@@ -37,43 +37,64 @@ interface AdminPanelModalProps {
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   isOpen,
   onClose,
-  globalApiKey,
-  onApiKeyChange,
+  hasApiKey,
+  onApiKeyStatusChange,
   currentEmail,
   onResetCurrentProgress,
 }) => {
-  const [keyDraft, setKeyDraft] = useState(globalApiKey);
+  const [keyDraft, setKeyDraft] = useState('');
+  const [maskedKey, setMaskedKey] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [accounts, setAccounts] = useState<UserAccount[]>(() => getAccounts());
+  const [users, setUsers] = useState<AdminUserSummary[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [testingKey, setTestingKey] = useState(false);
 
+  const loadOverview = async () => {
+    setLoadingList(true);
+    try {
+      const data = await fetchAdminOverview();
+      setUsers(data.users);
+      setMaskedKey(data.maskedApiKey);
+      onApiKeyStatusChange(data.hasApiKey);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Không tải được dữ liệu SQLite Admin.'}`);
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadOverview();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const refreshAccounts = () => setAccounts(getAccounts());
-
-  const handleSaveKey = () => {
-    const clean = keyDraft.trim();
-    saveGlobalApiKey(clean);
-    onApiKeyChange(clean);
-    setStatusMsg(
-      clean
-        ? '✅ Đã lưu Gemini API Key dùng chung cho toàn bộ hệ thống.'
-        : 'ℹ️ Đã xóa Gemini API Key dùng chung.'
-    );
+  const handleSaveKey = async () => {
+    try {
+      const clean = keyDraft.trim();
+      const res = await saveAdminApiKey(clean);
+      setMaskedKey(res.maskedApiKey);
+      onApiKeyStatusChange(res.hasApiKey);
+      setKeyDraft('');
+      setStatusMsg(
+        res.hasApiKey
+          ? `✅ Đã lưu an toàn Gemini API Key (${res.maskedApiKey}) vào SQLite Server.`
+          : 'ℹ️ Đã xóa Gemini API Key khỏi SQLite Server.'
+      );
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Lưu API Key thất bại.'}`);
+    }
   };
 
   const handleTestKey = async () => {
-    const clean = keyDraft.trim();
-    if (!clean) {
-      setStatusMsg('⚠️ Hãy nhập API Key trước khi kiểm tra.');
-      return;
-    }
     setTestingKey(true);
     setStatusMsg(null);
     try {
-      const { text, model } = await callGeminiTextWithMeta(clean, 'Reply ONLY with: OK');
-      setStatusMsg(`✅ Kết nối thành công tới Gemini AI (${model})! Phản hồi: "${text.slice(0, 60)}"`);
+      const res = await testAdminApiKey(keyDraft.trim());
+      setStatusMsg(`✅ Kết nối thành công từ Server tới Gemini AI (${res.model})! Phản hồi: "${res.text.slice(0, 60)}"`);
     } catch (err: any) {
       setStatusMsg(`❌ Lỗi kết nối Key: ${err?.message || 'Không xác định'}`);
     } finally {
@@ -81,26 +102,35 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
-  const handleResetProgress = (email: string) => {
-    resetUserProgress(email);
-    if (email.toLowerCase() === currentEmail.toLowerCase()) {
-      onResetCurrentProgress();
+  const handleResetProgress = async (email: string) => {
+    try {
+      await adminResetUserProgress(email);
+      if (email.toLowerCase() === currentEmail.toLowerCase()) {
+        onResetCurrentProgress();
+      }
+      await loadOverview();
+      setStatusMsg(`✅ Đã reset toàn bộ tiến độ SQLite của "${email}" về Bước 1A.`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Reset tiến độ thất bại.'}`);
     }
-    refreshAccounts();
-    setStatusMsg(`✅ Đã reset toàn bộ tiến độ học của tài khoản "${email}".`);
   };
 
   const handleResetPassword = async (email: string) => {
-    const ok = await resetUserPassword(email, '123456');
-    if (ok) {
-      setStatusMsg(`🔑 Đã đặt lại mật khẩu của "${email}" thành: 123456`);
+    try {
+      await adminResetUserPassword(email, '123456');
+      setStatusMsg(`🔑 Đã đặt lại mật khẩu SQLite của "${email}" thành: 123456`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Reset mật khẩu thất bại.'}`);
     }
   };
 
-  const handleDeleteAccount = (email: string) => {
-    if (deleteUserAccount(email)) {
-      refreshAccounts();
-      setStatusMsg(`🗑️ Đã xóa tài khoản "${email}".`);
+  const handleDeleteAccount = async (email: string) => {
+    try {
+      await adminDeleteUser(email);
+      await loadOverview();
+      setStatusMsg(`🗑️ Đã xóa tài khoản "${email}" và dữ liệu liên quan khỏi SQLite.`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Xóa tài khoản thất bại.'}`);
     }
   };
 
@@ -114,11 +144,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white">
-                Quản Trị Hệ Thống (Admin Dev)
+              <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Quản Trị Hệ Thống (SQLite Admin)</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                  <Database className="w-3 h-3" /> SQLite DB
+                </span>
               </h2>
               <p className="text-xs text-slate-500">
-                Cấu hình Gemini API Key dùng chung & quản lý reset tài khoản học viên
+                API Key được lưu bảo mật trên Server & quản lý trực tiếp bảng tài khoản SQL
               </p>
             </div>
           </div>
@@ -137,30 +170,34 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
         )}
 
-        {/* Section 1: Global API Key */}
+        {/* Section 1: Global Server API Key */}
         <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-extrabold uppercase text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
-              <KeyRound className="w-4 h-4" /> Cấu hình Gemini API Key dùng chung
+              <KeyRound className="w-4 h-4" /> Cấu hình Gemini API Key (Bảo mật Server)
             </span>
             <span
               className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                globalApiKey
+                hasApiKey
                   ? 'bg-emerald-100 text-emerald-800'
                   : 'bg-amber-100 text-amber-800'
               }`}
             >
-              {globalApiKey ? 'Đã gán Key' : 'Chưa cấu hình'}
+              {hasApiKey ? `Đã gán Key (${maskedKey})` : 'Chưa cấu hình'}
             </span>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-[220px]">
+            <div className="relative w-full sm:flex-1 sm:min-w-[220px]">
               <input
                 type={showKey ? 'text' : 'password'}
                 value={keyDraft}
                 onChange={(e) => setKeyDraft(e.target.value)}
-                placeholder="Nhập Gemini API Key (AIza...) để gán cho toàn bộ app"
+                placeholder={
+                  hasApiKey
+                    ? 'Nhập Key mới để thay đổi (hoặc để trống rồi bấm Lưu để xóa)'
+                    : 'Nhập Gemini API Key để lưu trên Server SQLite'
+                }
                 className="w-full pr-9 pl-3.5 py-2 rounded-xl border border-indigo-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
@@ -176,7 +213,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               onClick={handleSaveKey}
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
             >
-              Lưu & Gán API Key
+              Lưu vào SQLite
             </button>
             <button
               onClick={handleTestKey}
@@ -188,28 +225,28 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </button>
           </div>
           <p className="text-[11px] text-slate-500">
-            Học viên ở giao diện học sẽ chỉ thấy các nút tính năng AI (chấm bài, tạo đề theo nghề nghiệp) mà không thấy ô nhập API Key.
+            API Key được lưu trong bảng <code>app_settings</code> của SQLite và gọi qua proxy <code>/api/ai/generate</code> — trình duyệt học viên không bao giờ thấy được Key này.
           </p>
         </div>
 
-        {/* Section 2: User Account Management & Reset */}
+        {/* Section 2: SQLite Users Table */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-extrabold uppercase text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Users className="w-4 h-4" /> Danh sách tài khoản trên hệ thống ({accounts.length})
+              <Users className="w-4 h-4" /> Bảng Tài khoản SQLite ({users.length})
             </span>
             <button
-              onClick={refreshAccounts}
+              onClick={loadOverview}
+              disabled={loadingList}
               className="text-xs font-bold text-indigo-600 inline-flex items-center gap-1 hover:underline"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Làm mới
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingList ? 'animate-spin' : ''}`} /> Làm mới
             </button>
           </div>
 
           <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-            {accounts.map((acc) => {
-              const p = loadProgress(acc.email);
-              const isAdmin = isDevAccount(acc.email);
+            {users.map((acc) => {
+              const isAdmin = acc.role === 'admin' || isDevAccount(acc.email);
               return (
                 <div
                   key={acc.email}
@@ -227,7 +264,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       )}
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      {acc.email} • Bước mở khóa: <strong>{p.unlockedStepIndex}</strong> • {p.xp} XP • {p.completedLessons.length} bài từ vựng
+                      {acc.email} • Bước mở khóa: <strong>{acc.unlockedStepIndex}</strong> • {acc.xp} XP • {acc.completedLessonsCount} bài từ vựng
                     </div>
                   </div>
 
@@ -251,7 +288,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         <button
                           onClick={() => handleDeleteAccount(acc.email)}
                           className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200"
-                          title="Xóa tài khoản này"
+                          title="Xóa tài khoản này khỏi SQLite"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

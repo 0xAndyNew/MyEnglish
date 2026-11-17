@@ -1,151 +1,55 @@
 import { SrsCardState, UserAccount, UserProgress, WordEntry } from '../types/learning';
 
-const ACCOUNTS_KEY = 'myenglish_accounts_v1';
-const SESSION_KEY = 'myenglish_active_email_v1';
-const GLOBAL_API_KEY_STORAGE = 'myenglish_global_gemini_key_v1';
-
+const TOKEN_KEY = 'myenglish_token_v1';
 export const DEV_EMAIL = 'admin@hieupro.io.vn';
-
-export function isDevAccount(email?: string | null): boolean {
-  return (email ?? '').trim().toLowerCase() === DEV_EMAIL;
-}
-
-export function getGlobalApiKey(): string {
-  try {
-    return localStorage.getItem(GLOBAL_API_KEY_STORAGE) || '';
-  } catch {
-    return '';
-  }
-}
-
-export function saveGlobalApiKey(apiKey: string): void {
-  try {
-    const clean = apiKey.trim();
-    if (clean) localStorage.setItem(GLOBAL_API_KEY_STORAGE, clean);
-    else localStorage.removeItem(GLOBAL_API_KEY_STORAGE);
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function getProgressKey(email: string): string {
-  return `myenglish_progress_${email.trim().toLowerCase()}`;
-}
 
 function getTodayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export async function hashPassword(password: string): Promise<string> {
-  if (typeof window !== 'undefined' && window.crypto?.subtle) {
-    const data = new TextEncoder().encode(password);
-    const hashBuf = await window.crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hashBuf))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-  return btoa(password);
+export function isDevAccount(email?: string | null): boolean {
+  return (email ?? '').trim().toLowerCase() === DEV_EMAIL;
 }
 
-export function getAccounts(): UserAccount[] {
+export function getAuthToken(): string {
   try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY);
-    return raw ? (JSON.parse(raw) as UserAccount[]) : [];
+    return localStorage.getItem(TOKEN_KEY) || '';
   } catch {
-    return [];
+    return '';
   }
 }
 
-export function getCurrentUser(): UserAccount | null {
+export function setAuthToken(token: string): void {
   try {
-    const email = localStorage.getItem(SESSION_KEY);
-    if (!email) return null;
-    return getAccounts().find((a) => a.email.toLowerCase() === email.toLowerCase()) || null;
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {
-    return null;
+    // ignore storage errors
   }
 }
 
-export async function registerAccount(
-  emailRaw: string,
-  displayNameRaw: string,
-  password: string
-): Promise<{ ok: true; user: UserAccount } | { ok: false; error: string }> {
-  const email = emailRaw.trim().toLowerCase();
-  const displayName = displayNameRaw.trim() || email.split('@')[0];
-
-  if (email === DEV_EMAIL) {
-    return { ok: false, error: 'Tài khoản quản trị đã được tạo sẵn, vui lòng chuyển sang tab Đăng nhập.' };
-  }
-  if (!email.endsWith('@gmail.com') || email.length < 11) {
-    return { ok: false, error: 'Vui lòng nhập đúng địa chỉ Gmail (ví dụ: tenban@gmail.com).' };
-  }
-  if (password.length < 6) {
-    return { ok: false, error: 'Mật khẩu phải có ít nhất 6 ký tự.' };
-  }
-
-  const accounts = getAccounts();
-  if (accounts.some((a) => a.email.toLowerCase() === email)) {
-    return { ok: false, error: 'Gmail này đã được đăng ký. Vui lòng chuyển sang tab Đăng nhập.' };
-  }
-
-  const passwordHash = await hashPassword(password);
-  const user: UserAccount = {
-    email,
-    displayName,
-    passwordHash,
-    createdAt: new Date().toISOString(),
+async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options.headers as Record<string, string>) || {}),
   };
-
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...accounts, user]));
-  localStorage.setItem(SESSION_KEY, email);
-  saveProgress(getDefaultProgress(), email);
-  return { ok: true, user };
-}
-
-export async function loginAccount(
-  emailRaw: string,
-  password: string
-): Promise<{ ok: true; user: UserAccount } | { ok: false; error: string }> {
-  const email = emailRaw.trim().toLowerCase();
-  const accounts = getAccounts();
-
-  if (email === DEV_EMAIL) {
-    if (password !== 'Admin@123') {
-      return { ok: false, error: 'Mật khẩu tài khoản Dev chưa đúng.' };
-    }
-    let devUser = accounts.find((a) => a.email.toLowerCase() === DEV_EMAIL);
-    if (!devUser) {
-      const passwordHash = await hashPassword('Admin@123');
-      devUser = {
-        email: DEV_EMAIL,
-        displayName: 'Admin Dev',
-        passwordHash,
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify([...accounts, devUser]));
-      saveProgress(getDefaultProgress(), DEV_EMAIL);
-    }
-    localStorage.setItem(SESSION_KEY, DEV_EMAIL);
-    return { ok: true, user: devUser };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const found = accounts.find((a) => a.email.toLowerCase() === email);
-  if (!found) {
-    return { ok: false, error: 'Không tìm thấy tài khoản Gmail này. Anh hãy bấm Đăng ký mới nhé.' };
+  let res: Response;
+  try {
+    res = await fetch(path, { ...options, headers });
+  } catch {
+    throw new Error('Không kết nối được Backend SQLite Server (cổng 3001). Hãy chạy "npm run server".');
   }
 
-  const passwordHash = await hashPassword(password);
-  if (found.passwordHash !== passwordHash) {
-    return { ok: false, error: 'Mật khẩu chưa đúng. Vui lòng thử lại.' };
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || `Lỗi máy chủ (${res.status})`);
   }
-
-  localStorage.setItem(SESSION_KEY, email);
-  return { ok: true, user: found };
-}
-
-export function logoutAccount(): void {
-  localStorage.removeItem(SESSION_KEY);
+  return data as T;
 }
 
 export function getDefaultProgress(): UserProgress {
@@ -153,7 +57,7 @@ export function getDefaultProgress(): UserProgress {
     xp: 0,
     streakDays: 1,
     lastActiveDate: getTodayStr(),
-    unlockedStepIndex: 0, // Bắt đầu từ Bước 1A (Chữ cái A-Z)
+    unlockedStepIndex: 0,
     passedLetters: [],
     passedIpaPairs: [],
     completedGrammarIds: [],
@@ -168,37 +72,161 @@ export function getDefaultProgress(): UserProgress {
   };
 }
 
-export function loadProgress(email?: string): UserProgress {
-  if (!email) return getDefaultProgress();
+export async function fetchSessionState(): Promise<{
+  user: UserAccount;
+  progress: UserProgress;
+  hasApiKey: boolean;
+} | null> {
+  const token = getAuthToken();
+  if (!token) return null;
   try {
-    const raw = localStorage.getItem(getProgressKey(email));
-    if (!raw) return getDefaultProgress();
-    const parsed = JSON.parse(raw) as UserProgress;
-    const today = getTodayStr();
-    if (parsed.lastActiveDate !== today) {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      parsed.streakDays = parsed.lastActiveDate === yesterday ? (parsed.streakDays || 0) + 1 : 1;
-      parsed.lastActiveDate = today;
-    }
-    return { ...getDefaultProgress(), ...parsed };
+    return await apiRequest<{ user: UserAccount; progress: UserProgress; hasApiKey: boolean }>(
+      '/api/auth/me'
+    );
   } catch {
-    return getDefaultProgress();
+    setAuthToken('');
+    return null;
   }
 }
 
-export function saveProgress(progress: UserProgress, email?: string): void {
-  if (!email) return;
+export async function registerAccount(
+  emailRaw: string,
+  displayNameRaw: string,
+  password: string
+): Promise<{ ok: true; user: UserAccount; progress: UserProgress } | { ok: false; error: string }> {
   try {
-    localStorage.setItem(getProgressKey(email), JSON.stringify(progress));
-  } catch {
-    // ignore quota errors
+    const data = await apiRequest<{ user: UserAccount; token: string; progress: UserProgress }>(
+      '/api/auth/register',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: emailRaw.trim().toLowerCase(),
+          displayName: displayNameRaw.trim(),
+          password,
+        }),
+      }
+    );
+    setAuthToken(data.token);
+    return { ok: true, user: data.user, progress: data.progress };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Đăng ký thất bại.' };
   }
+}
+
+export async function loginAccount(
+  emailRaw: string,
+  password: string
+): Promise<{ ok: true; user: UserAccount; progress: UserProgress } | { ok: false; error: string }> {
+  try {
+    const data = await apiRequest<{ user: UserAccount; token: string; progress: UserProgress }>(
+      '/api/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: emailRaw.trim().toLowerCase(),
+          password,
+        }),
+      }
+    );
+    setAuthToken(data.token);
+    return { ok: true, user: data.user, progress: data.progress };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Đăng nhập thất bại.' };
+  }
+}
+
+export async function logoutAccount(): Promise<void> {
+  const token = getAuthToken();
+  setAuthToken('');
+  if (!token) return;
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // ignore network errors on logout
+  }
+}
+
+export async function saveProgressToDb(progress: UserProgress): Promise<void> {
+  if (!getAuthToken()) return;
+  try {
+    await apiRequest('/api/progress', {
+      method: 'PUT',
+      body: JSON.stringify({ progress }),
+    });
+  } catch {
+    // ignore transient save error
+  }
+}
+
+// ---------------- ADMIN SQLITE API ----------------
+
+export interface AdminUserSummary {
+  email: string;
+  displayName: string;
+  role: 'admin' | 'user';
+  createdAt: string;
+  xp: number;
+  unlockedStepIndex: number;
+  completedLessonsCount: number;
+}
+
+export async function fetchAdminOverview(): Promise<{
+  hasApiKey: boolean;
+  maskedApiKey: string;
+  users: AdminUserSummary[];
+}> {
+  return apiRequest('/api/admin/overview');
+}
+
+export async function saveAdminApiKey(apiKey: string): Promise<{
+  hasApiKey: boolean;
+  maskedApiKey: string;
+}> {
+  return apiRequest('/api/admin/api-key', {
+    method: 'PUT',
+    body: JSON.stringify({ apiKey }),
+  });
+}
+
+export async function testAdminApiKey(apiKey?: string): Promise<{ text: string; model: string }> {
+  return apiRequest('/api/admin/test-key', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey: apiKey || '' }),
+  });
+}
+
+export async function adminResetUserProgress(email: string): Promise<UserProgress> {
+  const res = await apiRequest<{ ok: boolean; progress: UserProgress }>(
+    `/api/admin/users/${encodeURIComponent(email)}/reset-progress`,
+    { method: 'POST' }
+  );
+  return res.progress;
+}
+
+export async function adminResetUserPassword(email: string, newPassword = '123456'): Promise<void> {
+  await apiRequest(`/api/admin/users/${encodeURIComponent(email)}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ newPassword }),
+  });
+}
+
+export async function adminDeleteUser(email: string): Promise<void> {
+  await apiRequest(`/api/admin/users/${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+  });
 }
 
 /**
  * Thuật toán Ôn tập Ngắt quãng (SM-2)
  */
-export function updateSrsCard(current: SrsCardState | undefined, wordId: string, quality: 0 | 2 | 4 | 5): SrsCardState {
+export function updateSrsCard(
+  current: SrsCardState | undefined,
+  wordId: string,
+  quality: 0 | 2 | 4 | 5
+): SrsCardState {
   const card: SrsCardState = current || {
     wordId,
     intervalDays: 0,
@@ -246,32 +274,4 @@ export function addWordToNotebook(progress: UserProgress, word: WordEntry): User
     };
   }
   return { ...progress, savedWords, srsCards, xp: progress.xp + (exists ? 0 : 10) };
-}
-
-export function resetUserProgress(email: string): UserProgress {
-  const fresh = getDefaultProgress();
-  saveProgress(fresh, email);
-  return fresh;
-}
-
-export async function resetUserPassword(email: string, newPass = '123456'): Promise<boolean> {
-  const lower = email.trim().toLowerCase();
-  if (lower === DEV_EMAIL) return false;
-  const accounts = getAccounts();
-  const idx = accounts.findIndex((a) => a.email.toLowerCase() === lower);
-  if (idx < 0) return false;
-  const passwordHash = await hashPassword(newPass);
-  const updated = [...accounts];
-  updated[idx] = { ...updated[idx], passwordHash };
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(updated));
-  return true;
-}
-
-export function deleteUserAccount(email: string): boolean {
-  const lower = email.trim().toLowerCase();
-  if (lower === DEV_EMAIL) return false;
-  const accounts = getAccounts().filter((a) => a.email.toLowerCase() !== lower);
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-  localStorage.removeItem(getProgressKey(lower));
-  return true;
 }

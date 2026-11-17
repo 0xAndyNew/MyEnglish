@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
-import { BookOpenCheck, Mail, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
-import { UserAccount } from '../types/learning';
-import { getAccounts, loginAccount, registerAccount } from '../utils/storage';
+import { BookOpenCheck, Mail, Lock, User, ArrowRight, ShieldCheck, Database } from 'lucide-react';
+import { UserAccount, UserProgress } from '../types/learning';
+import { loginAccount, registerAccount } from '../utils/storage';
 
 interface AuthScreenProps {
-  onAuthSuccess: (user: UserAccount) => void;
+  onAuthSuccess: (user: UserAccount, progress: UserProgress) => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'register'>(() =>
-    getAccounts().length > 0 ? 'login' : 'register'
-  );
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const existingAccounts = getAccounts();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +25,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           ? await registerAccount(email, displayName, password)
           : await loginAccount(email, password);
       if (res.ok) {
-        onAuthSuccess(res.user);
+        onAuthSuccess(res.user, res.progress);
       } else {
         setError(res.error);
       }
@@ -47,7 +43,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white">MyEnglish</h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Đăng nhập bằng Gmail — Tiến độ học và lộ trình mở khóa của mỗi tài khoản được lưu riêng biệt.
+            Đăng nhập để lưu tiến độ, từ vựng và lộ trình học đồng bộ trên cơ sở dữ liệu SQLite.
           </p>
         </div>
 
@@ -65,7 +61,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                 : 'text-slate-500'
             }`}
           >
-            Đăng nhập Gmail
+            Đăng nhập
           </button>
           <button
             type="button"
@@ -104,7 +100,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
           <div>
             <label className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-1 block">
-              Địa chỉ Gmail
+              Địa chỉ Gmail / Email
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -146,34 +142,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md transition"
+            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-md transition disabled:opacity-50"
           >
-            <span>{mode === 'register' ? 'Tạo tài khoản Gmail & Bắt đầu Bước 1' : 'Đăng nhập & Tiếp tục học'}</span>
+            <span>
+              {loading
+                ? 'Đang xác thực...'
+                : mode === 'register'
+                ? 'Tạo tài khoản & Bắt đầu Bước 1'
+                : 'Đăng nhập & Tiếp tục học'}
+            </span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {existingAccounts.length > 0 && mode === 'login' && (
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <div className="text-[11px] font-bold uppercase text-slate-400">Tài khoản Gmail đã lưu trên máy:</div>
-            <div className="flex flex-wrap gap-1.5">
-              {existingAccounts.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => setEmail(acc.email)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600"
-                >
-                  {acc.email}
-                </button>
-              ))}
-            </div>
+        <div className="flex flex-col items-center gap-1 text-[11px] text-slate-400 text-center">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Mật khẩu được mã hóa an toàn (scrypt) trên server.</span>
           </div>
-        )}
-
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-          <span>Mỗi tài khoản Gmail có tiến độ mở khóa & từ vựng tách biệt 100%.</span>
+          <div className="flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Lưu trữ đồng bộ bằng cơ sở dữ liệu SQLite.</span>
+          </div>
         </div>
       </div>
     </div>

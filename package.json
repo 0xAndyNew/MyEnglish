@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node server/server.mjs",
     "build": "tsc && vite build",
+    "start": "node server/server.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

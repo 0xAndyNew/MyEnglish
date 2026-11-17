@@ -136,7 +136,8 @@ export interface SrsCardState {
 export interface UserAccount {
   email: string;
   displayName: string;
-  passwordHash: string;
+  passwordHash?: string;
+  role?: 'admin' | 'user';
   createdAt: string;
 }
 

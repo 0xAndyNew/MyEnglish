@@ -22,30 +22,30 @@
 
 ---
 
-## Tính năng Quản trị & Bảo mật Tiến độ
+## Tính năng Quản trị & Lưu trữ SQLite
 
-- **Lưu tiến độ độc lập theo tài khoản**: Mỗi tài khoản Gmail đăng ký trên trình duyệt được tách riêng lộ trình mở khóa, điểm XP, từ vựng đã lưu và thẻ SRS (`localStorage`).
-- **Tài khoản thường (`@gmail.com`)**: Khóa lộ trình tuần tự từng bài và từng bước để đảm bảo học chắc kiến thức nền.
+- **Cơ sở dữ liệu SQLite (`data/myenglish.db`)**: Chạy bằng `node:sqlite` (`DatabaseSync`) tích hợp sẵn trên Node.js v22.5+, lưu trữ chuẩn 5 bảng quan hệ (`users`, `sessions`, `user_progress`, `saved_words`, `app_settings`).
+- **Tài khoản thường (`@gmail.com`)**: Đăng ký/đăng nhập đồng bộ qua REST API (`/api/auth/*`), mật khẩu mã hóa an toàn bằng `scrypt` + salt, khóa lộ trình tuần tự từng bài và từng bước.
 - **Mục Quản trị Admin (`admin@hieupro.io.vn`)**:
   - Bật/tắt chế độ Dev mở khóa nhanh để kiểm tra bài học.
-  - Cấu hình & kiểm tra kết nối **Gemini API Key** dùng chung cho toàn hệ thống (giao diện học viên chỉ hiển thị các nút thực hiện AI, không lộ ô nhập API Key).
-  - Quản lý danh sách tài khoản học viên: Reset tiến độ học, Reset mật khẩu hoặc Xóa tài khoản thường.
+  - Cấu hình & kiểm tra kết nối **Gemini API Key** lưu trực tiếp trong SQLite Server (`app_settings`) và gọi qua proxy `/api/ai/generate` (trình duyệt học viên không bao giờ thấy được API Key).
+  - Quản lý danh sách tài khoản trong SQLite: Reset tiến độ học, Reset mật khẩu (`123456`) hoặc Xóa tài khoản thường.
 
 ---
 
 ## Công nghệ sử dụng
 
 - **Frontend**: React 18, TypeScript, Vite 5, Tailwind CSS 3, Lucide Icons, Canvas Confetti
+- **Backend & Database**: Node.js built-in `http`, `crypto` (`scrypt`), **SQLite (`node:sqlite`)**
 - **Audio & Speech**: Web Speech API (`speechSynthesis` US/UK & `SpeechRecognition`) + `MediaRecorder` thu âm tự nghe lại
 - **AI & OCR**: Google Gemini API (`gemini-3.8-flash` với fallback `gemini-3.8-flash-lite` / `gemini-flash-latest`), `tesseract.js`
-- **Lưu trữ**: Client-side `localStorage` (hỗ trợ Export/Sao lưu tiến độ JSON)
 
 ---
 
 ## Cài đặt & Chạy trên máy (Local Development)
 
 ### Yêu cầu môi trường
-- Node.js >= 18
+- **Node.js >= 22.5** (khuyến nghị Node 24/26 để sử dụng `node:sqlite` tích hợp sẵn)
 - npm >= 9
 
 ### Các bước chạy dự án
@@ -57,14 +57,18 @@ cd MyEnglish
 # 2. Cài đặt thư viện
 npm install
 
-# 3. Chạy môi trường phát triển (Dev Server)
+# 3. Terminal 1 — Chạy SQLite API Server (cổng 3001)
+npm run server
+
+# 4. Terminal 2 — Chạy Frontend Vite Dev Server (cổng 5173)
 npm run dev
 
-# 4. Build bản Production
+# Hoặc build bản Production & phục vụ trọn gói cả Frontend + SQLite API trên cổng 3001:
 npm run build
+npm start
 ```
 
-Mở trình duyệt tại `http://localhost:5173/` để sử dụng.
+Mở trình duyệt tại `http://localhost:5173/` (môi trường dev) hoặc `http://localhost:3001/` (production) để sử dụng.
 
 ---
 
