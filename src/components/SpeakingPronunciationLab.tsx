@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Mic,
   Square,
@@ -16,6 +16,7 @@ import { AccentMode } from '../types/learning';
 import { callGeminiText } from '../utils/geminiClient';
 import {
   isSpeechRecognitionSupported,
+  playLoudAudioUrl,
   PronunciationScoreResult,
   scorePronunciation,
   speakText,
@@ -55,6 +56,14 @@ export const SpeakingPronunciationLab: React.FC<SpeakingPronunciationLabProps> =
   const [isListening, setIsListening] = useState(false);
   const [scoreResult, setScoreResult] = useState<PronunciationScoreResult | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [userAudioUrl, setUserAudioUrl] = useState<string | null>(null);
+  const stopMicRef = useRef<((abort?: boolean) => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (userAudioUrl) URL.revokeObjectURL(userAudioUrl);
+    };
+  }, [userAudioUrl]);
 
   // Tab 2: Voice Recorder & Compare
   const [isRecording, setIsRecording] = useState(false);
@@ -73,22 +82,31 @@ export const SpeakingPronunciationLab: React.FC<SpeakingPronunciationLabProps> =
   const [aiLoading, setAiLoading] = useState(false);
 
   const handleStartShadowing = () => {
+    if (isListening) {
+      stopMicRef.current?.(false);
+      return;
+    }
     if (!isSpeechRecognitionSupported()) {
-      setSpeechError('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome hoặc Edge.');
+      setSpeechError('Trình duyệt không hỗ trợ thu âm Micro.');
       return;
     }
     setSpeechError(null);
     setScoreResult(null);
+    setUserAudioUrl(null);
     setIsListening(true);
-    startSpeechRecognition(
+    stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(targetSentence, transcript);
         setScoreResult(res);
+        setUserAudioUrl(meta?.audioUrl ?? null);
         onPronunciationScore(res.score);
       },
       (err) => setSpeechError(err),
-      () => setIsListening(false)
+      () => {
+        setIsListening(false);
+        stopMicRef.current = null;
+      }
     );
   };
 
@@ -157,18 +175,30 @@ export const SpeakingPronunciationLab: React.FC<SpeakingPronunciationLabProps> =
   const currentTurn = currentScenario.turns[turnIdx] || currentScenario.turns[0];
 
   const handleRoleplayMic = (expectedReply: string) => {
-    if (!isSpeechRecognitionSupported()) return;
+    if (isListening) {
+      stopMicRef.current?.(false);
+      return;
+    }
+    if (!isSpeechRecognitionSupported()) {
+      setSpeechError('Trình duyệt không hỗ trợ thu âm Micro.');
+      return;
+    }
     setIsListening(true);
     setRoleplayFeedback(null);
-    startSpeechRecognition(
+    setUserAudioUrl(null);
+    stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(expectedReply, transcript);
         setRoleplayFeedback(res);
+        setUserAudioUrl(meta?.audioUrl ?? null);
         onPronunciationScore(res.score);
       },
       (err) => setSpeechError(err),
-      () => setIsListening(false)
+      () => {
+        setIsListening(false);
+        stopMicRef.current = null;
+      }
     );
   };
 
@@ -330,12 +360,12 @@ export const SpeakingPronunciationLab: React.FC<SpeakingPronunciationLabProps> =
               </button>
               <button
                 onClick={handleStartShadowing}
-                disabled={isListening}
                 className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition ${
                   isListening ? 'bg-rose-600 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
                 }`}
               >
-                <Mic className="w-4 h-4" /> {isListening ? 'Đang nghe bạn đọc...' : 'Bấm Micro để đọc'}
+                {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isListening ? 'Dừng & Chấm điểm' : 'Bấm Micro để đọc'}
               </button>
             </div>
 
@@ -346,7 +376,18 @@ export const SpeakingPronunciationLab: React.FC<SpeakingPronunciationLabProps> =
                     <div className="text-xs text-slate-500">Đánh giá tổng quan</div>
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{scoreResult.feedback}</p>
                   </div>
-                  <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{scoreResult.score}%</div>
+                  <div className="flex items-center gap-2">
+                    {userAudioUrl && (
+                      <button
+                        type="button"
+                        onClick={() => playLoudAudioUrl(userAudioUrl, { gain: 1.4 })}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
+                      </button>
+                    )}
+                    <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{scoreResult.score}%</div>
+                  </div>
                 </div>
 
                 <div>
@@ -530,8 +571,19 @@ export const SpeakingPronunciationLab: React.FC<SpeakingPronunciationLabProps> =
             </div>
 
             {roleplayFeedback && (
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-xs">
-                Điểm phát âm: <strong>{roleplayFeedback.score}%</strong> — "{roleplayFeedback.transcript}"
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-xs flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  Điểm phát âm: <strong>{roleplayFeedback.score}%</strong> — "{roleplayFeedback.transcript}"
+                </span>
+                {userAudioUrl && (
+                  <button
+                    type="button"
+                    onClick={() => playLoudAudioUrl(userAudioUrl, { gain: 1.4 })}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold inline-flex items-center gap-1"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
+                  </button>
+                )}
               </div>
             )}
 

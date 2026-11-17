@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Volume2,
   Turtle,
   Mic,
+  Square,
   BookmarkPlus,
   BookmarkCheck,
   Sparkles,
@@ -18,7 +19,6 @@ import { isVowelChar } from '../utils/wordAnalyzer';
 import {
   isSpeechRecognitionSupported,
   PronunciationScoreResult,
-  recordAudioClip,
   scorePronunciation,
   speakText,
   startSpeechRecognition,
@@ -43,10 +43,27 @@ export const WordAnatomyCard: React.FC<WordAnatomyCardProps> = ({
   const [showColorCode, setShowColorCode] = useState(true);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [micInterim, setMicInterim] = useState('');
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<PronunciationScoreResult | null>(null);
-  const [recordingSelf, setRecordingSelf] = useState(false);
   const [selfAudioUrl, setSelfAudioUrl] = useState<string | null>(null);
+  const stopMicRef = useRef<((abort?: boolean) => void) | null>(null);
+
+  useEffect(() => {
+    setScoreResult(null);
+    setSpeechError(null);
+    setSelfAudioUrl(null);
+    return () => {
+      stopMicRef.current?.(true);
+      stopMicRef.current = null;
+    };
+  }, [wordEntry.word]);
+
+  useEffect(() => {
+    return () => {
+      if (selfAudioUrl) URL.revokeObjectURL(selfAudioUrl);
+    };
+  }, [selfAudioUrl]);
 
   const ipa = accent === 'en-US' ? wordEntry.ipaUS : wordEntry.ipaUK;
   const silentSet = new Set(wordEntry.silentIndices || []);
@@ -59,37 +76,38 @@ export const WordAnatomyCard: React.FC<WordAnatomyCardProps> = ({
   };
 
   const handleMicTest = () => {
+    if (isListening) {
+      stopMicRef.current?.(false);
+      return;
+    }
     if (!isSpeechRecognitionSupported()) {
-      setSpeechError('Trình duyệt chưa hỗ trợ Micro nhận diện giọng nói (hãy dùng Chrome hoặc Edge).');
+      setSpeechError('Trình duyệt không hỗ trợ thu âm Micro.');
       return;
     }
     setSpeechError(null);
     setScoreResult(null);
+    setSelfAudioUrl(null);
+    setMicInterim('');
     setIsListening(true);
 
-    startSpeechRecognition(
+    stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(wordEntry.word, transcript);
         setScoreResult(res);
+        setSelfAudioUrl(meta?.audioUrl ?? null);
         onPronunciationScore?.(res.score);
       },
       (err) => setSpeechError(err),
-      () => setIsListening(false)
+      () => {
+        setIsListening(false);
+        setMicInterim('');
+        stopMicRef.current = null;
+      },
+      {
+        onInterim: (text) => setMicInterim(text),
+      }
     );
-  };
-
-  const handleRecordSelf = async () => {
-    setSpeechError(null);
-    setRecordingSelf(true);
-    try {
-      const { url } = await recordAudioClip(3000);
-      setSelfAudioUrl(url);
-    } catch (err: any) {
-      setSpeechError(err?.message || 'Không thể mở Micro để tự ghi âm.');
-    } finally {
-      setRecordingSelf(false);
-    }
   };
 
   const levelBadgeColors: Record<string, string> = {
@@ -241,37 +259,24 @@ export const WordAnatomyCard: React.FC<WordAnatomyCardProps> = ({
             </button>
             <button
               onClick={handleMicTest}
-              disabled={isListening}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
                 isListening
                   ? 'bg-rose-600 text-white animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
               }`}
             >
-              <Mic className="w-4 h-4" />
-              <span>{isListening ? 'Đang nghe...' : 'Đọc thử'}</span>
+              {isListening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              <span>{isListening ? 'Dừng & Chấm' : 'Đọc thử'}</span>
             </button>
-            <button
-              onClick={handleRecordSelf}
-              disabled={recordingSelf}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition"
-              title="Thu âm 3 giây & nghe lại không cần API Key"
-            >
-              <Mic className="w-3.5 h-3.5" />
-              <span>{recordingSelf ? 'Đang thu 3s...' : 'Tự thu nghe lại'}</span>
-            </button>
-            {selfAudioUrl && (
-              <button
-                onClick={() => new Audio(selfAudioUrl).play()}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 text-indigo-700 text-xs font-semibold transition"
-              >
-                <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
-              </button>
-            )}
           </div>
         </div>
 
         {/* Speech Scoring Feedback */}
+        {isListening && micInterim && (
+          <div className="mt-3 p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+            ● {micInterim}
+          </div>
+        )}
         {speechError && (
           <div className="mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
             {speechError}
@@ -283,6 +288,9 @@ export const WordAnatomyCard: React.FC<WordAnatomyCardProps> = ({
               result={scoreResult}
               accent={accent}
               title="Kết quả phát âm"
+              userAudioUrl={selfAudioUrl}
+              sampleText={wordEntry.word}
+              onRetry={handleMicTest}
               compact
             />
           </div>

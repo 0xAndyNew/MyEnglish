@@ -1,9 +1,61 @@
 import { AccentMode } from '../types/learning';
-import { transcribeAudioWithGemini } from './geminiClient';
+import { startParallelAudioBackup, startUniversalAudioCapture } from './audioRecorder';
+import { SttProviderMode, transcribeSpeechViaServer } from './storage';
 
 let serverHasGeminiKey = false;
+let serverSttProvider: SttProviderMode = 'auto';
+
+const WEB_SPEECH_BLOCKED_KEY = 'myenglish_webspeech_blocked_v1';
+
 export function setServerHasGeminiKey(flag: boolean): void {
   serverHasGeminiKey = flag;
+}
+
+export function setServerSttProvider(provider: SttProviderMode): void {
+  serverSttProvider = provider;
+}
+
+function isWebSpeechFlaggedBlocked(): boolean {
+  try {
+    return sessionStorage.getItem(WEB_SPEECH_BLOCKED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markWebSpeechBlocked(): void {
+  try {
+    sessionStorage.setItem(WEB_SPEECH_BLOCKED_KEY, '1');
+  } catch {
+    // ignore storage restriction
+  }
+}
+
+function isKnownUnsupportedWebSpeechBrowser(): boolean {
+  if (typeof navigator === 'undefined') return true;
+  const ua = navigator.userAgent || '';
+  if ((navigator as any).brave) return true;
+  if (/Edg\/|OPR\/|Vivaldi\/|Electron\/|SamsungBrowser\/|Firefox\/|; wv\)/i.test(ua)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldUseUniversalServerStt(): boolean {
+  if (serverSttProvider === 'local' || serverSttProvider === 'gemini') {
+    return true;
+  }
+  const SpeechRec =
+    typeof window !== 'undefined' &&
+    ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  if (!SpeechRec) return true;
+  if (isWebSpeechFlaggedBlocked()) return true;
+  if (isKnownUnsupportedWebSpeechBrowser()) return true;
+  return false;
+}
+
+export function hasServerGeminiFallback(): boolean {
+  return serverHasGeminiKey;
 }
 
 export interface WordMatchResult {
@@ -33,6 +85,101 @@ export interface SpeechRecognitionOptions {
   maxDurationMs?: number;
 }
 
+export interface SpeechRecognitionResultMeta {
+  audioUrl?: string;
+  provider?: 'web-speech' | 'server-stt';
+}
+
+let ttsScheduleTimer: ReturnType<typeof setTimeout> | null = null;
+let activeAudioPlayer: HTMLAudioElement | null = null;
+let activeAudioCtx: AudioContext | null = null;
+
+// Pre-warm speechSynthesis voice list on browser load
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+}
+
+export function stopActiveAudioPlayback(): void {
+  if (activeAudioPlayer) {
+    try {
+      activeAudioPlayer.pause();
+      activeAudioPlayer.currentTime = 0;
+    } catch {
+      // ignore
+    }
+    activeAudioPlayer = null;
+  }
+  if (activeAudioCtx && activeAudioCtx.state !== 'closed') {
+    activeAudioCtx.close().catch(() => {});
+    activeAudioCtx = null;
+  }
+}
+
+/**
+ * Play an audio file/URL with optional Web Audio gain boost + soft limiter so quiet
+ * dictionary MP3s and recorded clips sound loud and clear without clipping.
+ */
+export function playLoudAudioUrl(
+  url: string,
+  options: { gain?: number; onEnded?: () => void; onError?: () => void } = {}
+): () => void {
+  stopActiveAudioPlayback();
+  const gainValue = options.gain ?? 1.5;
+  const audio = new Audio();
+  if (!url.startsWith('blob:') && !url.startsWith('data:')) {
+    audio.crossOrigin = 'anonymous';
+  }
+  audio.src = url;
+  activeAudioPlayer = audio;
+
+  const AudioCtx =
+    typeof window !== 'undefined'
+      ? (window.AudioContext || (window as any).webkitAudioContext)
+      : null;
+
+  if (AudioCtx && gainValue !== 1.0) {
+    try {
+      const ctx = new AudioCtx() as AudioContext;
+      activeAudioCtx = ctx;
+      const src = ctx.createMediaElementSource(audio);
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -16;
+      compressor.knee.value = 18;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.005;
+      compressor.release.value = 0.15;
+
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = gainValue;
+
+      src.connect(gainNode);
+      gainNode.connect(compressor);
+      compressor.connect(ctx.destination);
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch {
+      // Fallback to direct HTMLAudioElement output if Web Audio wiring fails
+    }
+  }
+
+  audio.onended = () => {
+    stopActiveAudioPlayback();
+    options.onEnded?.();
+  };
+  audio.onerror = () => {
+    stopActiveAudioPlayback();
+    options.onError?.();
+  };
+
+  audio.play().catch(() => {
+    stopActiveAudioPlayback();
+    options.onError?.();
+  });
+
+  return () => stopActiveAudioPlayback();
+}
+
 /**
  * Phát âm văn bản tiếng Anh chuẩn qua Web Speech API (hỗ trợ US/UK & tốc độ chậm 0.5x - 1.0x).
  */
@@ -43,8 +190,10 @@ export function speakText(
   audioUrl?: string
 ): void {
   if (rate === 1.0 && audioUrl) {
-    const audio = new Audio(audioUrl);
-    audio.play().catch(() => fallbackTTS(text, accent, rate));
+    playLoudAudioUrl(audioUrl, {
+      gain: 1.85,
+      onError: () => fallbackTTS(text, accent, rate),
+    });
     return;
   }
   fallbackTTS(text, accent, rate);
@@ -52,22 +201,57 @@ export function speakText(
 
 function fallbackTTS(text: string, accent: AccentMode, rate: number): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = accent;
-  utterance.rate = rate;
-
-  const voices = window.speechSynthesis.getVoices();
-  const preferred =
-    voices.find((v) => v.lang === accent && (v.name.includes('Natural') || v.name.includes('Google'))) ||
-    voices.find((v) => v.lang.startsWith(accent)) ||
-    voices.find((v) => v.lang.startsWith('en'));
-
-  if (preferred) {
-    utterance.voice = preferred;
+  const synth = window.speechSynthesis;
+  if (ttsScheduleTimer) {
+    clearTimeout(ttsScheduleTimer);
+    ttsScheduleTimer = null;
   }
 
-  window.speechSynthesis.speak(utterance);
+  const speakNow = () => {
+    if (synth.paused) {
+      synth.resume();
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = accent;
+    utterance.rate = rate;
+    utterance.volume = 1.0;
+
+    const voices = synth.getVoices();
+    const targetLang = accent.toLowerCase();
+    const targetPrefix = targetLang.split('-')[0];
+    const normLang = (v: SpeechSynthesisVoice) => (v.lang || '').replace('_', '-').toLowerCase();
+
+    const preferred =
+      voices.find(
+        (v) =>
+          normLang(v) === targetLang &&
+          /natural|neural|aria|jenny|ryan|sonia|google/i.test(v.name)
+      ) ||
+      voices.find((v) => normLang(v) === targetLang) ||
+      voices.find(
+        (v) =>
+          normLang(v).startsWith(targetPrefix) &&
+          /natural|neural|google/i.test(v.name)
+      ) ||
+      voices.find((v) => normLang(v).startsWith(targetPrefix));
+
+    if (preferred) {
+      utterance.voice = preferred;
+    }
+
+    synth.speak(utterance);
+  };
+
+  // Chromium/Edge clips the start of short single words if cancel() and speak() fire on the same tick
+  if (synth.speaking || synth.pending) {
+    synth.cancel();
+    ttsScheduleTimer = setTimeout(() => {
+      ttsScheduleTimer = null;
+      speakNow();
+    }, 55);
+  } else {
+    speakNow();
+  }
 }
 
 export function startControllableAudioRecording(durationMs = 4000): {
@@ -138,82 +322,100 @@ export async function recordAudioClip(durationMs = 4000): Promise<{ blob: Blob; 
   return startControllableAudioRecording(durationMs).promise;
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      const base64 = result.split(',')[1] || '';
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('Lỗi đọc dữ liệu âm thanh.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 /**
- * Kiểm tra trình duyệt có hỗ trợ nhận diện giọng nói hoặc ghi âm Micro không.
+ * Kiểm tra trình duyệt có hỗ trợ nhận diện giọng nói hoặc thu âm Micro đa trình duyệt không.
  */
 export function isSpeechRecognitionSupported(): boolean {
   if (typeof window === 'undefined') return false;
   return Boolean(
     (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition ||
-      navigator.mediaDevices?.getUserMedia
+      navigator.mediaDevices?.getUserMedia ||
+      !window.isSecureContext
   );
 }
 
 /**
- * Bắt đầu thu giọng nói bằng Web Speech API (hỗ trợ đọc liên tục cả đoạn văn và tự dự phòng sang MediaRecorder + Gemini AI).
+ * Bắt đầu thu giọng nói đa trình duyệt:
+ * - Tự động dùng Universal Audio Capture (16kHz WAV + VAD) + Backend Whisper/Gemini trên Edge/Brave/Firefox/Safari/Webview.
+ * - Trên Chrome chính chủ: dùng Web Speech API (realtime) và tự chuyển dự phòng + ghi nhớ nếu gặp lỗi network.
+ * - Gọi hàm trả về stop(false) để dừng & chấm ngay, hoặc stop(true) để hủy.
  */
 export function startSpeechRecognition(
   accent: AccentMode,
-  onResult: (transcript: string) => void,
+  onResult: (transcript: string, meta?: SpeechRecognitionResultMeta) => void,
   onError: (msg: string) => void,
   onEnd?: () => void,
   options?: SpeechRecognitionOptions
-): () => void {
+): (abort?: boolean) => void {
   const isContinuous = Boolean(options?.continuous);
-  const maxDurationMs = options?.maxDurationMs ?? (isContinuous ? 25000 : 4200);
-  let fallbackStopper: (() => void) | null = null;
+  const maxDurationMs = options?.maxDurationMs ?? (isContinuous ? 25000 : 8000);
+  let universalStopper: (() => void) | null = null;
+  let aborted = false;
   let cancelledByError = false;
 
-  const runGeminiVoiceFallback = async () => {
+  const runUniversalServerStt = async () => {
+    let createdPlaybackUrl: string | undefined;
     try {
-      const recording = startControllableAudioRecording(maxDurationMs);
-      fallbackStopper = recording.stop;
-      const { blob, mimeType } = await recording.promise;
-      const base64 = await blobToBase64(blob);
-      const text = await transcribeAudioWithGemini('SERVER', base64, mimeType);
-      if (!text) {
+      const capture = startUniversalAudioCapture({
+        maxDurationMs,
+        autoStopOnSilence: !isContinuous,
+        silenceStopMs: isContinuous ? 2200 : 1150,
+        onStatusText: (statusText) => {
+          if (!aborted) options?.onInterim?.(statusText);
+        },
+      });
+      universalStopper = capture.stop;
+      const captured = await capture.promise;
+      createdPlaybackUrl = captured.playbackUrl;
+      if (aborted) {
+        if (createdPlaybackUrl) URL.revokeObjectURL(createdPlaybackUrl);
+        return;
+      }
+
+      options?.onInterim?.('Đang phân tích giọng nói...');
+      const stt = await transcribeSpeechViaServer({
+        wavBase64: captured.wavBase64,
+        fallbackBase64: captured.fallbackBase64,
+        fallbackMimeType: captured.fallbackMimeType,
+      });
+      if (aborted) {
+        if (createdPlaybackUrl) URL.revokeObjectURL(createdPlaybackUrl);
+        return;
+      }
+
+      if (!stt.transcript || stt.silent) {
+        if (createdPlaybackUrl) URL.revokeObjectURL(createdPlaybackUrl);
         onError('Không nghe thấy giọng nói rõ ràng. Hãy nói to và rõ hơn gần Micro nhé!');
       } else {
-        onResult(text);
+        onResult(stt.transcript, { audioUrl: createdPlaybackUrl, provider: 'server-stt' });
       }
     } catch (err: any) {
-      onError(err?.message || 'Không thể thu âm hoặc kết nối Gemini AI để chấm giọng nói.');
+      if (createdPlaybackUrl) URL.revokeObjectURL(createdPlaybackUrl);
+      if (!aborted) {
+        onError(err?.message || 'Không thể thu âm hoặc kết nối máy chủ nhận diện giọng nói.');
+      }
     } finally {
-      fallbackStopper = null;
+      universalStopper = null;
       onEnd?.();
     }
   };
 
-  const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-  if (!SpeechRec) {
-    if (serverHasGeminiKey && Boolean(navigator.mediaDevices?.getUserMedia)) {
-      runGeminiVoiceFallback();
-      return () => {
-        fallbackStopper?.();
-      };
-    }
-    onError('Trình duyệt chưa hỗ trợ Web Speech API. Hãy dùng Google Chrome hoặc nhờ Admin gán Gemini API Key.');
-    onEnd?.();
-    return () => {};
+  if (shouldUseUniversalServerStt()) {
+    void runUniversalServerStt();
+    return (shouldAbort = false) => {
+      if (shouldAbort) aborted = true;
+      universalStopper?.();
+    };
   }
 
+  const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  const backupRecorder = startParallelAudioBackup();
   let handedOffToFallback = false;
   let latestTranscript = '';
   let deliveredResult = false;
+  let pendingDeliveryPromise: Promise<void> | null = null;
+
   const recognition = new SpeechRec();
   recognition.lang = accent;
   recognition.continuous = isContinuous;
@@ -221,6 +423,7 @@ export function startSpeechRecognition(
   recognition.maxAlternatives = 1;
 
   recognition.onresult = (event: any) => {
+    if (aborted) return;
     if (isContinuous) {
       const finals: string[] = [];
       const interims: string[] = [];
@@ -238,64 +441,99 @@ export function startSpeechRecognition(
 
     const res = event.results?.[0];
     const transcript = res?.[0]?.transcript || '';
-    if (recognition.interimResults && res && res.isFinal === false) {
+    if (res && !res.isFinal) {
       options?.onInterim?.(transcript);
       return;
     }
     deliveredResult = true;
-    onResult(transcript);
+    pendingDeliveryPromise = (async () => {
+      const audioUrl = await backupRecorder.stopAndGetUrl(false);
+      if (!aborted) {
+        onResult(transcript, { audioUrl, provider: 'web-speech' });
+      } else if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    })();
   };
 
   recognition.onerror = (event: any) => {
-    if (event.error === 'aborted') {
+    if (aborted || event.error === 'aborted') {
       return;
     }
     if (event.error === 'not-allowed') {
       cancelledByError = true;
+      void backupRecorder.stopAndGetUrl(true);
       onError('Bạn chưa cấp quyền Micro. Vui lòng bấm cho phép Micro trên thanh địa chỉ trình duyệt.');
     } else if (event.error === 'no-speech') {
       if (!isContinuous || !latestTranscript.trim()) {
         cancelledByError = true;
+        void backupRecorder.stopAndGetUrl(true);
         onError('Không nghe thấy giọng nói. Hãy nói to và rõ hơn gần Micro nhé!');
       }
-    } else if (event.error === 'network') {
-      if (serverHasGeminiKey && Boolean(navigator.mediaDevices?.getUserMedia)) {
-        handedOffToFallback = true;
-        runGeminiVoiceFallback();
-        return;
-      }
-      cancelledByError = true;
-      onError(
-        'Lỗi kết nối máy chủ nhận diện giọng nói (network — hay gặp trên Edge/Brave/trình duyệt nhúng). Hãy mở bằng Google Chrome hoặc bấm "Thu âm tự nghe lại" (hoặc nhờ Admin gán Gemini API Key)!'
-      );
+    } else if (
+      event.error === 'network' ||
+      event.error === 'service-not-allowed' ||
+      event.error === 'language-not-supported'
+    ) {
+      markWebSpeechBlocked();
+      handedOffToFallback = true;
+      void backupRecorder.stopAndGetUrl(true);
+      options?.onInterim?.('Chuyển sang chế độ thu âm đa trình duyệt — mời bạn đọc...');
+      void runUniversalServerStt();
     } else {
       cancelledByError = true;
+      void backupRecorder.stopAndGetUrl(true);
       onError(`Lỗi nhận diện giọng nói: ${event.error}`);
     }
   };
 
   recognition.onend = () => {
     if (handedOffToFallback) return;
-    if (isContinuous && !deliveredResult && !cancelledByError) {
-      const cleaned = latestTranscript.trim();
-      if (cleaned) {
-        deliveredResult = true;
-        onResult(cleaned);
+    void (async () => {
+      if (pendingDeliveryPromise) {
+        await pendingDeliveryPromise;
+      } else if (!aborted && isContinuous && !deliveredResult && !cancelledByError) {
+        const cleaned = latestTranscript.trim();
+        if (cleaned) {
+          deliveredResult = true;
+          const audioUrl = await backupRecorder.stopAndGetUrl(false);
+          if (!aborted) {
+            onResult(cleaned, { audioUrl, provider: 'web-speech' });
+          } else if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+          }
+        } else {
+          await backupRecorder.stopAndGetUrl(true);
+          onError('Chưa thu được câu nào rõ ràng. Hãy thử đọc lại to hơn gần Micro nhé!');
+        }
       } else {
-        onError('Chưa thu được câu nào rõ ràng. Hãy thử đọc lại to hơn gần Micro nhé!');
+        await backupRecorder.stopAndGetUrl(true);
       }
-    }
-    onEnd?.();
+      onEnd?.();
+    })();
   };
 
-  recognition.start();
-  return () => {
-    if (fallbackStopper) {
-      fallbackStopper();
+  try {
+    recognition.start();
+  } catch {
+    markWebSpeechBlocked();
+    handedOffToFallback = true;
+    void backupRecorder.stopAndGetUrl(true);
+    void runUniversalServerStt();
+  }
+
+  return (shouldAbort = false) => {
+    if (shouldAbort) {
+      aborted = true;
+      void backupRecorder.stopAndGetUrl(true);
+    }
+    if (universalStopper) {
+      universalStopper();
       return;
     }
     try {
-      recognition.stop();
+      if (shouldAbort) recognition.abort();
+      else recognition.stop();
     } catch {
       // ignore
     }

@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Volume2, Turtle, Mic, Sparkles, CheckCircle2, Headphones } from 'lucide-react';
+import { Volume2, Turtle, Mic, Square, Sparkles, CheckCircle2, Headphones } from 'lucide-react';
 import { AccentMode } from '../types/learning';
 import {
   isSpeechRecognitionSupported,
+  playLoudAudioUrl,
   scorePronunciation,
   speakText,
   startSpeechRecognition,
@@ -65,7 +66,24 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
 }) => {
   const [selected, setSelected] = useState<AlphabetItem>(ALPHABET_DATA[0]);
   const [listening, setListening] = useState(false);
-  const [micResult, setMicResult] = useState<{ score: number; heard: string } | null>(null);
+  const [micInterim, setMicInterim] = useState('');
+  const [micError, setMicError] = useState<string | null>(null);
+  const [micResult, setMicResult] = useState<{ score: number; heard: string; audioUrl?: string } | null>(null);
+  const stopMicRef = useRef<((abort?: boolean) => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      stopMicRef.current?.(true);
+      stopMicRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const url = micResult?.audioUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [micResult?.audioUrl]);
 
   // Listen & Pick Letter Quiz covering all 26 letters
   const [localPassedLetters, setLocalPassedLetters] = useState<string[]>([]);
@@ -94,23 +112,44 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
   }, [quizTarget]);
 
   const handleSelect = (item: AlphabetItem) => {
+    stopMicRef.current?.(true);
+    stopMicRef.current = null;
+    setListening(false);
+    setMicInterim('');
+    setMicError(null);
     setSelected(item);
     setMicResult(null);
     speakText(item.letter.toLowerCase(), accent, 0.85);
   };
 
   const handleMic = () => {
-    if (!isSpeechRecognitionSupported()) return;
+    if (listening) {
+      stopMicRef.current?.(false);
+      return;
+    }
+    if (!isSpeechRecognitionSupported()) {
+      setMicError('Trình duyệt không hỗ trợ thu âm Micro.');
+      return;
+    }
     setListening(true);
+    setMicError(null);
+    setMicInterim('');
     setMicResult(null);
-    startSpeechRecognition(
+    stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(selected.exampleWord, transcript);
-        setMicResult({ score: res.score, heard: transcript });
+        setMicResult({ score: res.score, heard: transcript, audioUrl: meta?.audioUrl });
       },
-      () => {},
-      () => setListening(false)
+      (err) => setMicError(err),
+      () => {
+        setListening(false);
+        setMicInterim('');
+        stopMicRef.current = null;
+      },
+      {
+        onInterim: (text) => setMicInterim(text),
+      }
     );
   };
 
@@ -251,16 +290,37 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
             <button
               onClick={handleMic}
               className={`p-2 rounded-lg text-white ${listening ? 'bg-rose-600 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-              title="Đọc thử từ ví dụ"
+              title={listening ? 'Dừng & chấm điểm' : 'Đọc thử từ ví dụ'}
             >
-              <Mic className="w-4 h-4" />
+              {listening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
+        {listening && micInterim && (
+          <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+            ● {micInterim}
+          </div>
+        )}
+        {micError && (
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 text-xs font-semibold text-rose-700 dark:text-rose-300">
+            {micError}
+          </div>
+        )}
         {micResult && (
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-xs">
-            Điểm đọc từ <strong>{selected.exampleWord}</strong>: <strong>{micResult.score}%</strong> (Nghe: "{micResult.heard}")
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-xs flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Điểm đọc từ <strong>{selected.exampleWord}</strong>: <strong>{micResult.score}%</strong> (Nghe: "{micResult.heard}")
+            </span>
+            {micResult.audioUrl && (
+              <button
+                type="button"
+                onClick={() => playLoudAudioUrl(micResult.audioUrl!, { gain: 1.4 })}
+                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold inline-flex items-center gap-1"
+              >
+                <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
+              </button>
+            )}
           </div>
         )}
       </div>

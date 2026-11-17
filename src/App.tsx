@@ -28,7 +28,7 @@ import {
   saveProgressToDb,
   updateSrsCard,
 } from './utils/storage';
-import { setServerHasGeminiKey } from './utils/speechEngine';
+import { setServerHasGeminiKey, setServerSttProvider } from './utils/speechEngine';
 import { analyzeWordFull } from './utils/wordAnalyzer';
 import { AuthScreen } from './components/AuthScreen';
 import { AlphabetFoundation } from './components/AlphabetFoundation';
@@ -99,6 +99,9 @@ export function App() {
         setActiveStepIdx(state.progress.unlockedStepIndex || 0);
         setDevUnlockAll(state.user.role === 'admin' || isDevAccount(state.user.email));
         setHasServerApiKey(state.hasApiKey);
+        if (state.sttProvider) {
+          setServerSttProvider(state.sttProvider);
+        }
         const lessons = await fetchCustomLessons();
         if (active) setCustomLessons(lessons);
       }
@@ -131,6 +134,9 @@ export function App() {
     const [state, lessons] = await Promise.all([fetchSessionState(), fetchCustomLessons()]);
     if (state) {
       setHasServerApiKey(state.hasApiKey);
+      if (state.sttProvider) {
+        setServerSttProvider(state.sttProvider);
+      }
     }
     setCustomLessons(lessons);
   };
@@ -141,6 +147,7 @@ export function App() {
     setCurrentUser(null);
     setDevUnlockAll(false);
     setHasServerApiKey(false);
+    setServerSttProvider('auto');
     setCustomLessons([]);
     setSearchedWord(null);
   };

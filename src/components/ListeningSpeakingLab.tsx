@@ -25,7 +25,6 @@ import { callGeminiText } from '../utils/geminiClient';
 import {
   isSpeechRecognitionSupported,
   PronunciationScoreResult,
-  recordAudioClip,
   scorePronunciation,
   speakText,
   startSpeechRecognition,
@@ -129,17 +128,28 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   const [passageInterim, setPassageInterim] = useState('');
   const [passageScoreResult, setPassageScoreResult] = useState<PronunciationScoreResult | null>(null);
   const [passageSpeechError, setPassageSpeechError] = useState<string | null>(null);
-  const [recordingPassageSelf, setRecordingPassageSelf] = useState(false);
   const [passageSelfAudioUrl, setPassageSelfAudioUrl] = useState<string | null>(null);
-  const stopMicRef = useRef<(() => void) | null>(null);
+  const stopMicRef = useRef<((abort?: boolean) => void) | null>(null);
 
   // Inline Shadowing on current lesson sentence
   const [shadowSentenceIdx, setShadowSentenceIdx] = useState(0);
   const [isListening, setIsListening] = useState(false);
+  const [micInterim, setMicInterim] = useState('');
   const [scoreResult, setScoreResult] = useState<PronunciationScoreResult | null>(null);
   const [speechError, setSpeechError] = useState<string | null>(null);
-  const [recordingSelf, setRecordingSelf] = useState(false);
   const [selfAudioUrl, setSelfAudioUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (passageSelfAudioUrl) URL.revokeObjectURL(passageSelfAudioUrl);
+    };
+  }, [passageSelfAudioUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (selfAudioUrl) URL.revokeObjectURL(selfAudioUrl);
+    };
+  }, [selfAudioUrl]);
 
   // Tab 2: Standalone Speaking sentences (Focus Mode 1-by-1)
   const allSentences = useMemo(
@@ -165,7 +175,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   useEffect(() => {
     return () => {
-      stopMicRef.current?.();
+      stopMicRef.current?.(true);
       stopMicRef.current = null;
     };
   }, []);
@@ -202,10 +212,12 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   const activeLessonSentence = lessonSentences[shadowSentenceIdx % lessonSentences.length] || currentLesson.transcript;
 
   const stopActiveMic = () => {
-    stopMicRef.current?.();
+    stopMicRef.current?.(true);
     stopMicRef.current = null;
     setIsListening(false);
     setPassageListening(false);
+    setMicInterim('');
+    setPassageInterim('');
   };
 
   const handleSelectLesson = (idx: number) => {
@@ -220,6 +232,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     setPassageSpeechError(null);
     setPassageInterim('');
     setPassageSelfAudioUrl(null);
+    setSelfAudioUrl(null);
     setLookedUpWord(null);
   };
 
@@ -251,25 +264,26 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   const runPassageMicCheck = () => {
     if (passageListening) {
-      stopMicRef.current?.();
-      stopMicRef.current = null;
+      stopMicRef.current?.(false);
       return;
     }
     if (!isSpeechRecognitionSupported()) {
-      setPassageSpeechError('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome hoặc Edge.');
+      setPassageSpeechError('Trình duyệt không hỗ trợ thu âm Micro.');
       return;
     }
     stopActiveMic();
     setPassageSpeechError(null);
     setPassageScoreResult(null);
+    setPassageSelfAudioUrl(null);
     setPassageInterim('');
     setPassageListening(true);
 
     stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(currentLesson.transcript, transcript);
         setPassageScoreResult(res);
+        setPassageSelfAudioUrl(meta?.audioUrl ?? null);
         setPassageScores((prev) => ({
           ...prev,
           [currentLesson.id]: Math.max(prev[currentLesson.id] ?? 0, res.score),
@@ -282,6 +296,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
       (err) => setPassageSpeechError(err),
       () => {
         setPassageListening(false);
+        setPassageInterim('');
         stopMicRef.current = null;
       },
       {
@@ -290,19 +305,6 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
         onInterim: (text) => setPassageInterim(text),
       }
     );
-  };
-
-  const handleRecordPassageSelf = async () => {
-    setPassageSpeechError(null);
-    setRecordingPassageSelf(true);
-    try {
-      const { url } = await recordAudioClip(10000);
-      setPassageSelfAudioUrl(url);
-    } catch (err: any) {
-      setPassageSpeechError(err?.message || 'Không thể mở Micro để tự ghi âm đoạn văn.');
-    } finally {
-      setRecordingPassageSelf(false);
-    }
   };
 
   const selectSpeakingLesson = (idx: number) => {
@@ -317,19 +319,26 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   };
 
   const runMicCheck = (expectedText: string, onSuccess?: (res: PronunciationScoreResult) => void) => {
+    if (isListening) {
+      stopMicRef.current?.(false);
+      return;
+    }
     if (!isSpeechRecognitionSupported()) {
-      setSpeechError('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome hoặc Edge.');
+      setSpeechError('Trình duyệt không hỗ trợ thu âm Micro.');
       return;
     }
     stopActiveMic();
     setSpeechError(null);
     setScoreResult(null);
     setRoleplayFeedback(null);
+    setSelfAudioUrl(null);
+    setMicInterim('');
     setIsListening(true);
     stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(expectedText, transcript);
+        setSelfAudioUrl(meta?.audioUrl ?? null);
         if (onSuccess) {
           onSuccess(res);
         } else {
@@ -348,26 +357,17 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
       (err) => setSpeechError(err),
       () => {
         setIsListening(false);
+        setMicInterim('');
         stopMicRef.current = null;
+      },
+      {
+        onInterim: (text) => setMicInterim(text),
       }
     );
   };
 
   const currentScenario = allScenarios[scenarioIdx % allScenarios.length];
   const currentTurn = currentScenario.turns[turnIdx] || currentScenario.turns[0];
-
-  const handleRecordSelf = async () => {
-    setSpeechError(null);
-    setRecordingSelf(true);
-    try {
-      const { url } = await recordAudioClip(4000);
-      setSelfAudioUrl(url);
-    } catch (err: any) {
-      setSpeechError(err?.message || 'Không thể mở Micro để tự ghi âm.');
-    } finally {
-      setRecordingSelf(false);
-    }
-  };
 
   const callGeminiJson = async (promptText: string) => {
     const key = (geminiApiKey || '').trim();
@@ -765,22 +765,6 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                       </>
                     )}
                   </button>
-                  <button
-                    onClick={handleRecordPassageSelf}
-                    disabled={recordingPassageSelf}
-                    className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                    {recordingPassageSelf ? 'Đang ghi 10s...' : 'Thu âm đoạn tự nghe lại'}
-                  </button>
-                  {passageSelfAudioUrl && (
-                    <button
-                      onClick={() => new Audio(passageSelfAudioUrl).play()}
-                      className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 text-indigo-700 text-xs font-bold inline-flex items-center gap-1"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
-                    </button>
-                  )}
                 </div>
 
                 {passageListening && (
@@ -797,6 +781,8 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                     result={passageScoreResult}
                     accent={accent}
                     title="Chấm điểm đọc đoạn văn từng chữ"
+                    userAudioUrl={passageSelfAudioUrl}
+                    sampleText={currentLesson.transcript}
                     onRetry={runPassageMicCheck}
                   />
                 )}
@@ -894,38 +880,33 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                   </button>
                   <button
                     onClick={() => runMicCheck(activeLessonSentence)}
-                    disabled={isListening}
                     className={`px-4 py-1.5 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 ${
                       isListening ? 'bg-rose-500 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
                     }`}
                   >
-                    <Mic className="w-3.5 h-3.5" /> {isListening ? 'Đang nghe bạn đọc...' : 'Bấm Mic để đọc nhại'}
+                    {isListening ? (
+                      <>
+                        <Square className="w-3.5 h-3.5" /> Dừng & Chấm điểm
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3.5 h-3.5" /> Bấm Mic để đọc nhại
+                      </>
+                    )}
                   </button>
-                  <button
-                    onClick={handleRecordSelf}
-                    disabled={recordingSelf}
-                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold inline-flex items-center gap-1.5"
-                    title="Thu âm 4 giây không cần server Web Speech"
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                    {recordingSelf ? 'Đang ghi 4s...' : 'Thu âm tự nghe lại'}
-                  </button>
-                  {selfAudioUrl && (
-                    <button
-                      onClick={() => new Audio(selfAudioUrl).play()}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold inline-flex items-center gap-1"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
-                    </button>
-                  )}
                 </div>
 
+                {isListening && micInterim && (
+                  <p className="text-xs text-indigo-700 dark:text-indigo-300 font-semibold">● {micInterim}</p>
+                )}
                 {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
                 {scoreResult && (
                   <PronunciationReportCard
                     result={scoreResult}
                     accent={accent}
                     title="Chấm phát âm câu Shadowing"
+                    userAudioUrl={selfAudioUrl}
+                    sampleText={activeLessonSentence}
                     onRetry={() => runMicCheck(activeLessonSentence)}
                   />
                 )}
@@ -1029,36 +1010,33 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                   </button>
                   <button
                     onClick={() => runMicCheck(activeTargetSentence)}
-                    disabled={isListening}
                     className={`px-5 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 ${
                       isListening ? 'bg-rose-500 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
                     }`}
                   >
-                    <Mic className="w-4 h-4" /> {isListening ? 'Đang nghe...' : 'Bấm Mic & Đọc to'}
+                    {isListening ? (
+                      <>
+                        <Square className="w-4 h-4" /> Dừng & Chấm điểm
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-4 h-4" /> Bấm Mic & Đọc to
+                      </>
+                    )}
                   </button>
-                  <button
-                    onClick={handleRecordSelf}
-                    disabled={recordingSelf}
-                    className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold inline-flex items-center gap-1.5"
-                  >
-                    <Mic className="w-4 h-4" /> {recordingSelf ? 'Đang ghi 4s...' : 'Thu âm tự nghe lại'}
-                  </button>
-                  {selfAudioUrl && (
-                    <button
-                      onClick={() => new Audio(selfAudioUrl).play()}
-                      className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-300 text-indigo-700 text-xs font-bold inline-flex items-center gap-1.5"
-                    >
-                      <Volume2 className="w-4 h-4" /> Nghe lại giọng bạn
-                    </button>
-                  )}
                 </div>
 
+                {isListening && micInterim && (
+                  <p className="text-xs text-indigo-700 dark:text-indigo-300 font-semibold">● {micInterim}</p>
+                )}
                 {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
                 {scoreResult && (
                   <PronunciationReportCard
                     result={scoreResult}
                     accent={accent}
                     title={`Chấm điểm Bài ${safeSpeakingIdx + 1} từng chữ`}
+                    userAudioUrl={selfAudioUrl}
+                    sampleText={activeTargetSentence}
                     onRetry={() => runMicCheck(activeTargetSentence)}
                   />
                 )}
@@ -1365,41 +1343,34 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                     </button>
                     <button
                       onClick={() => runMicCheck(targetReply, (res) => setRoleplayFeedback(res))}
-                      disabled={isListening}
-                      className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                      className={`px-4 py-1.5 rounded-xl text-white text-xs font-bold inline-flex items-center gap-1.5 ${
+                        isListening ? 'bg-rose-500 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
+                      }`}
                     >
-                      {isListening ? 'Đang nghe...' : '🎙️ Bấm Mic nói câu đáp'}
+                      {isListening ? '⏹️ Dừng & Chấm điểm' : '🎙️ Bấm Mic nói câu đáp'}
                     </button>
-                    <button
-                      onClick={handleRecordSelf}
-                      disabled={recordingSelf}
-                      className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold"
-                    >
-                      {recordingSelf ? 'Đang ghi 4s...' : 'Thu âm tự nghe lại'}
-                    </button>
-                    {selfAudioUrl && (
-                      <button
-                        onClick={() => new Audio(selfAudioUrl).play()}
-                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 text-indigo-700 text-xs font-bold"
-                      >
-                        🔊 Nghe lại giọng bạn
-                      </button>
-                    )}
                     <button
                       onClick={() => {
                         setTurnIdx((t) => (t + 1) % currentScenario.turns.length);
                         setRoleplayFeedback(null);
+                        setSelfAudioUrl(null);
                       }}
                       className="ml-auto px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
                     >
                       Lượt tiếp →
                     </button>
                   </div>
+                  {isListening && micInterim && (
+                    <p className="text-xs text-indigo-700 dark:text-indigo-300 font-semibold">● {micInterim}</p>
+                  )}
+                  {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
                   {roleplayFeedback && (
                     <PronunciationReportCard
                       result={roleplayFeedback}
                       accent={accent}
                       title="Điểm phản xạ hội thoại từng chữ"
+                      userAudioUrl={selfAudioUrl}
+                      sampleText={targetReply}
                       compact
                       onRetry={() => runMicCheck(targetReply, (res) => setRoleplayFeedback(res))}
                     />

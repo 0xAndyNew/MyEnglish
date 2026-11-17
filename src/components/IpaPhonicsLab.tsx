@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
-import { Volume2, Turtle, Mic, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Volume2, Turtle, Mic, Square, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 import { IPA_PHONEMES } from '../data/ipaData';
 import { AccentMode, IpaCategory, PhonemeIPA } from '../types/learning';
-import { isSpeechRecognitionSupported, scorePronunciation, speakText, startSpeechRecognition } from '../utils/speechEngine';
+import {
+  isSpeechRecognitionSupported,
+  playLoudAudioUrl,
+  scorePronunciation,
+  speakText,
+  startSpeechRecognition,
+} from '../utils/speechEngine';
 import { AlphabetFoundation } from './AlphabetFoundation';
 
 interface IpaPhonicsLabProps {
@@ -38,7 +44,24 @@ export const IpaPhonicsLab: React.FC<IpaPhonicsLabProps> = ({
   const [filter, setFilter] = useState<'all' | IpaCategory>('all');
   const [selected, setSelected] = useState<PhonemeIPA>(IPA_PHONEMES[0]);
   const [testingWord, setTestingWord] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<{ word: string; score: number; heard: string } | null>(null);
+  const [micInterim, setMicInterim] = useState('');
+  const [micError, setMicError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ word: string; score: number; heard: string; audioUrl?: string } | null>(null);
+  const stopMicRef = useRef<((abort?: boolean) => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      stopMicRef.current?.(true);
+      stopMicRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const url = testResult?.audioUrl;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [testResult?.audioUrl]);
 
   // IPA & Ending sound listening quiz (12 pairs: Vowels + Consonants/Ending sounds)
   const [ipaQuizSeed, setIpaQuizSeed] = useState(0);
@@ -93,17 +116,34 @@ export const IpaPhonicsLab: React.FC<IpaPhonicsLabProps> = ({
   };
 
   const handleTestExample = (word: string) => {
-    if (!isSpeechRecognitionSupported()) return;
+    if (testingWord === word) {
+      stopMicRef.current?.(false);
+      return;
+    }
+    if (!isSpeechRecognitionSupported()) {
+      setMicError('Trình duyệt không hỗ trợ thu âm Micro.');
+      return;
+    }
+    stopMicRef.current?.(true);
     setTestingWord(word);
+    setMicError(null);
+    setMicInterim('');
     setTestResult(null);
-    startSpeechRecognition(
+    stopMicRef.current = startSpeechRecognition(
       accent,
-      (transcript) => {
+      (transcript, meta) => {
         const res = scorePronunciation(word, transcript);
-        setTestResult({ word, score: res.score, heard: transcript });
+        setTestResult({ word, score: res.score, heard: transcript, audioUrl: meta?.audioUrl });
       },
-      () => {},
-      () => setTestingWord(null)
+      (err) => setMicError(err),
+      () => {
+        setTestingWord(null);
+        setMicInterim('');
+        stopMicRef.current = null;
+      },
+      {
+        onInterim: (text) => setMicInterim(text),
+      }
     );
   };
 
@@ -331,18 +371,39 @@ export const IpaPhonicsLab: React.FC<IpaPhonicsLabProps> = ({
                           ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
                           : 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
                       }`}
-                      title="Đọc thử vào Micro"
+                      title={testingWord === ex.word ? 'Dừng & chấm điểm' : 'Đọc thử vào Micro'}
                     >
-                      <Mic className="w-4 h-4" />
+                      {testingWord === ex.word ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
               ))}
             </div>
 
+            {testingWord && micInterim && (
+              <div className="mt-2 p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                ● {micInterim}
+              </div>
+            )}
+            {micError && (
+              <div className="mt-2 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                {micError}
+              </div>
+            )}
             {testResult && (
-              <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs">
-                Từ <strong>{testResult.word}</strong>: Điểm <strong>{testResult.score}%</strong> (Máy nghe: "{testResult.heard}")
+              <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  Từ <strong>{testResult.word}</strong>: Điểm <strong>{testResult.score}%</strong> (Máy nghe: "{testResult.heard}")
+                </span>
+                {testResult.audioUrl && (
+                  <button
+                    type="button"
+                    onClick={() => playLoudAudioUrl(testResult.audioUrl!, { gain: 1.4 })}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold inline-flex items-center gap-1"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
+                  </button>
+                )}
               </div>
             )}
           </div>

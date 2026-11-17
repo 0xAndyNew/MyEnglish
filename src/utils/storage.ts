@@ -72,17 +72,36 @@ export function getDefaultProgress(): UserProgress {
   };
 }
 
+export type SttProviderMode = 'auto' | 'local' | 'gemini';
+
+export interface LocalSttStatus {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  model: string;
+  targetModel: string;
+  progressPercent: number;
+  lastError: string | null;
+  isLoaded: boolean;
+  isTargetCached: boolean;
+  downloadedModels: string[];
+}
+
 export async function fetchSessionState(): Promise<{
   user: UserAccount;
   progress: UserProgress;
   hasApiKey: boolean;
+  sttProvider?: SttProviderMode;
+  sttModel?: string;
 } | null> {
   const token = getAuthToken();
   if (!token) return null;
   try {
-    return await apiRequest<{ user: UserAccount; progress: UserProgress; hasApiKey: boolean }>(
-      '/api/auth/me'
-    );
+    return await apiRequest<{
+      user: UserAccount;
+      progress: UserProgress;
+      hasApiKey: boolean;
+      sttProvider?: SttProviderMode;
+      sttModel?: string;
+    }>('/api/auth/me');
   } catch {
     setAuthToken('');
     return null;
@@ -177,8 +196,64 @@ export async function fetchAdminOverview(): Promise<{
   hasApiKey: boolean;
   maskedApiKey: string;
   users: AdminUserSummary[];
+  sttProvider: SttProviderMode;
+  sttModel: string;
+  allowedSttModels: string[];
+  localStt: LocalSttStatus;
 }> {
   return apiRequest('/api/admin/overview');
+}
+
+export async function fetchSpeechStatus(): Promise<{
+  sttProvider: SttProviderMode;
+  sttModel: string;
+  allowedModels: string[];
+  hasGeminiKey: boolean;
+  localStt: LocalSttStatus;
+}> {
+  return apiRequest('/api/speech/status');
+}
+
+export async function transcribeSpeechViaServer(payload: {
+  wavBase64?: string;
+  fallbackBase64?: string;
+  fallbackMimeType?: string;
+}): Promise<{
+  transcript: string;
+  provider: string;
+  model: string;
+  durationSec?: number;
+  silent?: boolean;
+}> {
+  return apiRequest('/api/speech/transcribe', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminUpdateSttSettings(
+  sttProvider: SttProviderMode,
+  sttModel: string
+): Promise<{
+  ok: boolean;
+  sttProvider: SttProviderMode;
+  sttModel: string;
+  localStt: LocalSttStatus;
+}> {
+  return apiRequest('/api/admin/stt-settings', {
+    method: 'PUT',
+    body: JSON.stringify({ sttProvider, sttModel }),
+  });
+}
+
+export async function adminWarmupSttModel(model?: string): Promise<{
+  ok: boolean;
+  localStt: LocalSttStatus;
+}> {
+  return apiRequest('/api/admin/stt-warmup', {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  });
 }
 
 export async function saveAdminApiKey(apiKey: string): Promise<{

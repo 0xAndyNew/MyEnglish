@@ -19,6 +19,15 @@ import {
   setAppSetting,
   verifyPassword,
 } from './db.mjs';
+import {
+  ALLOWED_STT_MODELS,
+  DEFAULT_STT_MODEL,
+  ensureWhisperPipeline,
+  getLocalSttStatus,
+  sanitizeSttModel,
+  transcribeWavBase64Local,
+  warmupCachedSttIfPresent,
+} from './speechStt.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +135,35 @@ async function callGoogleGemini(apiKey, parts) {
   }
 
   throw new Error(errors.join(' | ') || vData?.error?.message || 'Lỗi kết nối Gemini API');
+}
+
+function getSttSettings() {
+  const rawProvider = getAppSetting('stt_provider');
+  const sttProvider = ['auto', 'local', 'gemini'].includes(rawProvider) ? rawProvider : 'auto';
+  const sttModel = sanitizeSttModel(getAppSetting('stt_model') || DEFAULT_STT_MODEL);
+  return { sttProvider, sttModel };
+}
+
+async function transcribeWithGeminiServer(apiKey, base64Audio, mimeType) {
+  const cleanMime = String(mimeType || 'audio/wav').split(';')[0] || 'audio/wav';
+  const result = await callGoogleGemini(apiKey, [
+    {
+      text: 'Listen to this short English speech recording and transcribe ONLY the exact English words spoken. Return plain text with no quotes or extra explanation. If nothing was spoken, return an empty string.',
+    },
+    {
+      inline_data: {
+        mime_type: cleanMime,
+        data: base64Audio,
+      },
+    },
+  ]);
+  const cleanText = String(result.text || '').trim().replace(/^["']|["']$/g, '');
+  return {
+    transcript: cleanText,
+    provider: 'gemini',
+    model: result.model,
+    silent: !cleanText,
+  };
 }
 
 const MIME_MAP = {
@@ -250,7 +288,74 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && pathname === '/api/auth/me') {
       const progress = loadFullProgress(currentUser.email);
       const hasApiKey = Boolean(getAppSetting('gemini_api_key'));
-      return sendJson(res, 200, { user: currentUser, progress, hasApiKey });
+      const { sttProvider, sttModel } = getSttSettings();
+      return sendJson(res, 200, { user: currentUser, progress, hasApiKey, sttProvider, sttModel });
+    }
+
+    if (method === 'GET' && pathname === '/api/speech/status') {
+      const { sttProvider, sttModel } = getSttSettings();
+      const hasGeminiKey = Boolean(getAppSetting('gemini_api_key'));
+      return sendJson(res, 200, {
+        sttProvider,
+        sttModel,
+        allowedModels: ALLOWED_STT_MODELS,
+        hasGeminiKey,
+        localStt: getLocalSttStatus(sttModel),
+      });
+    }
+
+    if (method === 'POST' && pathname === '/api/speech/transcribe') {
+      const body = await readJsonBody(req);
+      const wavBase64 = typeof body.wavBase64 === 'string' ? body.wavBase64.trim() : '';
+      const fallbackBase64 = typeof body.fallbackBase64 === 'string' ? body.fallbackBase64.trim() : '';
+      const fallbackMimeType = typeof body.fallbackMimeType === 'string' ? body.fallbackMimeType : 'audio/webm';
+
+      if (!wavBase64 && !fallbackBase64) {
+        return sendJson(res, 400, { error: 'Thiếu dữ liệu âm thanh để nhận diện.' });
+      }
+
+      const { sttProvider, sttModel } = getSttSettings();
+      const geminiKey = getAppSetting('gemini_api_key');
+
+      // When Admin prioritizes Gemini and has a key, try Gemini first and fall back to Local Whisper
+      if (sttProvider === 'gemini' && geminiKey) {
+        try {
+          const b64 = fallbackBase64 || wavBase64;
+          const mime = fallbackBase64 ? fallbackMimeType : 'audio/wav';
+          const out = await transcribeWithGeminiServer(geminiKey, b64, mime);
+          return sendJson(res, 200, out);
+        } catch (geminiErr) {
+          if (!wavBase64) {
+            throw geminiErr;
+          }
+          const out = await transcribeWavBase64Local(wavBase64, { modelName: sttModel });
+          return sendJson(res, 200, out);
+        }
+      }
+
+      // Default ('auto' or 'local'): run Local Offline Whisper on Node.js (works on all browsers without API Key)
+      if (wavBase64) {
+        try {
+          const out = await transcribeWavBase64Local(wavBase64, { modelName: sttModel });
+          return sendJson(res, 200, out);
+        } catch (localErr) {
+          if (geminiKey && sttProvider !== 'local') {
+            const b64 = fallbackBase64 || wavBase64;
+            const mime = fallbackBase64 ? fallbackMimeType : 'audio/wav';
+            const out = await transcribeWithGeminiServer(geminiKey, b64, mime);
+            return sendJson(res, 200, out);
+          }
+          throw localErr;
+        }
+      }
+
+      // If browser failed to produce WAV and only sent compressed blob, use Gemini if available
+      if (geminiKey && fallbackBase64) {
+        const out = await transcribeWithGeminiServer(geminiKey, fallbackBase64, fallbackMimeType);
+        return sendJson(res, 200, out);
+      }
+
+      return sendJson(res, 400, { error: 'Trình duyệt không giải mã được âm thanh WAV để chấm offline.' });
     }
 
     if (method === 'GET' && pathname === '/api/progress') {
@@ -294,10 +399,42 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET' && pathname === '/api/admin/overview') {
         const key = getAppSetting('gemini_api_key');
         const users = listAllUsersAdmin();
+        const { sttProvider, sttModel } = getSttSettings();
         return sendJson(res, 200, {
           hasApiKey: Boolean(key),
           maskedApiKey: maskKey(key),
           users,
+          sttProvider,
+          sttModel,
+          allowedSttModels: ALLOWED_STT_MODELS,
+          localStt: getLocalSttStatus(sttModel),
+        });
+      }
+
+      if (method === 'PUT' && pathname === '/api/admin/stt-settings') {
+        const body = await readJsonBody(req);
+        const nextProvider = ['auto', 'local', 'gemini'].includes(body.sttProvider)
+          ? body.sttProvider
+          : 'auto';
+        const nextModel = sanitizeSttModel(body.sttModel || DEFAULT_STT_MODEL);
+        setAppSetting('stt_provider', nextProvider);
+        setAppSetting('stt_model', nextModel);
+        return sendJson(res, 200, {
+          ok: true,
+          sttProvider: nextProvider,
+          sttModel: nextModel,
+          localStt: getLocalSttStatus(nextModel),
+        });
+      }
+
+      if (method === 'POST' && pathname === '/api/admin/stt-warmup') {
+        const body = await readJsonBody(req);
+        const { sttModel } = getSttSettings();
+        const targetModel = sanitizeSttModel(body.model || sttModel);
+        await ensureWhisperPipeline(targetModel);
+        return sendJson(res, 200, {
+          ok: true,
+          localStt: getLocalSttStatus(targetModel),
         });
       }
 
@@ -378,4 +515,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`✅ MyEnglish SQLite API Server running on http://localhost:${PORT}`);
+  const { sttModel } = getSttSettings();
+  warmupCachedSttIfPresent(sttModel);
 });

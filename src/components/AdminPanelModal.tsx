@@ -7,6 +7,7 @@ import {
   EyeOff,
   KeyRound,
   Loader2,
+  Mic,
   PlusCircle,
   RefreshCw,
   RotateCcw,
@@ -18,19 +19,24 @@ import {
 } from 'lucide-react';
 import { CefrLevel } from '../types/learning';
 import { callGeminiText } from '../utils/geminiClient';
+import { setServerSttProvider } from '../utils/speechEngine';
 import {
   adminCreateCustomLesson,
   adminDeleteCustomLesson,
   adminDeleteUser,
   adminResetUserPassword,
   adminResetUserProgress,
+  adminUpdateSttSettings,
+  adminWarmupSttModel,
   AdminUserSummary,
   CustomLessonKind,
   CustomLessonRecord,
   fetchAdminOverview,
   fetchCustomLessons,
   isDevAccount,
+  LocalSttStatus,
   saveAdminApiKey,
+  SttProviderMode,
   testAdminApiKey,
 } from '../utils/storage';
 
@@ -63,6 +69,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [loadingList, setLoadingList] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [testingKey, setTestingKey] = useState(false);
+  const [sttProvider, setSttProvider] = useState<SttProviderMode>('auto');
+  const [sttModel, setSttModel] = useState('Xenova/whisper-tiny.en');
+  const [allowedSttModels, setAllowedSttModels] = useState<string[]>([
+    'Xenova/whisper-tiny.en',
+    'Xenova/whisper-base.en',
+  ]);
+  const [localStt, setLocalStt] = useState<LocalSttStatus | null>(null);
+  const [savingStt, setSavingStt] = useState(false);
+  const [warmingStt, setWarmingStt] = useState(false);
 
   // Tab 2: Custom Lessons Manager
   const [customLessons, setCustomLessons] = useState<CustomLessonRecord[]>([]);
@@ -94,6 +109,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setUsers(overview.users);
       setMaskedKey(overview.maskedApiKey);
       onApiKeyStatusChange(overview.hasApiKey);
+      setSttProvider(overview.sttProvider || 'auto');
+      setSttModel(overview.sttModel || 'Xenova/whisper-tiny.en');
+      if (Array.isArray(overview.allowedSttModels) && overview.allowedSttModels.length > 0) {
+        setAllowedSttModels(overview.allowedSttModels);
+      }
+      setLocalStt(overview.localStt || null);
+      setServerSttProvider(overview.sttProvider || 'auto');
       setCustomLessons(lessons);
       onCustomLessonsChange?.(lessons);
     } catch (err: any) {
@@ -151,6 +173,39 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setStatusMsg(`❌ Lỗi kết nối Key: ${err?.message || 'Không xác định'}`);
     } finally {
       setTestingKey(false);
+    }
+  };
+
+  const handleSaveSttSettings = async () => {
+    setSavingStt(true);
+    setStatusMsg(null);
+    try {
+      const res = await adminUpdateSttSettings(sttProvider, sttModel);
+      setLocalStt(res.localStt);
+      setServerSttProvider(res.sttProvider);
+      setStatusMsg(
+        `✅ Đã lưu cấu hình nhận diện giọng nói đa trình duyệt (${res.sttProvider} / ${res.sttModel}).`
+      );
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Lưu cấu hình giọng nói thất bại.'}`);
+    } finally {
+      setSavingStt(false);
+    }
+  };
+
+  const handleWarmupStt = async () => {
+    setWarmingStt(true);
+    setStatusMsg('⏳ Đang tải & khởi tạo model Whisper offline trên server (chỉ tải 1 lần)...');
+    try {
+      await adminUpdateSttSettings(sttProvider, sttModel);
+      setServerSttProvider(sttProvider);
+      const res = await adminWarmupSttModel(sttModel);
+      setLocalStt(res.localStt);
+      setStatusMsg(`✅ Model Whisper (${sttModel}) đã sẵn sàng chạy offline trên mọi trình duyệt!`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Không tải được model Whisper.'}`);
+    } finally {
+      setWarmingStt(false);
     }
   };
 
@@ -485,6 +540,80 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 >
                   {testingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   Kiểm tra kết nối Key
+                </button>
+              </div>
+            </div>
+
+            {/* Cross-Browser Speech-to-Text Engine */}
+            <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-900/50 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-extrabold uppercase text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                  <Mic className="w-4 h-4" /> Nhận Diện Giọng Nói Đa Trình Duyệt (Local Whisper Offline)
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    localStt?.isLoaded
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : localStt?.isTargetCached
+                      ? 'bg-sky-100 text-sky-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {localStt?.isLoaded
+                    ? 'Đang chạy sẵn trên Server'
+                    : localStt?.isTargetCached
+                    ? 'Đã tải cache trên ổ đĩa'
+                    : 'Chưa tải model (~41–75 MB lần đầu)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Hỗ trợ Edge, Brave, Firefox, Safari và trình duyệt nhúng không cần Gemini API Key.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Chế độ nhận diện</label>
+                  <select
+                    value={sttProvider}
+                    onChange={(e) => setSttProvider(e.target.value as SttProviderMode)}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                  >
+                    <option value="auto">Tự động (Chrome realtime, trình duyệt khác dùng Whisper)</option>
+                    <option value="local">Luôn dùng Local Whisper Offline (mọi trình duyệt)</option>
+                    <option value="gemini">Ưu tiên Gemini AI (lùi về Whisper khi lỗi/hết quota)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">Model Whisper Offline</label>
+                  <select
+                    value={sttModel}
+                    onChange={(e) => setSttModel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                  >
+                    {allowedSttModels.map((m) => (
+                      <option key={m} value={m}>
+                        {m === 'Xenova/whisper-tiny.en'
+                          ? 'Xenova/whisper-tiny.en (~41 MB — Rất nhanh)'
+                          : 'Xenova/whisper-base.en (~75 MB — Chuẩn từ đơn hơn)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleSaveSttSettings}
+                  disabled={savingStt}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50"
+                >
+                  {savingStt ? 'Đang lưu...' : 'Lưu cấu hình giọng nói'}
+                </button>
+                <button
+                  onClick={handleWarmupStt}
+                  disabled={warmingStt}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {warmingStt ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  Tải trước & Khởi động model
                 </button>
               </div>
             </div>

@@ -1,13 +1,20 @@
-import React from 'react';
-import { CheckCircle2, AlertTriangle, Volume2, RotateCcw, XCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, AlertTriangle, Volume2, RotateCcw, XCircle, Square } from 'lucide-react';
 import { AccentMode } from '../types/learning';
-import { PronunciationScoreResult, speakText } from '../utils/speechEngine';
+import {
+  playLoudAudioUrl,
+  PronunciationScoreResult,
+  speakText,
+  stopActiveAudioPlayback,
+} from '../utils/speechEngine';
 
 interface PronunciationReportCardProps {
   result: PronunciationScoreResult;
   accent: AccentMode;
   title?: string;
   onRetry?: () => void;
+  userAudioUrl?: string | null;
+  sampleText?: string;
   compact?: boolean;
 }
 
@@ -16,8 +23,46 @@ export const PronunciationReportCard: React.FC<PronunciationReportCardProps> = (
   accent,
   title = 'Kết quả chấm phát âm chi tiết từng chữ',
   onRetry,
+  userAudioUrl,
+  sampleText,
   compact = false,
 }) => {
+  const [isPlayingSelf, setIsPlayingSelf] = useState(false);
+  const stopPlaybackRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    setIsPlayingSelf(false);
+    stopPlaybackRef.current?.();
+    stopPlaybackRef.current = null;
+    return () => {
+      stopPlaybackRef.current?.();
+      stopPlaybackRef.current = null;
+    };
+  }, [userAudioUrl]);
+
+  const handleToggleSelfPlayback = () => {
+    if (!userAudioUrl) return;
+    if (isPlayingSelf) {
+      stopPlaybackRef.current?.();
+      stopPlaybackRef.current = null;
+      stopActiveAudioPlayback();
+      setIsPlayingSelf(false);
+      return;
+    }
+    window.speechSynthesis?.cancel();
+    setIsPlayingSelf(true);
+    stopPlaybackRef.current = playLoudAudioUrl(userAudioUrl, {
+      gain: 1.4,
+      onEnded: () => {
+        setIsPlayingSelf(false);
+        stopPlaybackRef.current = null;
+      },
+      onError: () => {
+        setIsPlayingSelf(false);
+        stopPlaybackRef.current = null;
+      },
+    });
+  };
   const scoreColorClass =
     result.score >= 80
       ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300'
@@ -60,11 +105,36 @@ export const PronunciationReportCard: React.FC<PronunciationReportCardProps> = (
               <XCircle className="w-3 h-3" /> Sai/Thiếu: {result.wrongCount}
             </span>
           )}
+          {userAudioUrl && (
+            <button
+              type="button"
+              onClick={handleToggleSelfPlayback}
+              className={`px-3 py-1 rounded-lg border inline-flex items-center gap-1 transition ${
+                isPlayingSelf
+                  ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-sm'
+              }`}
+              title="Nghe lại chính giọng bạn vừa đọc để đối chiếu phát âm"
+            >
+              {isPlayingSelf ? <Square className="w-3 h-3" /> : <Volume2 className="w-3.5 h-3.5" />}
+              <span>{isPlayingSelf ? 'Dừng phát' : 'Nghe lại giọng bạn'}</span>
+            </button>
+          )}
+          {sampleText && (
+            <button
+              type="button"
+              onClick={() => speakText(sampleText, accent, 0.9)}
+              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1"
+              title="Nghe lại giọng mẫu chuẩn để so sánh"
+            >
+              <Volume2 className="w-3 h-3 text-indigo-500" /> Nghe mẫu
+            </button>
+          )}
           {onRetry && (
             <button
               type="button"
               onClick={onRetry}
-              className="px-2.5 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1"
+              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1"
             >
               <RotateCcw className="w-3 h-3" /> Đọc lại
             </button>
