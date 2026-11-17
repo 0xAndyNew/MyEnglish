@@ -23,6 +23,7 @@ import {
   speakText,
   startSpeechRecognition,
 } from '../utils/speechEngine';
+import { PronunciationReportCard } from './PronunciationReportCard';
 
 interface WordAnatomyCardProps {
   wordEntry: WordEntry;
@@ -277,26 +278,13 @@ export const WordAnatomyCard: React.FC<WordAnatomyCardProps> = ({
           </div>
         )}
         {scoreResult && (
-          <div className="mt-3 p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-lg font-extrabold px-2.5 py-1 rounded-lg ${
-                  scoreResult.score >= 85
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : scoreResult.score >= 60
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-rose-100 text-rose-700'
-                }`}
-              >
-                {scoreResult.score}%
-              </span>
-              <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Máy nghe được: <strong className="text-slate-900 dark:text-white">"{scoreResult.transcript}"</strong>
-                </p>
-                <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{scoreResult.feedback}</p>
-              </div>
-            </div>
+          <div className="mt-3">
+            <PronunciationReportCard
+              result={scoreResult}
+              accent={accent}
+              title="Kết quả phát âm"
+              compact
+            />
           </div>
         )}
       </div>

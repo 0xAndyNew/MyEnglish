@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones,
   Play,
@@ -7,6 +7,7 @@ import {
   EyeOff,
   Volume2,
   CheckCircle2,
+  XCircle,
   Mic,
   Turtle,
   MessageSquare,
@@ -29,6 +30,7 @@ import {
   speakText,
   startSpeechRecognition,
 } from '../utils/speechEngine';
+import { PronunciationReportCard } from './PronunciationReportCard';
 import { WordAnatomyCard } from './WordAnatomyCard';
 
 interface ListeningSpeakingLabProps {
@@ -102,8 +104,19 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   const [showVi, setShowVi] = useState(false);
   const [selectedAns, setSelectedAns] = useState<number | null>(null);
   const [completedIds, setCompletedIds] = useState<string[]>([]);
+  const [quizResults, setQuizResults] = useState<Record<string, 'correct' | 'wrong'>>({});
+  const [passageScores, setPassageScores] = useState<Record<string, number>>({});
   const [lookedUpWord, setLookedUpWord] = useState<WordEntry | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
+
+  // Full Passage Read-Aloud scoring state
+  const [passageListening, setPassageListening] = useState(false);
+  const [passageInterim, setPassageInterim] = useState('');
+  const [passageScoreResult, setPassageScoreResult] = useState<PronunciationScoreResult | null>(null);
+  const [passageSpeechError, setPassageSpeechError] = useState<string | null>(null);
+  const [recordingPassageSelf, setRecordingPassageSelf] = useState(false);
+  const [passageSelfAudioUrl, setPassageSelfAudioUrl] = useState<string | null>(null);
+  const stopMicRef = useRef<(() => void) | null>(null);
 
   // Inline Shadowing on current lesson sentence
   const [shadowSentenceIdx, setShadowSentenceIdx] = useState(0);
@@ -119,7 +132,15 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     [customSentences]
   );
   const [targetSentence, setTargetSentence] = useState(PRACTICE_SENTENCES[0].en);
+  const [sentenceScores, setSentenceScores] = useState<Record<string, number>>({});
   const [customInput, setCustomInput] = useState('');
+
+  useEffect(() => {
+    return () => {
+      stopMicRef.current?.();
+      stopMicRef.current = null;
+    };
+  }, []);
 
   // Tab 3: Roleplay
   const allScenarios = useMemo(
@@ -152,13 +173,25 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   );
   const activeLessonSentence = lessonSentences[shadowSentenceIdx % lessonSentences.length] || currentLesson.transcript;
 
+  const stopActiveMic = () => {
+    stopMicRef.current?.();
+    stopMicRef.current = null;
+    setIsListening(false);
+    setPassageListening(false);
+  };
+
   const handleSelectLesson = (idx: number) => {
     window.speechSynthesis?.cancel();
+    stopActiveMic();
     setLessonIdx(idx);
     setSelectedAns(null);
     setShadowSentenceIdx(0);
     setScoreResult(null);
     setSpeechError(null);
+    setPassageScoreResult(null);
+    setPassageSpeechError(null);
+    setPassageInterim('');
+    setPassageSelfAudioUrl(null);
     setLookedUpWord(null);
   };
 
@@ -177,9 +210,70 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   const handleAnswerQuiz = (oIdx: number) => {
     setSelectedAns(oIdx);
-    if (oIdx === currentLesson.question.correctIdx && !completedIds.includes(currentLesson.id)) {
+    const isCorrect = oIdx === currentLesson.question.correctIdx;
+    setQuizResults((prev) => ({
+      ...prev,
+      [currentLesson.id]: isCorrect ? 'correct' : 'wrong',
+    }));
+    if (isCorrect && !completedIds.includes(currentLesson.id)) {
       setCompletedIds((prev) => [...prev, currentLesson.id]);
       onAddXp(20);
+    }
+  };
+
+  const runPassageMicCheck = () => {
+    if (passageListening) {
+      stopMicRef.current?.();
+      stopMicRef.current = null;
+      return;
+    }
+    if (!isSpeechRecognitionSupported()) {
+      setPassageSpeechError('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome hoặc Edge.');
+      return;
+    }
+    stopActiveMic();
+    setPassageSpeechError(null);
+    setPassageScoreResult(null);
+    setPassageInterim('');
+    setPassageListening(true);
+
+    stopMicRef.current = startSpeechRecognition(
+      accent,
+      (transcript) => {
+        const res = scorePronunciation(currentLesson.transcript, transcript);
+        setPassageScoreResult(res);
+        setPassageScores((prev) => ({
+          ...prev,
+          [currentLesson.id]: Math.max(prev[currentLesson.id] ?? 0, res.score),
+        }));
+        onPronunciationScore(res.score);
+        if (res.score >= 70) {
+          onAddXp(25);
+        }
+      },
+      (err) => setPassageSpeechError(err),
+      () => {
+        setPassageListening(false);
+        stopMicRef.current = null;
+      },
+      {
+        continuous: true,
+        maxDurationMs: 25000,
+        onInterim: (text) => setPassageInterim(text),
+      }
+    );
+  };
+
+  const handleRecordPassageSelf = async () => {
+    setPassageSpeechError(null);
+    setRecordingPassageSelf(true);
+    try {
+      const { url } = await recordAudioClip(10000);
+      setPassageSelfAudioUrl(url);
+    } catch (err: any) {
+      setPassageSpeechError(err?.message || 'Không thể mở Micro để tự ghi âm đoạn văn.');
+    } finally {
+      setRecordingPassageSelf(false);
     }
   };
 
@@ -188,20 +282,33 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
       setSpeechError('Trình duyệt chưa hỗ trợ nhận diện giọng nói. Vui lòng dùng Chrome hoặc Edge.');
       return;
     }
+    stopActiveMic();
     setSpeechError(null);
     setScoreResult(null);
     setRoleplayFeedback(null);
     setIsListening(true);
-    startSpeechRecognition(
+    stopMicRef.current = startSpeechRecognition(
       accent,
       (transcript) => {
         const res = scorePronunciation(expectedText, transcript);
-        if (onSuccess) onSuccess(res);
-        else setScoreResult(res);
+        if (onSuccess) {
+          onSuccess(res);
+        } else {
+          setScoreResult(res);
+          if (expectedText === targetSentence) {
+            setSentenceScores((prev) => ({
+              ...prev,
+              [expectedText]: Math.max(prev[expectedText] ?? 0, res.score),
+            }));
+          }
+        }
         onPronunciationScore(res.score);
       },
       (err) => setSpeechError(err),
-      () => setIsListening(false)
+      () => {
+        setIsListening(false);
+        stopMicRef.current = null;
+      }
     );
   };
 
@@ -327,6 +434,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
               key={t.id}
               onClick={() => {
                 window.speechSynthesis?.cancel();
+                stopActiveMic();
                 setSubTab(t.id as 'listen_read' | 'shadowing' | 'roleplay');
                 setScoreResult(null);
                 setSpeechError(null);
@@ -348,10 +456,18 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Left: Lesson list */}
           <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 h-fit">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-extrabold uppercase text-slate-500">
-                Kho bài Nghe & Đọc ({completedIds.length}/{allLessons.length})
+                Kho bài Nghe & Đọc ({allLessons.length} bài)
               </span>
+              <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Quiz: {completedIds.length}/{allLessons.length}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  Đọc: {Object.keys(passageScores).length}/{allLessons.length}
+                </span>
+              </div>
             </div>
 
             {/* AI Generate Listening Lesson */}
@@ -396,6 +512,8 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
               {filteredLessons.map((item, idx) => {
                 const active = item.id === currentLesson.id;
                 const done = completedIds.includes(item.id);
+                const quizWrong = !done && quizResults[item.id] === 'wrong';
+                const passageScore = passageScores[item.id];
                 return (
                   <button
                     key={item.id}
@@ -406,13 +524,34 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                         : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 hover:border-indigo-300'
                     }`}
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-xs font-bold">{item.title}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {item.level} • {item.category}
+                      <div className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span>{item.level} • {item.category}</span>
+                        {passageScore !== undefined && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                              passageScore >= 80
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : passageScore >= 55
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            Đọc: {passageScore}đ
+                          </span>
+                        )}
                       </div>
                     </div>
-                    {done && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />}
+                    {done ? (
+                      <span title="Đã làm đúng Quiz" className="shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      </span>
+                    ) : quizWrong ? (
+                      <span title="Quiz đang chọn sai" className="shrink-0 mt-0.5">
+                        <XCircle className="w-4 h-4 text-rose-500" />
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -536,10 +675,99 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                 />
               )}
 
+              {/* Full Passage Read-Aloud & Word-by-Word Pronunciation Grading */}
+              <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/50 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-extrabold uppercase text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                      <Mic className="w-4 h-4" /> Đọc phát âm lại cả đoạn văn & Chấm điểm từng chữ
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                      Bấm đọc cả đoạn văn bằng giọng của bạn rồi bấm Dừng — hệ thống sẽ chỉ rõ chữ nào phát âm đúng, gần đúng hay sai/thiếu.
+                    </p>
+                  </div>
+                  {passageScores[currentLesson.id] !== undefined && (
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-black">
+                      Điểm cao nhất: {passageScores[currentLesson.id]}/100
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={runPassageMicCheck}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 transition ${
+                      passageListening
+                        ? 'bg-rose-600 hover:bg-rose-700 animate-pulse'
+                        : 'bg-indigo-600 hover:bg-indigo-700'
+                    }`}
+                  >
+                    {passageListening ? (
+                      <>
+                        <Square className="w-3.5 h-3.5" /> Dừng đọc & Chấm điểm ngay
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3.5 h-3.5" /> Bắt đầu đọc cả đoạn văn
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleRecordPassageSelf}
+                    disabled={recordingPassageSelf}
+                    className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    {recordingPassageSelf ? 'Đang ghi 10s...' : 'Thu âm đoạn tự nghe lại'}
+                  </button>
+                  {passageSelfAudioUrl && (
+                    <button
+                      onClick={() => new Audio(passageSelfAudioUrl).play()}
+                      className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 text-indigo-700 text-xs font-bold inline-flex items-center gap-1"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" /> Nghe lại giọng bạn
+                    </button>
+                  )}
+                </div>
+
+                {passageListening && (
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-300 text-xs text-slate-700 dark:text-slate-200">
+                    <span className="font-bold text-rose-600">● Đang thu giọng đọc đoạn văn... </span>
+                    <span>{passageInterim || 'Hãy đọc to, rõ ràng từng câu theo đoạn văn phía trên...'}</span>
+                  </div>
+                )}
+
+                {passageSpeechError && <p className="text-xs text-rose-600 font-semibold">{passageSpeechError}</p>}
+
+                {passageScoreResult && (
+                  <PronunciationReportCard
+                    result={passageScoreResult}
+                    accent={accent}
+                    title="Chấm điểm đọc đoạn văn từng chữ"
+                    onRetry={runPassageMicCheck}
+                  />
+                )}
+              </div>
+
               {/* Comprehension Quiz */}
               <div className="p-4 rounded-xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-900/50 space-y-2.5">
-                <div className="text-xs font-extrabold uppercase text-sky-700 dark:text-sky-300">
-                  📝 Kiểm tra Nghe & Đọc hiểu
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-extrabold uppercase text-sky-700 dark:text-sky-300">
+                    📝 Kiểm tra Nghe & Đọc hiểu
+                  </div>
+                  {selectedAns !== null && (
+                    <span
+                      className={`px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                        selectedAns === currentLesson.question.correctIdx
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-rose-100 text-rose-700'
+                      }`}
+                    >
+                      {selectedAns === currentLesson.question.correctIdx
+                        ? '✓ Trả lời đúng (+20 XP)'
+                        : '✕ Trả lời chưa đúng'}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-bold text-slate-900 dark:text-white">{currentLesson.question.q}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -565,6 +793,12 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                     );
                   })}
                 </div>
+                {selectedAns !== null && selectedAns !== currentLesson.question.correctIdx && (
+                  <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+                    ✕ Đáp án bạn chọn chưa đúng. Đáp án chính xác là:{' '}
+                    <strong>"{currentLesson.question.options[currentLesson.question.correctIdx]}"</strong>
+                  </p>
+                )}
               </div>
 
               {/* Inline Shadowing Practice on THIS lesson */}
@@ -635,24 +869,25 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
                 {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
                 {scoreResult && (
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 text-xs space-y-1">
-                    <div className="font-extrabold text-emerald-700 dark:text-emerald-300">
-                      Điểm phát âm: {scoreResult.score}/100
-                    </div>
-                    <div className="text-slate-600 dark:text-slate-300">
-                      Bạn vừa đọc: "{scoreResult.transcript}"
-                    </div>
-                  </div>
+                  <PronunciationReportCard
+                    result={scoreResult}
+                    accent={accent}
+                    title="Chấm phát âm câu Shadowing"
+                    onRetry={() => runMicCheck(activeLessonSentence)}
+                  />
                 )}
               </div>
 
-              {onUnlockNext && !isNextUnlocked && (
+              {onUnlockNext && (
                 <div className="pt-2 flex justify-end">
                   <button
                     onClick={onUnlockNext}
                     className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5"
                   >
-                    Mở khóa Bước 4: Đọc, Viết & SRS <ArrowRight className="w-4 h-4" />
+                    {isNextUnlocked
+                      ? 'Sang Bước 4: Đọc, Viết & SRS (Đã mở khóa)'
+                      : 'Mở khóa Bước 4: Đọc, Viết & SRS'}{' '}
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -686,24 +921,42 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {allSentences.map((item, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  setTargetSentence(item.en);
-                  setScoreResult(null);
-                  setSpeechError(null);
-                }}
-                className={`text-left p-3 rounded-xl border transition ${
-                  targetSentence === item.en
-                    ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-400'
-                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                <div className="text-xs font-bold text-slate-900 dark:text-white">{item.en}</div>
-                <div className="text-[11px] text-slate-500 mt-1">{item.vi}</div>
-              </button>
-            ))}
+            {allSentences.map((item, idx) => {
+              const best = sentenceScores[item.en];
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setTargetSentence(item.en);
+                    setScoreResult(null);
+                    setSpeechError(null);
+                  }}
+                  className={`text-left p-3 rounded-xl border transition ${
+                    targetSentence === item.en
+                      ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-400'
+                      : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">{item.en}</div>
+                    {best !== undefined && (
+                      <span
+                        className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-black ${
+                          best >= 80
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : best >= 55
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}
+                      >
+                        {best}đ
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">{item.vi}</div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -768,9 +1021,12 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
             </div>
             {speechError && <p className="text-xs text-rose-600 font-semibold">{speechError}</p>}
             {scoreResult && (
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 text-sm">
-                <strong className="text-emerald-700">Điểm: {scoreResult.score}/100</strong> — Bạn đọc: "{scoreResult.transcript}"
-              </div>
+              <PronunciationReportCard
+                result={scoreResult}
+                accent={accent}
+                title="Kết quả chấm phát âm từng chữ"
+                onRetry={() => runMicCheck(targetSentence)}
+              />
             )}
           </div>
         </div>
@@ -891,9 +1147,13 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                     </button>
                   </div>
                   {roleplayFeedback && (
-                    <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300 pt-1">
-                      Điểm phản xạ: {roleplayFeedback.score}/100 — "{roleplayFeedback.transcript}"
-                    </div>
+                    <PronunciationReportCard
+                      result={roleplayFeedback}
+                      accent={accent}
+                      title="Điểm phản xạ hội thoại từng chữ"
+                      compact
+                      onRetry={() => runMicCheck(targetReply, (res) => setRoleplayFeedback(res))}
+                    />
                   )}
                 </div>
               );

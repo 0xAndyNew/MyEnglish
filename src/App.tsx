@@ -54,6 +54,12 @@ const ROADMAP_STEPS = [
   { idx: 6, label: 'B4: Đọc, Viết & SRS' },
 ];
 
+function normalizeProgressUnlock(prog: UserProgress): UserProgress {
+  return prog.unlockedStepIndex >= 4 && prog.unlockedStepIndex < 6
+    ? { ...prog, unlockedStepIndex: 6 }
+    : prog;
+}
+
 export function App() {
   const [authChecking, setAuthChecking] = useState(() => Boolean(getAuthToken()));
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
@@ -86,9 +92,10 @@ export function App() {
       const state = await fetchSessionState();
       if (!active) return;
       if (state) {
+        const normalizedProg = normalizeProgressUnlock(state.progress);
         hydratedEmailRef.current = state.user.email;
         setCurrentUser(state.user);
-        setProgress(state.progress);
+        setProgress(normalizedProg);
         setActiveStepIdx(state.progress.unlockedStepIndex || 0);
         setDevUnlockAll(state.user.role === 'admin' || isDevAccount(state.user.email));
         setHasServerApiKey(state.hasApiKey);
@@ -114,9 +121,10 @@ export function App() {
   }, [darkMode]);
 
   const handleAuthSuccess = async (user: UserAccount, loadedProg: UserProgress) => {
+    const normalizedProg = normalizeProgressUnlock(loadedProg);
     hydratedEmailRef.current = user.email;
     setCurrentUser(user);
-    setProgress(loadedProg);
+    setProgress(normalizedProg);
     setActiveStepIdx(loadedProg.unlockedStepIndex || 0);
     setDevUnlockAll(user.role === 'admin' || isDevAccount(user.email));
     setSearchedWord(null);
@@ -145,6 +153,17 @@ export function App() {
       xp: prev.xp + (prev.unlockedStepIndex < effectiveTarget ? 40 : 0),
     }));
     setActiveStepIdx(targetIdx);
+  };
+
+  const autoUnlockPracticeStages = () => {
+    setProgress((prev) => {
+      if (prev.unlockedStepIndex >= 6) return prev;
+      return {
+        ...prev,
+        unlockedStepIndex: 6,
+        xp: prev.xp + 40,
+      };
+    });
   };
 
   if (authChecking) {
@@ -485,6 +504,8 @@ export function App() {
             onAddXp={(amount) => setProgress((p) => ({ ...p, xp: p.xp + amount }))}
             isStep3Unlocked={progress.unlockedStepIndex >= 4}
             onUnlockStep3={() => unlockStep(4)}
+            onAutoUnlockNext={autoUnlockPracticeStages}
+            onGoToStep3={() => unlockStep(5)}
             devUnlockAll={devUnlockAll}
             savedCompletedGrammarIds={progress.completedGrammarIds ?? []}
             onCompleteGrammarId={(id) =>

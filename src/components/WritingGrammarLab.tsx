@@ -27,6 +27,8 @@ interface WritingGrammarLabProps {
   onAddXp: (amount: number) => void;
   isStep3Unlocked?: boolean;
   onUnlockStep3?: () => void;
+  onAutoUnlockNext?: () => void;
+  onGoToStep3?: () => void;
   devUnlockAll?: boolean;
   savedCompletedGrammarIds?: string[];
   onCompleteGrammarId?: (id: string) => void;
@@ -247,6 +249,8 @@ export const WritingGrammarLab: React.FC<WritingGrammarLabProps> = ({
   onAddXp,
   isStep3Unlocked = false,
   onUnlockStep3,
+  onAutoUnlockNext,
+  onGoToStep3,
   devUnlockAll = false,
   savedCompletedGrammarIds,
   onCompleteGrammarId,
@@ -353,6 +357,7 @@ export const WritingGrammarLab: React.FC<WritingGrammarLabProps> = ({
     setExamSubmitted(true);
     if (examScorePercent >= 80) {
       onAddXp(60);
+      onAutoUnlockNext?.();
       confetti({ particleCount: 80, spread: 70 });
     }
   };
@@ -927,7 +932,7 @@ Bài viết của học viên:
                       🏆 Bài {GRAMMAR_LESSONS.length + 1}: Thi Tổng Hợp Nhận Biết Các Thì & Cấu Trúc ({examCount} câu)
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-                      Đạt từ <strong>80% trở lên ({Math.ceil(examCount * 0.8)}/{examCount} câu đúng)</strong> để mở khóa <strong>Bước 3: Luyện Nghe</strong>.
+                      Đạt từ <strong>80% trở lên ({Math.ceil(examCount * 0.8)}/{examCount} câu đúng)</strong> để mở khóa đồng thời <strong>Bước 2C (Ghép Câu), Bước 3 (Nghe–Nói) và Bước 4 (Đọc, Viết & SRS)</strong>.
                     </p>
                   </div>
 
@@ -1052,13 +1057,25 @@ Bài viết của học viên:
                     )}
                   </div>
 
-                  {onUnlockStep3 && (isStep3Unlocked || examPassed) && (
-                    <button
-                      onClick={onUnlockStep3}
-                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-md"
-                    >
-                      🎉 Đạt chuẩn ≥ 80%! Mở khóa toàn bộ Bước Thực Hành (Ghép Câu, Nghe–Nói & Viết) →
-                    </button>
+                  {(onUnlockStep3 || onGoToStep3) && (isStep3Unlocked || examPassed) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onUnlockStep3 && (
+                        <button
+                          onClick={onUnlockStep3}
+                          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-md"
+                        >
+                          🎉 Đạt chuẩn ≥ 80%! Vào Bước 2C: Lab Ghép Câu →
+                        </button>
+                      )}
+                      {onGoToStep3 && (
+                        <button
+                          onClick={onGoToStep3}
+                          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md"
+                        >
+                          Sang Bước 3: Nghe & Nói (Bước 4 đã mở sẵn) →
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
