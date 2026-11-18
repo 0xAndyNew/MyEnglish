@@ -919,8 +919,8 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                     className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5"
                   >
                     {isNextUnlocked
-                      ? 'Sang Bước 4: Đọc, Viết & SRS (Đã mở khóa)'
-                      : 'Mở khóa Bước 4: Đọc, Viết & SRS'}{' '}
+                      ? 'Sang Bước 4: Đọc & Viết Thực Chiến (Đã mở khóa)'
+                      : 'Mở khóa Bước 4: Đọc & Viết Thực Chiến'}{' '}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

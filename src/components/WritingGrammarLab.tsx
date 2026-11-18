@@ -932,7 +932,7 @@ Bài viết của học viên:
                       🏆 Bài {GRAMMAR_LESSONS.length + 1}: Thi Tổng Hợp Nhận Biết Các Thì & Cấu Trúc ({examCount} câu)
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
-                      Đạt từ <strong>80% trở lên ({Math.ceil(examCount * 0.8)}/{examCount} câu đúng)</strong> để mở khóa đồng thời <strong>Bước 2C (Ghép Câu), Bước 3 (Nghe–Nói) và Bước 4 (Đọc, Viết & SRS)</strong>.
+                      Đạt từ <strong>80% trở lên ({Math.ceil(examCount * 0.8)}/{examCount} câu đúng)</strong> để mở khóa đồng thời <strong>Bước 2C (Ghép Câu), Bước 3 (Nghe–Nói) và Bước 4 (Đọc & Viết Thực Chiến)</strong>.
                     </p>
                   </div>
 

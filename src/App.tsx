@@ -51,7 +51,7 @@ const ROADMAP_STEPS = [
   { idx: 3, label: 'B2B: Ngữ pháp' },
   { idx: 4, label: 'B2C: Lab Ghép Câu' },
   { idx: 5, label: 'B3: Luyện Nghe & Nói' },
-  { idx: 6, label: 'B4: Đọc, Viết & SRS' },
+  { idx: 6, label: 'B4: Đọc & Viết Thực Chiến' },
 ];
 
 function normalizeProgressUnlock(prog: UserProgress): UserProgress {
@@ -73,8 +73,11 @@ export function App() {
   const effectiveApiKey = hasServerApiKey ? 'SERVER_CONFIGURED' : '';
   const hydratedEmailRef = useRef<string | null>(null);
 
-  // Step 6 (B5) sub-view
-  const [step5Sub, setStep5Sub] = useState<'write' | 'read' | 'vocab' | 'srs'>('write');
+  // Step 2A sub-view (Roadmap 133 lessons + Extra 980+ Vocab + SRS)
+  const [step2ASub, setStep2ASub] = useState<'roadmap' | 'vocab' | 'srs'>('roadmap');
+
+  // Step 4 (B4) sub-view
+  const [step5Sub, setStep5Sub] = useState<'write' | 'read'>('write');
 
   // Global quick word lookup
   const [searchQuery, setSearchQuery] = useState('');
@@ -486,21 +489,69 @@ export function App() {
           />
         )}
 
-        {/* B2A: Nạp Từ Vựng (133 bài khóa tuần tự) */}
+        {/* B2A: Nạp Từ Vựng (Lộ trình 133 bài + Học thêm Kho 980+ Từ + Ôn tập SRS) */}
         {activeStepIdx === 2 && (
-          <CurriculumRoadmap
-            accent={progress.accent}
-            completedLessons={progress.completedLessons}
-            savedWords={progress.savedWords}
-            onCompleteLesson={handleCompleteLesson}
-            onResetLessons={() => setProgress((p) => ({ ...p, completedLessons: [] }))}
-            onNavigateTab={() => {}}
-            onSaveWord={handleSaveWord}
-            onPronunciationScore={handlePronunciationScore}
-            isStep2BUnlocked={progress.unlockedStepIndex >= 3}
-            onUnlockStep2B={() => unlockStep(3)}
-            devUnlockAll={devUnlockAll}
-          />
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 gap-1 w-full sm:w-fit">
+                {[
+                  { id: 'roadmap', label: '📖 Lộ Trình Nạp Từ (133 bài)' },
+                  { id: 'vocab', label: '📚 Học Thêm: Kho 980+ Từ Cốt Lõi' },
+                  { id: 'srs', label: '🧠 Ôn Tập Từ Đã Lưu (SRS 1-3-7-30)' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setStep2ASub(t.id as 'roadmap' | 'vocab' | 'srs')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition ${
+                      step2ASub === t.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                Khu vực học thêm từ vựng theo nhu cầu & ôn tập ngắt quãng SRS
+              </span>
+            </div>
+
+            {step2ASub === 'roadmap' && (
+              <CurriculumRoadmap
+                accent={progress.accent}
+                completedLessons={progress.completedLessons}
+                savedWords={progress.savedWords}
+                onCompleteLesson={handleCompleteLesson}
+                onResetLessons={() => setProgress((p) => ({ ...p, completedLessons: [] }))}
+                onNavigateTab={(tab) => {
+                  if (tab === 'vocab_srs') setStep2ASub('vocab');
+                }}
+                onSaveWord={handleSaveWord}
+                onPronunciationScore={handlePronunciationScore}
+                isStep2BUnlocked={progress.unlockedStepIndex >= 3}
+                onUnlockStep2B={() => unlockStep(3)}
+                devUnlockAll={devUnlockAll}
+              />
+            )}
+
+            {step2ASub === 'vocab' && (
+              <VocabularyLibrary
+                accent={progress.accent}
+                savedWords={progress.savedWords}
+                onSaveWord={handleSaveWord}
+                onPronunciationScore={handlePronunciationScore}
+              />
+            )}
+
+            {step2ASub === 'srs' && (
+              <MemoryGamesSRS
+                accent={progress.accent}
+                savedWords={progress.savedWords}
+                srsCards={progress.srsCards}
+                onRateSrs={handleRateSrs}
+                onAddXp={(amount) => setProgress((p) => ({ ...p, xp: p.xp + amount }))}
+              />
+            )}
+          </div>
         )}
 
         {/* B2B: Ngữ Pháp (5 Từ loại, S+V+O, 6 Thì cơ bản) */}
@@ -558,19 +609,17 @@ export function App() {
           />
         )}
 
-        {/* B5: Mở rộng Đọc OCR, Viết Nhật Ký, Kho 980+ Từ & Ôn SRS */}
+        {/* B4: Đọc & Viết Thực Chiến (Viết Song Ngữ + Đọc & Quét Ảnh OCR) */}
         {activeStepIdx === 6 && (
           <div className="space-y-5">
             <div className="flex flex-wrap bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 gap-1 w-full sm:w-fit">
               {[
                 { id: 'write', label: '✍️ Luyện Viết Song Ngữ (Việt ↔ Anh)' },
                 { id: 'read', label: '📖 Đọc & Quét Ảnh OCR' },
-                { id: 'vocab', label: '📚 Kho 980+ Từ Cốt Lõi' },
-                { id: 'srs', label: '🧠 Ôn Tập SRS (1-3-7-30)' },
               ].map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => setStep5Sub(t.id as any)}
+                  onClick={() => setStep5Sub(t.id as 'write' | 'read')}
                   className={`px-3.5 py-2 rounded-lg text-xs font-bold transition ${
                     step5Sub === t.id ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400'
                   }`}
@@ -594,23 +643,6 @@ export function App() {
                 savedWords={progress.savedWords}
                 onSaveWord={handleSaveWord}
                 onPronunciationScore={handlePronunciationScore}
-              />
-            )}
-            {step5Sub === 'vocab' && (
-              <VocabularyLibrary
-                accent={progress.accent}
-                savedWords={progress.savedWords}
-                onSaveWord={handleSaveWord}
-                onPronunciationScore={handlePronunciationScore}
-              />
-            )}
-            {step5Sub === 'srs' && (
-              <MemoryGamesSRS
-                accent={progress.accent}
-                savedWords={progress.savedWords}
-                srsCards={progress.srsCards}
-                onRateSrs={handleRateSrs}
-                onAddXp={(amount) => setProgress((p) => ({ ...p, xp: p.xp + amount }))}
               />
             )}
           </div>
