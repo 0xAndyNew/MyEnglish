@@ -1,38 +1,19 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Search,
-  Flame,
-  Trophy,
-  Sun,
-  Moon,
-  Download,
-  X,
-  Loader2,
-  BookOpenCheck,
-  Lock,
-  Unlock,
-  CheckCircle2,
-  LogOut,
-  Shield,
-  Sliders,
-  Eye,
-  ArrowRight,
-} from 'lucide-react';
+import { BookOpenCheck, X, Loader2 } from 'lucide-react';
 import {
   AUDIENCE_TRACKS,
   canViewPage,
   getInitialUnlockedStepForTrack,
-  isStepAutoPassed,
   resolveTrack,
 } from './config/audienceTracks';
 import {
-  AUDIENCE_METADATA,
   AudienceId,
   createDefaultProfile,
   getAudienceMeta,
   getExamMeta,
   LearnerProfile,
 } from './types/audience';
+import { AppShell } from './components/layout/AppShell';
 import { UserAccount, UserProgress, WordEntry } from './types/learning';
 import {
   addWordToNotebook,
@@ -69,6 +50,7 @@ const SchoolCurriculum = lazy(() => import('./components/teen/SchoolCurriculum')
 const AcademicSkills = lazy(() => import('./components/university/AcademicSkills').then((m) => ({ default: m.AcademicSkills })));
 const WorkplaceCareerHub = lazy(() => import('./components/worker/WorkplaceCareerHub').then((m) => ({ default: m.WorkplaceCareerHub })));
 const ExamPrepCenter = lazy(() => import('./components/exam/ExamPrepCenter').then((m) => ({ default: m.ExamPrepCenter })));
+const WorkbookStudio = lazy(() => import('./components/workbook/WorkbookStudio').then((m) => ({ default: m.WorkbookStudio })));
 
 function normalizeProgressUnlock(prog: UserProgress): UserProgress {
   return prog.unlockedStepIndex >= 4 && prog.unlockedStepIndex < 6
@@ -81,7 +63,9 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [learnerProfile, setLearnerProfile] = useState<LearnerProfile | null>(null);
   const [pendingWizardAudience, setPendingWizardAudience] = useState<AudienceId | undefined>(undefined);
+  const [pendingDraftProfile, setPendingDraftProfile] = useState<LearnerProfile | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showWorkbookStudio, setShowWorkbookStudio] = useState(false);
   const [adminPreviewAudience, setAdminPreviewAudience] = useState<AudienceId | null>(null);
 
   const [progress, setProgress] = useState<UserProgress>(() => getDefaultProgress());
@@ -154,7 +138,15 @@ export function App() {
       if (learnerProfile && learnerProfile.audience === adminPreviewAudience) {
         return learnerProfile;
       }
-      return createDefaultProfile(adminPreviewAudience);
+      const base = createDefaultProfile(adminPreviewAudience);
+      return {
+        ...base,
+        kids: learnerProfile?.kids || base.kids,
+        teen: learnerProfile?.teen || base.teen,
+        university: learnerProfile?.university || base.university,
+        worker: learnerProfile?.worker || base.worker,
+        exam: learnerProfile?.exam || base.exam,
+      };
     }
     return learnerProfile || createDefaultProfile('worker');
   }, [adminPreviewAudience, learnerProfile]);
@@ -183,13 +175,15 @@ export function App() {
   const handleAuthSuccess = async (
     user: UserAccount,
     loadedProg: UserProgress,
-    pendingAudience?: AudienceId
+    pendingAudience?: AudienceId,
+    draftProfile?: LearnerProfile
   ) => {
     const normalizedProg = normalizeProgressUnlock(loadedProg);
     hydratedEmailRef.current = user.email;
     setCurrentUser(user);
     setLearnerProfile(user.profile ?? null);
     setPendingWizardAudience(pendingAudience);
+    setPendingDraftProfile(draftProfile ?? null);
     setProgress(normalizedProg);
     setActiveStepIdx(0);
     setDevUnlockAll(user.role === 'admin' || isDevAccount(user.email));
@@ -208,25 +202,42 @@ export function App() {
   };
 
   const handleSaveLearnerProfile = async (nextProfile: LearnerProfile) => {
-    setLearnerProfile(nextProfile);
+    const mergedProfile: LearnerProfile = {
+      ...nextProfile,
+      kids: nextProfile.kids || learnerProfile?.kids,
+      teen: nextProfile.teen || learnerProfile?.teen,
+      university: nextProfile.university || learnerProfile?.university,
+      worker: nextProfile.worker || learnerProfile?.worker,
+      exam: nextProfile.exam || learnerProfile?.exam,
+      updatedAt: new Date().toISOString(),
+    };
+    const saved = await saveLearnerProfileApi(mergedProfile, currentUser?.email);
+    const hydratedSaved: LearnerProfile = {
+      ...mergedProfile,
+      ...saved,
+      kids: saved.kids || mergedProfile.kids,
+      teen: saved.teen || mergedProfile.teen,
+      university: saved.university || mergedProfile.university,
+      worker: saved.worker || mergedProfile.worker,
+      exam: saved.exam || mergedProfile.exam,
+    };
+    setLearnerProfile(hydratedSaved);
     setPendingWizardAudience(undefined);
+    setPendingDraftProfile(null);
     setAdminPreviewAudience(null);
     setActiveStepIdx(0);
+    setCurrentUser((prev) => (prev ? { ...prev, profile: hydratedSaved } : prev));
 
-    const saved = await saveLearnerProfileApi(nextProfile);
-    setLearnerProfile(saved);
-    setCurrentUser((prev) => (prev ? { ...prev, profile: saved } : prev));
-
-    const steps = resolveTrack(saved);
-    const initUnlock = getInitialUnlockedStepForTrack(steps, saved);
+    const steps = resolveTrack(hydratedSaved);
+    const initUnlock = getInitialUnlockedStepForTrack(steps, hydratedSaved);
     setProgress((prev) => {
-      const prevAudUnlock = prev.trackUnlocks?.[saved.audience] ?? 0;
+      const prevAudUnlock = prev.trackUnlocks?.[hydratedSaved.audience] ?? 0;
       const nextUnlock = Math.max(prevAudUnlock, initUnlock);
       return {
         ...prev,
         trackUnlocks: {
           ...(prev.trackUnlocks || {}),
-          [saved.audience]: nextUnlock,
+          [hydratedSaved.audience]: nextUnlock,
         },
       };
     });
@@ -243,8 +254,21 @@ export function App() {
     const base = createDefaultProfile(aud);
     const nextProf: LearnerProfile = {
       ...base,
-      startLevel: aud === 'kids' ? 'A0' : learnerProfile?.startLevel || base.startLevel,
+      ...(learnerProfile || {}),
+      audience: aud,
+      startLevel:
+        aud === 'kids'
+          ? 'A0'
+          : learnerProfile?.startLevel && learnerProfile.startLevel !== 'A0'
+          ? learnerProfile.startLevel
+          : base.startLevel,
       dailyMinutes: learnerProfile?.dailyMinutes || base.dailyMinutes,
+      kids: learnerProfile?.kids || base.kids,
+      teen: learnerProfile?.teen || base.teen,
+      university: learnerProfile?.university || base.university,
+      worker: learnerProfile?.worker || base.worker,
+      exam: learnerProfile?.exam || base.exam,
+      updatedAt: new Date().toISOString(),
     };
     handleSaveLearnerProfile(nextProf);
   };
@@ -255,6 +279,7 @@ export function App() {
     setCurrentUser(null);
     setLearnerProfile(null);
     setPendingWizardAudience(undefined);
+    setPendingDraftProfile(null);
     setAdminPreviewAudience(null);
     setDevUnlockAll(false);
     setHasServerApiKey(false);
@@ -330,11 +355,13 @@ export function App() {
       <OnboardingWizard
         displayName={currentUser.displayName}
         initialAudience={pendingWizardAudience || 'worker'}
-        initialProfile={learnerProfile}
+        initialProfile={pendingDraftProfile || learnerProfile}
         onComplete={handleSaveLearnerProfile}
       />
     );
   }
+
+  const isAdminUser = currentUser.role === 'admin' || isDevAccount(currentUser.email);
 
   const handleGlobalSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -432,258 +459,73 @@ export function App() {
 
   const canRenderCurrentPage = canViewPage(currentStep.page, effectiveProfile);
 
+  if (showWorkbookStudio) {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-20 text-sm font-semibold text-slate-500 gap-2">
+            <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+            <span>Đang tải Xưởng Xuất Sách Bài Tập PDF...</span>
+          </div>
+        }
+      >
+        <WorkbookStudio
+          defaultAudience={effectiveProfile.audience}
+          onClose={() => setShowWorkbookStudio(false)}
+        />
+      </Suspense>
+    );
+  }
+
   return (
-    <div
-      className={`min-h-screen flex flex-col text-slate-900 dark:text-slate-100 ${
-        isKidsAudience
-          ? 'bg-gradient-to-b from-amber-50/70 via-sky-50/40 to-pink-50/40 dark:from-slate-950 dark:to-slate-900'
-          : 'bg-slate-50 dark:bg-slate-950'
-      }`}
-    >
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-white/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
-          {/* Logo + Account Info + Active Audience Pill */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className={`w-9 h-9 rounded-xl bg-gradient-to-br ${audienceMeta.accentGradient} text-white flex items-center justify-center shadow-sm shrink-0`}
-            >
-              <BookOpenCheck className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-base font-black tracking-tight text-slate-900 dark:text-white leading-none">
-                  MyEnglish
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowProfileModal(true)}
-                  title="Bấm để xem hoặc đổi nhóm đối tượng học tập"
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition hover:opacity-90 ${audienceMeta.badgeColor}`}
-                >
-                  <span>{audienceMeta.emoji}</span>
-                  <span>{audienceMeta.shortLabel}</span>
-                  <span className="opacity-75">• {audienceSubTag}</span>
-                  <Sliders className="w-2.5 h-2.5 ml-0.5" />
-                </button>
-              </div>
-              <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 truncate block max-w-[200px] sm:max-w-[280px] mt-0.5">
-                {currentUser.displayName} ({currentUser.email})
-              </span>
-            </div>
-          </div>
-
-          {/* Global Quick Word Search — Hidden in Kids Mode per visibility matrix */}
-          {!isKidsAudience && (
-            <form onSubmit={handleGlobalSearch} className="order-last sm:order-none w-full sm:flex-1 sm:max-w-xs">
-              <div className="relative flex items-center">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3" />
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tra từ điển nhanh..."
-                  className="w-full pl-9 pr-14 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button
-                  type="submit"
-                  disabled={searchLoading}
-                  className="absolute right-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700"
-                >
-                  {searchLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Tra'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Stats & Account Actions */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[11px] sm:text-xs font-bold">
-              <Flame className="w-3.5 h-3.5 text-orange-500" />
-              <span>{progress.streakDays}d</span>
-            </div>
-            <div className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[11px] sm:text-xs font-bold">
-              <Trophy className="w-3.5 h-3.5 text-indigo-500" />
-              <span>{progress.xp} XP</span>
-            </div>
-
-            <button
-              onClick={() => setShowProfileModal(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold hover:bg-indigo-100 transition"
-              title="Đổi nhóm đối tượng / Lộ trình học tập"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Đổi đối tượng</span>
-            </button>
-
-            <button
-              onClick={() =>
-                setProgress((p) => ({ ...p, accent: p.accent === 'en-US' ? 'en-GB' : 'en-US' }))
-              }
-              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold"
-            >
-              {progress.accent === 'en-US' ? '🇺🇸 US' : '🇬🇧 UK'}
-            </button>
-
-            <button
-              onClick={handleExportData}
-              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-              title="Sao lưu dữ liệu học (JSON)"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-              title="Sáng / Tối"
-            >
-              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-            </button>
-
-            {isDevAccount(currentUser.email) && (
-              <>
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50/70 dark:bg-violet-950/40 text-xs font-bold text-violet-700 dark:text-violet-300">
-                  <Eye className="w-3.5 h-3.5 shrink-0" />
-                  <select
-                    value={adminPreviewAudience || ''}
-                    onChange={(e) => {
-                      const val = (e.target.value || null) as AudienceId | null;
-                      setAdminPreviewAudience(val);
-                      setActiveStepIdx(0);
-                    }}
-                    className="bg-transparent outline-none text-xs font-bold cursor-pointer"
-                    title="Admin: Xem giao diện như nhóm đối tượng"
-                  >
-                    <option value="">Xem như: Hồ sơ gốc</option>
-                    {AUDIENCE_METADATA.map((aud) => (
-                      <option key={aud.id} value={aud.id}>
-                        {aud.emoji} Xem như: {aud.shortLabel}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => setDevUnlockAll(!devUnlockAll)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition ${
-                    devUnlockAll
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
-                      : 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300'
-                  }`}
-                  title="Bật/tắt chế độ tạm mở khóa tất cả để test tính năng"
-                >
-                  {devUnlockAll ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                  <span className="hidden xl:inline">{devUnlockAll ? 'Dev: Mở hết' : 'Khóa tuần tự'}</span>
-                </button>
-                <button
-                  onClick={() => setShowAdminModal(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-300 transition"
-                  title="Mở bảng quản trị Admin (API Key & Tài khoản)"
-                >
-                  <Shield className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Quản trị</span>
-                </button>
-              </>
-            )}
-
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold transition"
-              title="Đăng xuất tài khoản"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Đăng xuất</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Audience Selector Bar + Track Progression Bar */}
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 pb-2.5 space-y-2">
-          {/* 1-Click Audience Group Switcher */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 mr-1">
-                Độ tuổi / Đối tượng:
-              </span>
-              {AUDIENCE_METADATA.map((aud) => {
-                const isSelected = effectiveProfile.audience === aud.id;
-                return (
-                  <button
-                    key={aud.id}
-                    type="button"
-                    onClick={() => handleQuickSwitchAudience(aud.id)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : 'bg-slate-100/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                    }`}
-                  >
-                    <span>{aud.emoji}</span>
-                    <span>{aud.shortLabel}</span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => setShowProfileModal(true)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border border-dashed border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-              >
-                <Sliders className="w-3 h-3" />
-                <span>Tùy chỉnh lớp / ngành / kỳ thi ({audienceSubTag})</span>
-              </button>
-            </div>
-
-            <div className="hidden lg:flex items-center gap-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-              {activeTrackConfig.skillDistribution.slice(0, 4).map((sk) => (
-                <span key={sk.skill} className="inline-flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${sk.color}`} />
-                  {sk.skill}: {sk.percent}%
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div
-            className={`grid grid-cols-2 sm:grid-cols-3 ${
-              activeTrackSteps.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-6'
-            } gap-1.5`}
+    <>
+      <AppShell
+        currentUser={currentUser}
+        effectiveProfile={effectiveProfile}
+        audienceMeta={audienceMeta}
+        audienceSubTag={audienceSubTag}
+        activeTrackConfig={activeTrackConfig}
+        activeTrackSteps={activeTrackSteps}
+        safeStepIdx={safeStepIdx}
+        currentStep={currentStep}
+        currentAudienceUnlock={currentAudienceUnlock}
+        progress={progress}
+        darkMode={darkMode}
+        devUnlockAll={devUnlockAll}
+        isAdminUser={isAdminUser}
+        isDevUser={isDevAccount(currentUser.email)}
+        adminPreviewAudience={adminPreviewAudience}
+        searchQuery={searchQuery}
+        searchLoading={searchLoading}
+        onSearchQueryChange={setSearchQuery}
+        onGlobalSearch={handleGlobalSearch}
+        onSelectStep={setActiveStepIdx}
+        onQuickSwitchAudience={handleQuickSwitchAudience}
+        onOpenProfileModal={() => setShowProfileModal(true)}
+        onOpenAdminModal={() => setShowAdminModal(true)}
+        onToggleAccent={() =>
+          setProgress((p) => ({ ...p, accent: p.accent === 'en-US' ? 'en-GB' : 'en-US' }))
+        }
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
+        onToggleDevUnlock={() => setDevUnlockAll(!devUnlockAll)}
+        onChangeAdminPreview={(val) => {
+          setAdminPreviewAudience(val);
+          setActiveStepIdx(0);
+        }}
+        onExportData={handleExportData}
+        onLogout={handleLogout}
+      >
+        <div className="mb-4 flex justify-end print:hidden">
+          <button
+            type="button"
+            onClick={() => setShowWorkbookStudio(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition shadow-sm"
           >
-            {activeTrackSteps.map((st) => {
-              const autoPassed = isStepAutoPassed(st, effectiveProfile);
-              const isLocked = !devUnlockAll && st.idx > currentAudienceUnlock && !autoPassed;
-              const isDone = st.idx < currentAudienceUnlock || autoPassed;
-              const isActive = safeStepIdx === st.idx;
-              return (
-                <button
-                  key={st.code}
-                  disabled={isLocked}
-                  onClick={() => setActiveStepIdx(st.idx)}
-                  title={`${st.label} — ${st.description}`}
-                  className={`inline-flex items-center justify-center sm:justify-start gap-1.5 px-2.5 py-2 rounded-xl text-[11px] sm:text-xs font-bold border transition text-left ${
-                    isActive
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : isLocked
-                      ? 'bg-slate-100/70 dark:bg-slate-800/40 text-slate-400 border-slate-200/60 dark:border-slate-800 cursor-not-allowed'
-                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                  }`}
-                >
-                  {isLocked ? (
-                    <Lock className="w-3 h-3 shrink-0" />
-                  ) : isDone ? (
-                    <CheckCircle2
-                      className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-300' : 'text-emerald-500'}`}
-                    />
-                  ) : null}
-                  <span className="truncate">{st.label}</span>
-                </button>
-              );
-            })}
-          </div>
+            <BookOpenCheck className="w-4 h-4" />
+            <span>📚 Xuất Sách Bài Tập PDF (Có Đáp Án)</span>
+          </button>
         </div>
-      </header>
 
-      {/* Main Content — Renders ONLY the pages allowed for the active audience track */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
         {searchError && (
           <div className="mb-4 p-3 rounded-xl bg-rose-50 text-rose-700 text-sm flex justify-between items-center">
             <span>{searchError}</span>
@@ -731,31 +573,19 @@ export function App() {
           <>
             {/* PAGE: ALPHABET FOUNDATION (Kids Mode / Foundation) */}
             {currentStep.page === 'alphabet' && (
-              <div className="space-y-4">
-                {!isKidsAudience && (
-                  <div>
-                    <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                      {currentStep.label}
-                    </h2>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                      {currentStep.description}
-                    </p>
-                  </div>
-                )}
-                <AlphabetFoundation
-                  accent={progress.accent}
-                  kidsMode={isKidsAudience || currentStep.subView === 'kids'}
-                  isStepCompleted={currentAudienceUnlock >= safeStepIdx + 1}
-                  onCompleteStep1A={() => unlockStep(safeStepIdx + 1)}
-                  savedPassedLetters={progress.passedLetters ?? []}
-                  onPassLetter={(letter) =>
-                    setProgress((p) => {
-                      const prev = p.passedLetters ?? [];
-                      return prev.includes(letter) ? p : { ...p, passedLetters: [...prev, letter] };
-                    })
-                  }
-                />
-              </div>
+              <AlphabetFoundation
+                accent={progress.accent}
+                kidsMode={isKidsAudience || currentStep.subView === 'kids'}
+                isStepCompleted={currentAudienceUnlock >= safeStepIdx + 1}
+                onCompleteStep1A={() => unlockStep(safeStepIdx + 1)}
+                savedPassedLetters={progress.passedLetters ?? []}
+                onPassLetter={(letter) =>
+                  setProgress((p) => {
+                    const prev = p.passedLetters ?? [];
+                    return prev.includes(letter) ? p : { ...p, passedLetters: [...prev, letter] };
+                  })
+                }
+              />
             )}
 
             <Suspense
@@ -773,6 +603,8 @@ export function App() {
                   profile={effectiveProfile}
                   onAddXp={handleAddXp}
                   initialTab={(currentStep.subView as any) || 'vocab'}
+                  allowAllOptions={isAdminUser}
+                  hideHeaderNav={true}
                 />
               )}
 
@@ -784,6 +616,8 @@ export function App() {
                   onAddXp={handleAddXp}
                   onSaveWord={handleSaveWord}
                   initialMode={currentStep.subView === 'exams' ? 'exams' : 'units'}
+                  allowAllOptions={isAdminUser}
+                  hideHeaderNav={true}
                 />
               )}
 
@@ -796,6 +630,7 @@ export function App() {
                   onAddXp={handleAddXp}
                   onSaveWord={handleSaveWord}
                   initialTab={(currentStep.subView as any) || 'awl'}
+                  hideHeaderNav={true}
                 />
               )}
 
@@ -805,6 +640,8 @@ export function App() {
                   accent={progress.accent}
                   profile={effectiveProfile}
                   onAddXp={handleAddXp}
+                  allowAllOptions={isAdminUser}
+                  hideHeaderNav={true}
                 />
               )}
 
@@ -816,6 +653,8 @@ export function App() {
                   profile={effectiveProfile}
                   onAddXp={handleAddXp}
                   initialTab={(currentStep.subView as any) || 'diagnostic'}
+                  allowAllOptions={isAdminUser}
+                  hideHeaderNav={true}
                 />
               )}
             </Suspense>
@@ -940,6 +779,7 @@ export function App() {
                 {examStep5Sub === 'grammar' && (
                   <WritingGrammarLab
                     accent={progress.accent}
+                    learnerProfile={effectiveProfile}
                     geminiApiKey={effectiveApiKey}
                     onAddXp={handleAddXp}
                     isStep3Unlocked={true}
@@ -972,6 +812,7 @@ export function App() {
             {currentStep.page === 'grammar' && (
               <WritingGrammarLab
                 accent={progress.accent}
+                learnerProfile={effectiveProfile}
                 geminiApiKey={effectiveApiKey}
                 onAddXp={handleAddXp}
                 isStep3Unlocked={currentAudienceUnlock >= safeStepIdx + 1}
@@ -1016,6 +857,7 @@ export function App() {
                 {effectiveProfile.audience === 'worker' && workerStep4Sub === 'grammar' ? (
                   <WritingGrammarLab
                     accent={progress.accent}
+                    learnerProfile={effectiveProfile}
                     geminiApiKey={effectiveApiKey}
                     onAddXp={handleAddXp}
                     isStep3Unlocked={currentAudienceUnlock >= safeStepIdx + 1}
@@ -1148,37 +990,15 @@ export function App() {
                 )}
               </div>
             )}
-
-            {/* Track Progression Helper Footer for Audience Steps */}
-            {safeStepIdx < activeTrackSteps.length - 1 && (
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-sm">
-                <div>
-                  <div className="text-xs font-extrabold text-slate-900 dark:text-white">
-                    Đang học: {currentStep.label}
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Bước tiếp theo: <strong>{activeTrackSteps[safeStepIdx + 1].label}</strong>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => unlockStep(safeStepIdx + 1)}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition"
-                >
-                  <span>Hoàn thành & Qua bước {activeTrackSteps[safeStepIdx + 1].code}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
           </>
         )}
-      </main>
+      </AppShell>
 
       {/* Learner Profile & Audience Switcher Modal */}
       <LearnerProfilePanel
         isOpen={showProfileModal}
         onClose={() => setShowProfileModal(false)}
-        profile={learnerProfile}
+        profile={effectiveProfile}
         onSaveProfile={handleSaveLearnerProfile}
         xp={progress.xp}
         savedWordsCount={progress.savedWords.length}
@@ -1198,7 +1018,7 @@ export function App() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 
