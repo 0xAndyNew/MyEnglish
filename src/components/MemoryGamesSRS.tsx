@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Volume2, RotateCw, Layers, Headphones, Puzzle, Zap, CheckCircle2 } from 'lucide-react';
+import { Volume2, RotateCw, Layers, Headphones, Puzzle, Zap, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ALL_CURRICULUM_WORDS } from '../data/curriculumData';
 import { AccentMode, SrsCardState, WordEntry } from '../types/learning';
 import { speakText } from '../utils/speechEngine';
+import { FlashcardIllustration } from './FlashcardIllustration';
 
 interface MemoryGamesSRSProps {
   accent: AccentMode;
@@ -31,6 +32,22 @@ export const MemoryGamesSRS: React.FC<MemoryGamesSRSProps> = ({
   // Flashcard state
   const [cardIdx, setCardIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [onlyPending, setOnlyPending] = useState(false);
+  const [sessionDoneIds, setSessionDoneIds] = useState<string[]>([]);
+
+  const isCardDone = (id: string) =>
+    sessionDoneIds.includes(id) || (srsCards[id]?.repetitions ?? 0) > 0;
+
+  const doneCount = useMemo(
+    () => pool.filter((w) => isCardDone(w.id)).length,
+    [pool, sessionDoneIds, srsCards]
+  );
+
+  const activeCards = useMemo(() => {
+    if (!onlyPending) return pool;
+    const pending = pool.filter((w) => !isCardDone(w.id));
+    return pending.length > 0 ? pending : pool;
+  }, [pool, onlyPending, sessionDoneIds, srsCards]);
 
   // Sound-to-word state
   const [quizIdx, setQuizIdx] = useState(0);
@@ -46,12 +63,30 @@ export const MemoryGamesSRS: React.FC<MemoryGamesSRSProps> = ({
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
   const [matchedIds, setMatchedIds] = useState<string[]>([]);
 
-  const currentCard = pool[cardIdx % pool.length];
+  const safeCardIdx = cardIdx % Math.max(1, activeCards.length);
+  const currentCard = activeCards[safeCardIdx] || pool[0];
 
-  const handleRate = (q: 0 | 2 | 4 | 5) => {
-    onRateSrs(currentCard.id, q);
+  const handlePrevCard = () => {
     setFlipped(false);
-    setCardIdx((i) => (i + 1) % pool.length);
+    setCardIdx((i) => (i - 1 + activeCards.length) % activeCards.length);
+  };
+
+  const handleSkipNext = () => {
+    setFlipped(false);
+    setCardIdx((i) => (i + 1) % activeCards.length);
+  };
+
+  const handleCompleteAndNext = () => {
+    if (!currentCard) return;
+    const wasDone = isCardDone(currentCard.id);
+    if (!wasDone) {
+      setSessionDoneIds((prev) => (prev.includes(currentCard.id) ? prev : [...prev, currentCard.id]));
+      onRateSrs(currentCard.id, 5);
+    }
+    setFlipped(false);
+    if (!onlyPending) {
+      setCardIdx((i) => (i + 1) % activeCards.length);
+    }
   };
 
   // Sound-to-Word options
@@ -96,17 +131,15 @@ export const MemoryGamesSRS: React.FC<MemoryGamesSRSProps> = ({
     }
   };
 
-  const dueCount = Object.values(srsCards).filter((c) => c.nextReviewAt <= Date.now()).length;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-            Ôn Tập Ngắt Quãng (SRS) & Game Nhận Diện Mặt Chữ
+            Ôn Tập Từ Đã Lưu & Game Nhận Diện Mặt Chữ
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Củng cố trí nhớ dài hạn với Flashcard 3D (có <strong>{dueCount}</strong> từ cần ôn) và 3 trò chơi phản xạ mặt chữ.
+            Ôn tập bằng Flashcard hình ảnh (đã xong <strong>{doneCount}/{pool.length}</strong> từ) và 3 trò chơi phản xạ mặt chữ.
           </p>
         </div>
 
@@ -135,47 +168,97 @@ export const MemoryGamesSRS: React.FC<MemoryGamesSRSProps> = ({
         </div>
       </div>
 
-      {/* 1. FLASHCARD 3D */}
+      {/* 1. FLASHCARD 3D WITH ILLUSTRATION & NEXT */}
       {gameMode === 'flashcard' && currentCard && (
-        <div className="max-w-xl mx-auto space-y-5">
+        <div className="max-w-2xl mx-auto space-y-5">
+          {/* Progress header & filter */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs font-bold">
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ✓ Đã xong: {doneCount}/{pool.length} từ
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                Còn lại: {pool.length - doneCount}
+              </span>
+            </div>
+            <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={onlyPending}
+                onChange={(e) => {
+                  setOnlyPending(e.target.checked);
+                  setCardIdx(0);
+                  setFlipped(false);
+                }}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>Chỉ hiện từ chưa xong</span>
+            </label>
+          </div>
+
           <div
             onClick={() => setFlipped(!flipped)}
-            className="cursor-pointer perspective-1000 h-72 w-full"
+            className="cursor-pointer perspective-1000 h-[340px] sm:h-[330px] w-full"
           >
             <div
               className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${
                 flipped ? 'rotate-y-180' : ''
               }`}
             >
-              {/* Front */}
-              <div className="absolute inset-0 backface-hidden rounded-3xl bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-900/60 shadow-lg p-6 flex flex-col items-center justify-center text-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-2">
-                  Thẻ {cardIdx + 1}/{pool.length} — Bấm để lật xem nghĩa
-                </span>
-                <div className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {currentCard.syllables.join(' · ')}
+              {/* Front: Illustration + Word + IPA + Audio */}
+              <div className="absolute inset-0 backface-hidden rounded-3xl bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-900/60 shadow-lg p-5 sm:p-6 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-500">
+                    Thẻ {safeCardIdx + 1}/{activeCards.length} — Bấm thẻ để lật xem nghĩa
+                  </span>
+                  {isCardDone(currentCard.id) ? (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã xong
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      Chưa xong
+                    </span>
+                  )}
                 </div>
-                <div className="font-mono text-lg text-indigo-600 dark:text-indigo-400 mt-3">
-                  {accent === 'en-US' ? currentCard.ipaUS : currentCard.ipaUK}
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-7 my-auto">
+                  <FlashcardIllustration wordEntry={currentCard} size="lg" />
+
+                  <div className="text-center sm:text-left">
+                    <div className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {currentCard.syllables.join(' · ')}
+                    </div>
+                    <div className="font-mono text-base sm:text-lg text-indigo-600 dark:text-indigo-400 mt-1.5">
+                      {accent === 'en-US' ? currentCard.ipaUS : currentCard.ipaUK}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speakText(currentCard.word, accent, 0.9);
+                      }}
+                      className="mt-3.5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs sm:text-sm font-semibold hover:bg-indigo-100"
+                    >
+                      <Volume2 className="w-4 h-4" /> Nghe phát âm
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speakText(currentCard.word, accent, 0.9);
-                  }}
-                  className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-sm font-semibold hover:bg-indigo-100"
-                >
-                  <Volume2 className="w-4 h-4" /> Nghe phát âm
-                </button>
+
+                <div className="text-center text-[11px] text-slate-400">
+                  Mặt trước: Hình minh họa & mặt chữ • Chạm vào thẻ để xem nghĩa tiếng Việt
+                </div>
               </div>
 
-              {/* Back */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg p-6 flex flex-col items-center justify-center text-center">
+              {/* Back: Meaning + Mnemonic + Thumbnail */}
+              <div className="absolute inset-0 backface-hidden rotate-y-180 rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg p-5 sm:p-6 flex flex-col items-center justify-center text-center">
+                <div className="mb-3">
+                  <FlashcardIllustration wordEntry={currentCard} size="sm" />
+                </div>
                 <div className="text-2xl font-extrabold mb-1">{currentCard.meaningVi}</div>
                 <div className="text-xs opacity-80 mb-3">
-                  ({currentCard.pos}) • Đọc gợi ý: {currentCard.vietPhonetic}
+                  {currentCard.word} ({currentCard.pos}) • Đọc gợi ý: {currentCard.vietPhonetic}
                 </div>
-                <p className="text-sm bg-white/15 rounded-xl p-3 max-w-md mb-3">
+                <p className="text-xs sm:text-sm bg-white/15 rounded-xl p-3 max-w-md mb-2.5">
                   💡 {currentCard.mnemonic}
                 </p>
                 {currentCard.examples[0] && (
@@ -185,21 +268,71 @@ export const MemoryGamesSRS: React.FC<MemoryGamesSRSProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { q: 0 as const, label: 'Quên (Học lại)', cls: 'bg-rose-100 text-rose-800 hover:bg-rose-200' },
-              { q: 2 as const, label: 'Khó (1 ngày)', cls: 'bg-amber-100 text-amber-800 hover:bg-amber-200' },
-              { q: 4 as const, label: 'Tốt (3 ngày)', cls: 'bg-sky-100 text-sky-800 hover:bg-sky-200' },
-              { q: 5 as const, label: 'Dễ (7 ngày)', cls: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' },
-            ].map((btn) => (
-              <button
-                key={btn.q}
-                onClick={() => handleRate(btn.q)}
-                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition ${btn.cls}`}
-              >
-                {btn.label}
-              </button>
-            ))}
+          {/* Clean Prev / Done & Next / Skip Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <button
+              type="button"
+              onClick={handlePrevCard}
+              className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 hover:border-indigo-400 inline-flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-4 h-4" /> Thẻ trước
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCompleteAndNext}
+              className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white shadow-sm inline-flex items-center justify-center gap-2 transition ${
+                isCardDone(currentCard.id)
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{isCardDone(currentCard.id) ? 'Đã xong • Next' : 'Xong từ này • Next'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSkipNext}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-bold inline-flex items-center gap-1.5"
+            >
+              Bỏ qua <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Card Status Quick Grid */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <span>DANH SÁCH THẺ ({activeCards.length} TỪ)</span>
+              <span>Xanh = Đã xong ✓</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+              {activeCards.map((item, idx) => {
+                const done = isCardDone(item.id);
+                const active = idx === safeCardIdx;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setCardIdx(idx);
+                      setFlipped(false);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition inline-flex items-center gap-1 ${
+                      active
+                        ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-300'
+                        : done
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-300'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                    }`}
+                  >
+                    <span>{item.word}</span>
+                    {done && <span>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

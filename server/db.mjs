@@ -47,6 +47,7 @@ db.exec(`
     completed_lessons TEXT NOT NULL DEFAULT '[]',
     mastered_phonemes TEXT NOT NULL DEFAULT '[]',
     pronunciation_scores TEXT NOT NULL DEFAULT '[]',
+    srs_cards TEXT NOT NULL DEFAULT '{}',
     updated_at TEXT NOT NULL
   );
 
@@ -72,6 +73,12 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 `);
+
+// Safe migration for existing SQLite databases missing srs_cards column
+const progressCols = db.prepare('PRAGMA table_info(user_progress)').all().map((c) => c.name);
+if (!progressCols.includes('srs_cards')) {
+  db.exec("ALTER TABLE user_progress ADD COLUMN srs_cards TEXT NOT NULL DEFAULT '{}'");
+}
 
 export const DEV_EMAIL = 'admin';
 
@@ -178,6 +185,8 @@ export function loadFullProgress(emailRaw) {
     }
   }
 
+  Object.assign(srsCards, parseJsonSafe(row.srs_cards, {}));
+
   return {
     xp: row.xp || 0,
     streakDays,
@@ -217,6 +226,7 @@ export function saveFullProgress(emailRaw, progress) {
         completed_lessons = ?,
         mastered_phonemes = ?,
         pronunciation_scores = ?,
+        srs_cards = ?,
         updated_at = ?
       WHERE email = ?`
     ).run(
@@ -232,6 +242,7 @@ export function saveFullProgress(emailRaw, progress) {
       JSON.stringify(progress.completedLessons || []),
       JSON.stringify(progress.masteredPhonemes || []),
       JSON.stringify(progress.pronunciationScores || []),
+      JSON.stringify(progress.srsCards || {}),
       now,
       email
     );
