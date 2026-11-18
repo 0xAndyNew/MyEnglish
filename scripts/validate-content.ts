@@ -1,5 +1,5 @@
 import { SCHOOL_UNITS, SCHOOL_EXAMS, SCHOOL_EXAM_SETS, SCHOOL_REVIEWS } from '../src/data/teen/schoolCurriculumData';
-import { KIDS_UNITS, KIDS_SENTENCE_CHUNKS, KIDS_YLE_CHALLENGES } from '../src/data/kids/kidsCurriculumData';
+import { KIDS_UNITS, KIDS_SENTENCE_CHUNKS, KIDS_YLE_CHALLENGES, KIDS_YLE_MOCK_TESTS } from '../src/data/kids/kidsCurriculumData';
 import {
   AWL_WORDS,
   ACADEMIC_ABSTRACTS,
@@ -189,6 +189,24 @@ checkUniqueIds('KIDS_YLE_CHALLENGES', KIDS_YLE_CHALLENGES.map((q) => q.id));
 const kidsYleDist = KIDS_YLE_CHALLENGES.filter((q) => q.options.length === 4).map((q) => q.correctIndex);
 checkMcqDistribution('KIDS_YLE_CHALLENGES', kidsYleDist);
 
+const kidsExDist: number[] = [];
+let kidsExCount = 0;
+for (const u of KIDS_UNITS) {
+  if (u.exercises && u.exercises.length > 0) {
+    validateExerciseList(`Kids ${u.id}`, u.exercises, kidsExDist);
+    kidsExCount += u.exercises.length;
+  }
+}
+if (kidsExDist.length > 0) checkMcqDistribution('KIDS_UNITS exercises', kidsExDist);
+
+checkUniqueIds('KIDS_YLE_MOCK_TESTS', KIDS_YLE_MOCK_TESTS.map((m) => m.id));
+const kidsMockQIds = KIDS_YLE_MOCK_TESTS.flatMap((m) => m.questions.map((q) => q.id));
+checkUniqueIds('KIDS_YLE_MOCK_TESTS questions', kidsMockQIds);
+checkMcqDistribution(
+  'KIDS_YLE_MOCK_TESTS',
+  KIDS_YLE_MOCK_TESTS.flatMap((m) => m.questions.map((q) => q.correctIndex))
+);
+
 // 3. UNIVERSITY
 checkUniqueIds('AWL_WORDS', AWL_WORDS.map((w) => w.id));
 checkUniqueIds('ACADEMIC_ABSTRACTS', ACADEMIC_ABSTRACTS.map((a) => a.id));
@@ -228,7 +246,7 @@ checkUniqueIds('GRAMMAR_LESSONS', GRAMMAR_LESSONS.map((g) => g.id));
 
 console.log('\n=== Inventory Summary ===');
 console.log(`• Teen: ${SCHOOL_UNITS.length} units, ${teenQuizIds.length} practiceQuiz, ${teenExerciseCount} exercises, ${SCHOOL_REVIEWS.length} reviews (${reviewExCount} ex), ${examQIds.length} school exam Qs (${SCHOOL_EXAM_SETS.entrance10.length}+${SCHOOL_EXAM_SETS.thpt.length} sets)`);
-console.log(`• Kids: ${KIDS_UNITS.length} units (${KIDS_UNITS.reduce((a, u) => a + u.words.length, 0)} words), ${KIDS_SENTENCE_CHUNKS.length} chunks, ${KIDS_YLE_CHALLENGES.length} YLE Qs`);
+console.log(`• Kids: ${KIDS_UNITS.length} units (${KIDS_UNITS.reduce((a, u) => a + u.words.length, 0)} words, ${kidsExCount} ex), ${KIDS_SENTENCE_CHUNKS.length} chunks, ${KIDS_YLE_CHALLENGES.length} YLE Qs, ${KIDS_YLE_MOCK_TESTS.length} YLE mocks (${kidsMockQIds.length} Qs)`);
 console.log(`• University: ${AWL_WORDS.length} AWL words, ${ACADEMIC_ABSTRACTS.length} abstracts, ${ACADEMIC_WRITING_PROMPTS.length} writing prompts, ${GRADUATION_QUICK_QUIZ.length} grad quiz`);
 console.log(`• Workplace: ${WORKPLACE_MEETING_PHRASES.length} meetings, ${WORKPLACE_EMAIL_TEMPLATES.length} emails, ${WORKPLACE_STAR_QUESTIONS.length} STAR, ${WORKPLACE_CASE_SITUATIONS.length} cases`);
 console.log(`• Exam Prep: ${EXAM_ORDER.length} exams, ${examPrepMcqCount} MCQ Qs`);
