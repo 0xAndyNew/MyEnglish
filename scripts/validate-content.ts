@@ -2,6 +2,7 @@ import { SCHOOL_UNITS, SCHOOL_EXAMS, SCHOOL_EXAM_SETS, SCHOOL_REVIEWS } from '..
 import { KIDS_UNITS, KIDS_SENTENCE_CHUNKS, KIDS_YLE_CHALLENGES, KIDS_YLE_MOCK_TESTS } from '../src/data/kids/kidsCurriculumData';
 import {
   AWL_WORDS,
+  AWL_DRILLS,
   ACADEMIC_ABSTRACTS,
   ACADEMIC_WRITING_PROMPTS,
   PRESENTATION_PHRASES,
@@ -13,6 +14,7 @@ import {
   WORKPLACE_EMAIL_TEMPLATES,
   WORKPLACE_STAR_QUESTIONS,
   WORKPLACE_CASE_SITUATIONS,
+  WORKPLACE_VOCAB_DRILLS,
 } from '../src/data/worker/workplaceScenariosData';
 import { EXAM_PREP_DATA, EXAM_ORDER } from '../src/data/exam/examPrepData';
 import { GRAMMAR_LESSONS } from '../src/data/grammarData';
@@ -214,12 +216,19 @@ checkUniqueIds('ACADEMIC_WRITING_PROMPTS', ACADEMIC_WRITING_PROMPTS.map((p) => p
 checkUniqueIds('PRESENTATION_PHRASES', PRESENTATION_PHRASES.map((p) => p.id));
 checkUniqueIds('SEMINAR_PHRASES', SEMINAR_PHRASES.map((p) => p.id));
 checkUniqueIds('GRADUATION_QUICK_QUIZ', GRADUATION_QUICK_QUIZ.map((q) => q.id));
+checkMcqDistribution('GRADUATION_QUICK_QUIZ', GRADUATION_QUICK_QUIZ.map((q) => q.correctIndex));
+const awlDrillDist: number[] = [];
+validateExerciseList('AWL_DRILLS', AWL_DRILLS, awlDrillDist);
+checkMcqDistribution('AWL_DRILLS', awlDrillDist);
 
 // 4. WORKPLACE
 checkUniqueIds('WORKPLACE_MEETING_PHRASES', WORKPLACE_MEETING_PHRASES.map((m) => m.id));
 checkUniqueIds('WORKPLACE_EMAIL_TEMPLATES', WORKPLACE_EMAIL_TEMPLATES.map((e) => e.id));
 checkUniqueIds('WORKPLACE_STAR_QUESTIONS', WORKPLACE_STAR_QUESTIONS.map((s) => s.id));
 checkUniqueIds('WORKPLACE_CASE_SITUATIONS', WORKPLACE_CASE_SITUATIONS.map((c) => c.id));
+const wpDrillDist: number[] = [];
+validateExerciseList('WORKPLACE_VOCAB_DRILLS', WORKPLACE_VOCAB_DRILLS, wpDrillDist);
+checkMcqDistribution('WORKPLACE_VOCAB_DRILLS', wpDrillDist);
 
 // 5. EXAM PREP
 let examPrepMcqCount = 0;
@@ -247,10 +256,10 @@ checkUniqueIds('GRAMMAR_LESSONS', GRAMMAR_LESSONS.map((g) => g.id));
 console.log('\n=== Inventory Summary ===');
 console.log(`• Teen: ${SCHOOL_UNITS.length} units, ${teenQuizIds.length} practiceQuiz, ${teenExerciseCount} exercises, ${SCHOOL_REVIEWS.length} reviews (${reviewExCount} ex), ${examQIds.length} school exam Qs (${SCHOOL_EXAM_SETS.entrance10.length}+${SCHOOL_EXAM_SETS.thpt.length} sets)`);
 console.log(`• Kids: ${KIDS_UNITS.length} units (${KIDS_UNITS.reduce((a, u) => a + u.words.length, 0)} words, ${kidsExCount} ex), ${KIDS_SENTENCE_CHUNKS.length} chunks, ${KIDS_YLE_CHALLENGES.length} YLE Qs, ${KIDS_YLE_MOCK_TESTS.length} YLE mocks (${kidsMockQIds.length} Qs)`);
-console.log(`• University: ${AWL_WORDS.length} AWL words, ${ACADEMIC_ABSTRACTS.length} abstracts, ${ACADEMIC_WRITING_PROMPTS.length} writing prompts, ${GRADUATION_QUICK_QUIZ.length} grad quiz`);
-console.log(`• Workplace: ${WORKPLACE_MEETING_PHRASES.length} meetings, ${WORKPLACE_EMAIL_TEMPLATES.length} emails, ${WORKPLACE_STAR_QUESTIONS.length} STAR, ${WORKPLACE_CASE_SITUATIONS.length} cases`);
+console.log(`• University: ${AWL_WORDS.length} AWL words, ${AWL_DRILLS.length} AWL drills, ${ACADEMIC_ABSTRACTS.length} abstracts (${ACADEMIC_ABSTRACTS.reduce((a, x) => a + x.questions.length, 0)} Qs), ${ACADEMIC_WRITING_PROMPTS.length} writing prompts, ${PRESENTATION_PHRASES.length + SEMINAR_PHRASES.length} pres/sem phrases, ${GRADUATION_QUICK_QUIZ.length} grad quiz`);
+console.log(`• Workplace: ${WORKPLACE_MEETING_PHRASES.length} meetings, ${WORKPLACE_EMAIL_TEMPLATES.length} emails, ${WORKPLACE_STAR_QUESTIONS.length} STAR, ${WORKPLACE_CASE_SITUATIONS.length} cases, ${WORKPLACE_VOCAB_DRILLS.length} industry drills`);
 console.log(`• Exam Prep: ${EXAM_ORDER.length} exams, ${examPrepMcqCount} MCQ Qs`);
-console.log(`• Grammar: ${GRAMMAR_LESSONS.length} lessons`);
+console.log(`• Grammar: ${GRAMMAR_LESSONS.length} lessons (${GRAMMAR_LESSONS.reduce((a, g) => a + g.quiz.length, 0)} quiz Qs)`);
 console.log(`\nResult: ${errorCount} errors, ${warningCount} warnings.`);
 
 if (errorCount > 0) process.exit(1);

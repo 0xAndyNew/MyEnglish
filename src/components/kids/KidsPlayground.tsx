@@ -4,6 +4,7 @@ import {
   Award,
   BookOpen,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Eye,
   EyeOff,
@@ -60,6 +61,7 @@ export interface KidsPlaygroundProps {
   onAddXp: (amount: number) => void;
   initialTab?: KidsTab;
   allowAllOptions?: boolean;
+  hideHeaderNav?: boolean;
 }
 
 interface KidsBadgeInfo {

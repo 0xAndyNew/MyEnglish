@@ -1,4 +1,5 @@
 import { CefrLevel } from '../types/learning';
+import { GRAMMAR_LESSONS_EXTRA } from './grammarExtra';
 
 export interface GrammarQuizItem {
   q: string;
@@ -36,7 +37,7 @@ export interface GrammarLesson {
   quiz: GrammarQuizItem[];
 }
 
-export const GRAMMAR_LESSONS: GrammarLesson[] = [
+const BASE_GRAMMAR_LESSONS: GrammarLesson[] = [
   {
     id: 'gl-noun',
     level: 'A1',
@@ -524,6 +525,11 @@ export const GRAMMAR_LESSONS: GrammarLesson[] = [
       { q: 'Điền từ nối đúng: "I stayed home ___ I was sick."', options: ['because', 'although', 'however'], correct: 0, explain: '"I was sick" là nguyên nhân → dùng "because".' },
     ],
   },
+];
+
+export const GRAMMAR_LESSONS: GrammarLesson[] = [
+  ...BASE_GRAMMAR_LESSONS,
+  ...GRAMMAR_LESSONS_EXTRA,
 ];
 
 export const COMPREHENSIVE_GRAMMAR_EXAM: GrammarQuizItem[] = [
