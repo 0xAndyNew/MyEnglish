@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
   CheckCircle2,
@@ -11,9 +11,12 @@ import {
   Filter,
   Eye,
   EyeOff,
+  Search,
 } from 'lucide-react';
 import { SENTENCE_EXERCISES, SentenceExercise, SENTENCE_TOPICS } from '../data/sentenceExercisesData';
+import { LearnerProfile } from '../types/audience';
 import { AccentMode, CefrLevel } from '../types/learning';
+import { filterAndSortByProfile, getAllowedCategoriesForProfile } from '../utils/audienceFilter';
 import { speakText } from '../utils/speechEngine';
 
 interface SentenceBuilderLabProps {
@@ -24,6 +27,7 @@ interface SentenceBuilderLabProps {
   onCompleteId?: (id: string) => void;
   isNextUnlocked?: boolean;
   onUnlockNext?: () => void;
+  learnerProfile?: LearnerProfile | null;
 }
 
 export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
@@ -34,11 +38,14 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
   onCompleteId,
   isNextUnlocked = false,
   onUnlockNext,
+  learnerProfile,
 }) => {
   const [levelFilter, setLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
   const [topicFilter, setTopicFilter] = useState<string>('Tất cả');
+  const [searchQuery, setSearchQuery] = useState('');
   const [sessionLimit, setSessionLimit] = useState<number>(20);
   const [exIdx, setExIdx] = useState(0);
+  const [jumpPage, setJumpPage] = useState(0);
   const [pickedIndices, setPickedIndices] = useState<number[]>([]);
   const [checked, setChecked] = useState<'none' | 'correct' | 'wrong'>('none');
   const [showHint, setShowHint] = useState(false);
@@ -50,22 +57,61 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
   const completedIds = savedCompletedIds ?? localCompletedIds;
 
   const allExercises = useMemo(
-    () => [...extraExercises, ...SENTENCE_EXERCISES],
-    [extraExercises]
+    () => filterAndSortByProfile([...extraExercises, ...SENTENCE_EXERCISES], learnerProfile),
+    [extraExercises, learnerProfile]
   );
 
+  const allowedTopics = useMemo(
+    () => [
+      'Tất cả',
+      ...getAllowedCategoriesForProfile(
+        SENTENCE_TOPICS.filter((t) => t !== 'Tất cả'),
+        learnerProfile
+      ),
+    ],
+    [learnerProfile]
+  );
+
+  const availableLevels = useMemo(
+    () =>
+      learnerProfile?.audience === 'kids'
+        ? (['ALL', 'A1'] as const)
+        : (['ALL', 'A1', 'A2', 'B1', 'B2'] as const),
+    [learnerProfile]
+  );
+
+  useEffect(() => {
+    if (!allowedTopics.includes(topicFilter)) {
+      setTopicFilter('Tất cả');
+      setExIdx(0);
+    }
+  }, [allowedTopics, topicFilter]);
+
+  useEffect(() => {
+    if (learnerProfile?.audience === 'kids' && levelFilter !== 'ALL' && levelFilter !== 'A1') {
+      setLevelFilter('ALL');
+      setExIdx(0);
+    }
+  }, [learnerProfile, levelFilter]);
+
   const filteredList = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     const matched = allExercises.filter((item) => {
       const okLevel = levelFilter === 'ALL' || item.level === levelFilter;
       const okTopic = topicFilter === 'Tất cả' || item.topic === topicFilter;
-      return okLevel && okTopic;
+      const okQuery =
+        !q ||
+        item.en.toLowerCase().includes(q) ||
+        item.vi.toLowerCase().includes(q) ||
+        item.topic.toLowerCase().includes(q);
+      return okLevel && okTopic && okQuery;
     });
     const list = matched.length > 0 ? matched : allExercises;
     return sessionLimit === 0 ? list : list.slice(0, sessionLimit);
-  }, [allExercises, levelFilter, topicFilter, sessionLimit]);
+  }, [allExercises, levelFilter, topicFilter, searchQuery, sessionLimit]);
 
-  const safeIdx = exIdx % filteredList.length;
-  const currentEx = filteredList[safeIdx] || allExercises[0];
+  const safeIdx = exIdx % Math.max(1, filteredList.length);
+  const currentEx = filteredList[safeIdx] || allExercises[0] || SENTENCE_EXERCISES[0];
 
   const exWords = useMemo(() => currentEx.en.split(' '), [currentEx]);
   const shuffledExWords = useMemo(() => {
@@ -88,6 +134,7 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
 
   const selectIndex = (idx: number) => {
     setExIdx(idx);
+    setJumpPage(Math.floor(idx / 25));
     setPickedIndices([]);
     setChecked('none');
     setShowHint(false);
@@ -162,7 +209,7 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
             <span className="text-xs font-bold text-slate-500 flex items-center gap-1 mr-1">
               <Filter className="w-3.5 h-3.5" /> Cấp độ:
             </span>
-            {(['ALL', 'A1', 'A2', 'B1', 'B2'] as const).map((lv) => (
+            {availableLevels.map((lv) => (
               <button
                 key={lv}
                 onClick={() => {
@@ -206,24 +253,58 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <span className="text-xs font-bold text-slate-500 mr-1">Chủ đề:</span>
-          {SENTENCE_TOPICS.map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                setTopicFilter(t);
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
                 selectIndex(0);
               }}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
-                topicFilter === t
-                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200 border border-indigo-300'
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-              }`}
+              placeholder="Tìm câu ghép theo từ khóa tiếng Anh hoặc tiếng Việt..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+            />
+          </div>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                selectIndex(0);
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600"
             >
-              {t}
+              Xóa tìm kiếm
             </button>
-          ))}
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <span className="text-xs font-bold text-slate-500 mr-1">Chủ đề:</span>
+          {allowedTopics.map((t) => {
+            const isPreferred =
+              learnerProfile?.audience === 'worker' &&
+              learnerProfile.worker?.industries?.includes(t);
+            return (
+              <button
+                key={t}
+                onClick={() => {
+                  setTopicFilter(t);
+                  selectIndex(0);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  topicFilter === t
+                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200 border border-indigo-300'
+                    : isPreferred
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                {isPreferred ? `⭐ ${t}` : t}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -487,7 +568,10 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setStatusFilter(tab.id as any)}
+                      onClick={() => {
+                        setStatusFilter(tab.id as any);
+                        setJumpPage(0);
+                      }}
                       className={`px-2 py-1 rounded-lg border transition ${
                         statusFilter === tab.id
                           ? 'bg-indigo-600 text-white border-indigo-600'
@@ -502,39 +586,80 @@ export const SentenceBuilderLab: React.FC<SentenceBuilderLabProps> = ({
             );
           })()}
 
-          <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-1.5 max-h-48 lg:max-h-[340px] overflow-y-auto pr-1">
-            {filteredList.map((item, idx) => {
-              const done = completedIds.includes(item.id);
-              const isWrong = !done && wrongIds.includes(item.id);
-              if (
-                (statusFilter === 'correct' && !done) ||
-                (statusFilter === 'wrong' && !isWrong) ||
-                (statusFilter === 'todo' && (done || isWrong))
-              ) {
-                return null;
-              }
-              const active = idx === safeIdx;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => selectIndex(idx)}
-                  title={`Câu ${idx + 1} (${done ? 'Đúng' : isWrong ? 'Làm sai' : 'Chưa làm'}): ${item.vi}`}
-                  className={`py-1.5 rounded-lg text-xs font-bold border transition ${
-                    active
-                      ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-300'
-                      : done
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-400 dark:bg-emerald-950/30 dark:text-emerald-300'
-                      : isWrong
-                      ? 'bg-rose-50 text-rose-700 border-rose-400 dark:bg-rose-950/30 dark:text-rose-300'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                  }`}
-                >
-                  {idx + 1}
-                  {done ? ' ✓' : isWrong ? ' ✕' : ''}
-                </button>
-              );
-            })}
-          </div>
+          {(() => {
+            const JUMP_PAGE_SIZE = 25;
+            const visibleEntries = filteredList
+              .map((item, idx) => ({ item, idx }))
+              .filter(({ item }) => {
+                const done = completedIds.includes(item.id);
+                const isWrong = !done && wrongIds.includes(item.id);
+                if (statusFilter === 'correct') return done;
+                if (statusFilter === 'wrong') return isWrong;
+                if (statusFilter === 'todo') return !done && !isWrong;
+                return true;
+              });
+            const totalPages = Math.max(1, Math.ceil(visibleEntries.length / JUMP_PAGE_SIZE));
+            const safePage = Math.min(jumpPage, totalPages - 1);
+            const pageEntries = visibleEntries.slice(
+              safePage * JUMP_PAGE_SIZE,
+              (safePage + 1) * JUMP_PAGE_SIZE
+            );
+
+            return (
+              <>
+                <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-1.5 max-h-48 lg:max-h-[340px] overflow-y-auto pr-1">
+                  {pageEntries.map(({ item, idx }) => {
+                    const done = completedIds.includes(item.id);
+                    const isWrong = !done && wrongIds.includes(item.id);
+                    const active = idx === safeIdx;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => selectIndex(idx)}
+                        title={`Câu ${idx + 1} (${done ? 'Đúng' : isWrong ? 'Làm sai' : 'Chưa làm'}): ${item.vi}`}
+                        className={`py-1.5 rounded-lg text-xs font-bold border transition ${
+                          active
+                            ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-300'
+                            : done
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-400 dark:bg-emerald-950/30 dark:text-emerald-300'
+                            : isWrong
+                            ? 'bg-rose-50 text-rose-700 border-rose-400 dark:bg-rose-950/30 dark:text-rose-300'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                        }`}
+                      >
+                        {idx + 1}
+                        {done ? ' ✓' : isWrong ? ' ✕' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
+                    <button
+                      type="button"
+                      disabled={safePage <= 0}
+                      onClick={() => setJumpPage((p) => Math.max(0, p - 1))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                    >
+                      ← Trang trước
+                    </button>
+                    <span className="text-slate-500">
+                      Trang {safePage + 1}/{totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safePage >= totalPages - 1}
+                      onClick={() => setJumpPage((p) => Math.min(totalPages - 1, p + 1))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                    >
+                      Trang sau →
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

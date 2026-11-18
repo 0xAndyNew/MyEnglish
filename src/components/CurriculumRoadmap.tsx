@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
   CheckCircle2,
@@ -14,7 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import { LEARNING_STAGES } from '../data/curriculumData';
+import { getAudienceMeta, LearnerProfile } from '../types/audience';
 import { AccentMode, WordEntry } from '../types/learning';
+import { filterAndSortByProfile, getAllowedCategoriesForProfile } from '../utils/audienceFilter';
 import { getAllStructuredLessons } from '../utils/lessonGenerator';
 import { speakText } from '../utils/speechEngine';
 import { WordAnatomyCard } from './WordAnatomyCard';
@@ -33,6 +35,7 @@ interface CurriculumRoadmapProps {
   isStep2BUnlocked?: boolean;
   onUnlockStep2B?: () => void;
   devUnlockAll?: boolean;
+  learnerProfile?: LearnerProfile | null;
 }
 
 export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
@@ -46,12 +49,33 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
   isStep2BUnlocked = false,
   onUnlockStep2B,
   devUnlockAll = false,
+  learnerProfile,
 }) => {
   const allLessons = useMemo(() => getAllStructuredLessons(), []);
 
+  const visibleStages = useMemo(() => {
+    const profileFiltered = filterAndSortByProfile(LEARNING_STAGES, learnerProfile);
+    if (!learnerProfile) return profileFiltered;
+    if (learnerProfile.audience === 'teen') {
+      const teenLevels = new Set(['A0', 'A1', 'A2', 'B1']);
+      return profileFiltered.filter((st) => teenLevels.has(st.level));
+    }
+    return profileFiltered;
+  }, [learnerProfile]);
+
+  const visibleStageIds = useMemo(
+    () => new Set(visibleStages.map((st) => st.id)),
+    [visibleStages]
+  );
+
+  const visibleLessons = useMemo(
+    () => allLessons.filter((l) => visibleStageIds.has(l.stageId)),
+    [allLessons, visibleStageIds]
+  );
+
   const [showLessonDrawer, setShowLessonDrawer] = useState(false);
-  const [selectedStageId, setSelectedStageId] = useState(LEARNING_STAGES[0].id);
-  const [selectedLessonId, setSelectedLessonId] = useState(allLessons[0].id);
+  const [selectedStageId, setSelectedStageId] = useState(visibleStages[0]?.id || LEARNING_STAGES[0].id);
+  const [selectedLessonId, setSelectedLessonId] = useState(visibleLessons[0]?.id || allLessons[0].id);
   const [activeWordIdx, setActiveWordIdx] = useState(0);
   const [viewedWords, setViewedWords] = useState<Record<string, boolean>>({});
 
@@ -61,9 +85,20 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
   const [spellingChecked, setSpellingChecked] = useState(false);
   const [quizPassed100, setQuizPassed100] = useState(false);
 
+  useEffect(() => {
+    if (!visibleStageIds.has(selectedStageId) && visibleStages[0]) {
+      const nextStageId = visibleStages[0].id;
+      setSelectedStageId(nextStageId);
+      const firstInStage = allLessons.find((l) => l.stageId === nextStageId);
+      if (firstInStage) {
+        setSelectedLessonId(firstInStage.id);
+      }
+    }
+  }, [visibleStageIds, visibleStages, selectedStageId, allLessons]);
+
   const stageLessons = allLessons.filter((l) => l.stageId === selectedStageId);
   const currentLesson =
-    allLessons.find((l) => l.id === selectedLessonId) || stageLessons[0] || allLessons[0];
+    visibleLessons.find((l) => l.id === selectedLessonId) || stageLessons[0] || visibleLessons[0] || allLessons[0];
   const currentWord = currentLesson.words[activeWordIdx] || currentLesson.words[0];
   const isCompleted = completedLessons.includes(currentLesson.id);
 
@@ -77,10 +112,35 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
   const allWordsViewed = viewedCountInLesson >= currentLesson.words.length;
 
   const currentGlobalLessonIdx = allLessons.findIndex((l) => l.id === currentLesson.id);
-  const nextLesson =
+  const candidateNext =
     currentGlobalLessonIdx >= 0 && currentGlobalLessonIdx + 1 < allLessons.length
       ? allLessons[currentGlobalLessonIdx + 1]
       : null;
+  const nextLesson =
+    candidateNext && visibleStageIds.has(candidateNext.stageId) ? candidateNext : null;
+
+  const profileRecommendation = useMemo(() => {
+    if (!learnerProfile) return null;
+    const meta = getAudienceMeta(learnerProfile.audience);
+    const preferredCats = getAllowedCategoriesForProfile([], learnerProfile);
+    void preferredCats;
+    let hint = `Bắt đầu gợi ý từ cấp ${learnerProfile.startLevel}`;
+    if (learnerProfile.audience === 'teen') {
+      hint = `Lộ trình A0 → B1 phù hợp THCS/THPT • Mốc hiện tại: ${learnerProfile.startLevel}`;
+    } else if (learnerProfile.audience === 'kids') {
+      hint = `Lộ trình nền tảng A0 → A1 • Mỗi ngày ${learnerProfile.dailyMinutes} phút`;
+    } else if (learnerProfile.audience === 'worker') {
+      const inds = learnerProfile.worker?.industries?.slice(0, 2).join(', ');
+      hint = inds
+        ? `Cấp ${learnerProfile.startLevel} • Ưu tiên thực hành: ${inds}`
+        : `Lộ trình A0 → C1 cho Người đi làm • Mốc ${learnerProfile.startLevel}`;
+    } else if (learnerProfile.audience === 'university') {
+      hint = `Cấp ${learnerProfile.startLevel} → C1 • Chuẩn đầu ra & Học thuật`;
+    } else if (learnerProfile.audience === 'exam') {
+      hint = `Bổ trợ từ vựng đến C1 cho kỳ thi ${learnerProfile.exam?.examType?.toUpperCase() || ''}`.trim();
+    }
+    return { meta, hint };
+  }, [learnerProfile]);
 
   const resetLessonLocalState = () => {
     setActiveWordIdx(0);
@@ -149,12 +209,23 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400">
               <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60">
                 Cấp {currentLesson.level}
               </span>
               <span>•</span>
-              <span>Đã hoàn thành {completedLessons.length}/{allLessons.length} bài</span>
+              <span>
+                Đã hoàn thành{' '}
+                {visibleLessons.filter((l) => completedLessons.includes(l.id)).length}/
+                {visibleLessons.length} bài
+              </span>
+              {profileRecommendation && (
+                <span
+                  className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${profileRecommendation.meta.badgeColor}`}
+                >
+                  {profileRecommendation.meta.emoji} {profileRecommendation.hint}
+                </span>
+              )}
             </div>
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1">
               {currentLesson.title} ({totalLessonWords} từ)
@@ -167,13 +238,13 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold hover:bg-indigo-100 transition"
             >
               <FolderOpen className="w-4 h-4" />
-              <span>{showLessonDrawer ? 'Đóng danh sách' : `Chọn bài khác (${allLessons.length} bài)`}</span>
+              <span>{showLessonDrawer ? 'Đóng danh sách' : `Chọn bài khác (${visibleLessons.length} bài)`}</span>
             </button>
             <button
               onClick={() => {
                 onResetLessons();
-                setSelectedStageId(LEARNING_STAGES[0].id);
-                setSelectedLessonId(allLessons[0].id);
+                setSelectedStageId(visibleStages[0]?.id || LEARNING_STAGES[0].id);
+                setSelectedLessonId(visibleLessons[0]?.id || allLessons[0].id);
                 setViewedWords({});
                 resetLessonLocalState();
               }}
@@ -196,10 +267,14 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              {LEARNING_STAGES.map((st) => {
+              {visibleStages.map((st) => {
                 const active = st.id === selectedStageId;
                 const count = allLessons.filter((l) => l.stageId === st.id).length;
                 const done = allLessons.filter((l) => l.stageId === st.id && completedLessons.includes(l.id)).length;
+                const isRecommendedStage =
+                  Boolean(learnerProfile) &&
+                  (st.level === learnerProfile?.startLevel ||
+                    (learnerProfile?.startLevel === 'C1' && st.level === 'B2'));
                 return (
                   <button
                     key={st.id}
@@ -207,9 +282,12 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                       active
                         ? 'bg-indigo-600 text-white border-indigo-600'
+                        : isRecommendedStage
+                        ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200'
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
                     }`}
                   >
+                    {isRecommendedStage ? '⭐ ' : ''}
                     {st.level} ({done}/{count})
                   </button>
                 );

@@ -70,9 +70,35 @@ db.exec(`
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,
     payload_json TEXT NOT NULL,
+    audiences TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS learner_profiles (
+    email TEXT PRIMARY KEY REFERENCES users(email) ON DELETE CASCADE,
+    audience TEXT NOT NULL DEFAULT 'worker',
+    start_level TEXT NOT NULL DEFAULT 'A0',
+    daily_minutes INTEGER NOT NULL DEFAULT 20,
+    details_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);
+
+function ensureColumnExists(tableName, columnName, columnDef) {
+  const cols = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (!cols.some((c) => c.name === columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`);
+  }
+}
+
+ensureColumnExists('user_progress', 'track_unlocks', "TEXT NOT NULL DEFAULT '{}'");
+ensureColumnExists('user_progress', 'srs_cards', "TEXT NOT NULL DEFAULT '{}'");
+ensureColumnExists('custom_lessons', 'audiences', "TEXT NOT NULL DEFAULT '[]'");
+
+export const VALID_AUDIENCES = new Set(['kids', 'teen', 'university', 'worker', 'exam']);
+const VALID_LEVELS = new Set(['A0', 'A1', 'A2', 'B1', 'B2', 'C1']);
+const VALID_DAILY_MINUTES = new Set([10, 20, 30, 60]);
 
 // Safe migration for existing SQLite databases missing srs_cards column
 const progressCols = db.prepare('PRAGMA table_info(user_progress)').all().map((c) => c.name);
@@ -107,6 +133,7 @@ export function getDefaultProgressObj() {
     streakDays: 1,
     lastActiveDate: todayStr(),
     unlockedStepIndex: 0,
+    trackUnlocks: {},
     passedLetters: [],
     passedIpaPairs: [],
     completedGrammarIds: [],
@@ -192,6 +219,7 @@ export function loadFullProgress(emailRaw) {
     streakDays,
     lastActiveDate,
     unlockedStepIndex: row.unlocked_step_index || 0,
+    trackUnlocks: parseJsonSafe(row.track_unlocks, {}),
     passedLetters: parseJsonSafe(row.passed_letters, []),
     passedIpaPairs: parseJsonSafe(row.passed_ipa_pairs, []),
     completedGrammarIds: parseJsonSafe(row.completed_grammar_ids, []),
@@ -218,6 +246,7 @@ export function saveFullProgress(emailRaw, progress) {
         streak_days = ?,
         last_active_date = ?,
         unlocked_step_index = ?,
+        track_unlocks = ?,
         accent = ?,
         passed_letters = ?,
         passed_ipa_pairs = ?,
@@ -234,6 +263,7 @@ export function saveFullProgress(emailRaw, progress) {
       Number(progress.streakDays || 1),
       String(progress.lastActiveDate || todayStr()),
       Number(progress.unlockedStepIndex || 0),
+      JSON.stringify(progress.trackUnlocks || {}),
       progress.accent === 'en-GB' ? 'en-GB' : 'en-US',
       JSON.stringify(progress.passedLetters || []),
       JSON.stringify(progress.passedIpaPairs || []),
@@ -314,13 +344,63 @@ export function setAppSetting(key, value) {
   ).run(key, clean, now);
 }
 
+function rowToLearnerProfile(row) {
+  if (!row) return null;
+  const details = parseJsonSafe(row.details_json, {});
+  return {
+    audience: VALID_AUDIENCES.has(row.audience) ? row.audience : 'worker',
+    startLevel: VALID_LEVELS.has(row.start_level) ? row.start_level : 'A0',
+    dailyMinutes: VALID_DAILY_MINUTES.has(Number(row.daily_minutes)) ? Number(row.daily_minutes) : 20,
+    ...(details && typeof details === 'object' ? details : {}),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function getLearnerProfile(emailRaw) {
+  const email = String(emailRaw || '').trim().toLowerCase();
+  if (!email) return null;
+  const row = db.prepare('SELECT * FROM learner_profiles WHERE email = ?').get(email);
+  return rowToLearnerProfile(row);
+}
+
+export function saveLearnerProfile(emailRaw, profileInput = {}) {
+  const email = String(emailRaw || '').trim().toLowerCase();
+  const audience = VALID_AUDIENCES.has(profileInput.audience) ? profileInput.audience : 'worker';
+  const startLevel = VALID_LEVELS.has(profileInput.startLevel) ? profileInput.startLevel : 'A0';
+  const dailyMinutesNum = Number(profileInput.dailyMinutes || 20);
+  const dailyMinutes = VALID_DAILY_MINUTES.has(dailyMinutesNum) ? dailyMinutesNum : 20;
+
+  const details = {};
+  if (profileInput.kids && typeof profileInput.kids === 'object') details.kids = profileInput.kids;
+  if (profileInput.teen && typeof profileInput.teen === 'object') details.teen = profileInput.teen;
+  if (profileInput.university && typeof profileInput.university === 'object') details.university = profileInput.university;
+  if (profileInput.worker && typeof profileInput.worker === 'object') details.worker = profileInput.worker;
+  if (profileInput.exam && typeof profileInput.exam === 'object') details.exam = profileInput.exam;
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO learner_profiles (email, audience, start_level, daily_minutes, details_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(email) DO UPDATE SET
+       audience = excluded.audience,
+       start_level = excluded.start_level,
+       daily_minutes = excluded.daily_minutes,
+       details_json = excluded.details_json,
+       updated_at = excluded.updated_at`
+  ).run(email, audience, startLevel, dailyMinutes, JSON.stringify(details), now, now);
+
+  return getLearnerProfile(email);
+}
+
 export function listAllUsersAdmin() {
   const rows = db
     .prepare(
       `SELECT u.email, u.display_name, u.role, u.created_at,
-              p.xp, p.unlocked_step_index, p.completed_lessons
+              p.xp, p.unlocked_step_index, p.completed_lessons,
+              lp.audience, lp.start_level, lp.daily_minutes, lp.details_json, lp.updated_at AS profile_updated_at
        FROM users u
        LEFT JOIN user_progress p ON p.email = u.email
+       LEFT JOIN learner_profiles lp ON lp.email = u.email
        ORDER BY CASE WHEN u.role = 'admin' THEN 0 ELSE 1 END, u.created_at DESC`
     )
     .all();
@@ -333,6 +413,16 @@ export function listAllUsersAdmin() {
     xp: r.xp || 0,
     unlockedStepIndex: r.unlocked_step_index || 0,
     completedLessonsCount: parseJsonSafe(r.completed_lessons, []).length,
+    audience: r.audience && VALID_AUDIENCES.has(r.audience) ? r.audience : null,
+    profile: r.audience
+      ? rowToLearnerProfile({
+          audience: r.audience,
+          start_level: r.start_level,
+          daily_minutes: r.daily_minutes,
+          details_json: r.details_json,
+          updated_at: r.profile_updated_at || r.created_at,
+        })
+      : null,
   }));
 }
 
@@ -343,10 +433,10 @@ export function resetProgressInDb(emailRaw) {
   try {
     db.prepare(
       `UPDATE user_progress SET
-        xp = 0, streak_days = 1, last_active_date = ?, unlocked_step_index = 0,
+        xp = 0, streak_days = 1, last_active_date = ?, unlocked_step_index = 0, track_unlocks = '{}',
         passed_letters = '[]', passed_ipa_pairs = '[]', completed_grammar_ids = '[]',
         completed_sentence_ids = '[]', completed_lessons = '[]', mastered_phonemes = '[]',
-        pronunciation_scores = '[]', updated_at = ?
+        pronunciation_scores = '[]', srs_cards = '{}', updated_at = ?
       WHERE email = ?`
     ).run(todayStr(), now, email);
     db.prepare('DELETE FROM saved_words WHERE email = ?').run(email);
@@ -359,22 +449,34 @@ export function resetProgressInDb(emailRaw) {
 }
 
 export function listCustomLessons() {
-  const rows = db.prepare('SELECT id, kind, payload_json, created_at FROM custom_lessons ORDER BY created_at DESC').all();
-  return rows.map((r) => ({
-    id: r.id,
-    kind: r.kind,
-    payload: parseJsonSafe(r.payload_json, {}),
-    createdAt: r.created_at,
-  }));
+  const rows = db
+    .prepare('SELECT id, kind, payload_json, audiences, created_at FROM custom_lessons ORDER BY created_at DESC')
+    .all();
+  return rows.map((r) => {
+    const rawAudiences = parseJsonSafe(r.audiences, []);
+    const audiences = Array.isArray(rawAudiences)
+      ? rawAudiences.filter((a) => VALID_AUDIENCES.has(a))
+      : [];
+    return {
+      id: r.id,
+      kind: r.kind,
+      payload: parseJsonSafe(r.payload_json, {}),
+      audiences,
+      createdAt: r.created_at,
+    };
+  });
 }
 
-export function addCustomLesson(kind, payload) {
+export function addCustomLesson(kind, payload, rawAudiences = []) {
   const id = `cl-${kind}-${Date.now()}`;
   const createdAt = new Date().toISOString();
-  const payloadWithId = { ...payload, id };
-  db.prepare('INSERT INTO custom_lessons (id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)')
-    .run(id, kind, JSON.stringify(payloadWithId), createdAt);
-  return { id, kind, payload: payloadWithId, createdAt };
+  const audiences = Array.isArray(rawAudiences)
+    ? Array.from(new Set(rawAudiences.filter((a) => VALID_AUDIENCES.has(a))))
+    : [];
+  const payloadWithId = { ...payload, id, ...(audiences.length > 0 ? { audiences } : {}) };
+  db.prepare('INSERT INTO custom_lessons (id, kind, payload_json, audiences, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(id, kind, JSON.stringify(payloadWithId), JSON.stringify(audiences), createdAt);
+  return { id, kind, payload: payloadWithId, audiences, createdAt };
 }
 
 export function deleteCustomLesson(id) {

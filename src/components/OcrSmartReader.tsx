@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Tesseract from 'tesseract.js';
-import { Camera, FileText, Volume2, Sparkles, Loader2, Upload, Eye } from 'lucide-react';
+import { Camera, FileText, Volume2, Sparkles, Loader2, Upload, Eye, Search } from 'lucide-react';
 import { READING_PASSAGES } from '../data/curriculumData';
-import { AccentMode, WordEntry } from '../types/learning';
+import { LISTENING_CATEGORIES, LISTENING_READING_LESSONS } from '../data/listeningReadingLessons';
+import { AccentMode, CefrLevel, WordEntry } from '../types/learning';
 import { analyzeWordFull } from '../utils/wordAnalyzer';
 import { speakText } from '../utils/speechEngine';
 import { WordAnatomyCard } from './WordAnatomyCard';
@@ -23,6 +24,57 @@ export const OcrSmartReader: React.FC<OcrSmartReaderProps> = ({
   const [text, setText] = useState(READING_PASSAGES[0].content);
   const [translation, setTranslation] = useState<string | null>(READING_PASSAGES[0].translation);
   const [showTranslation, setShowTranslation] = useState(false);
+
+  const [passageLevelFilter, setPassageLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
+  const [passageCatFilter, setPassageCatFilter] = useState<string>('Tất cả');
+  const [passageSearch, setPassageSearch] = useState('');
+  const [selectedPassageId, setSelectedPassageId] = useState<string>(READING_PASSAGES[0].id);
+
+  const allReadingItems = useMemo(
+    () => [
+      ...READING_PASSAGES.map((p) => ({
+        id: p.id,
+        title: p.title,
+        level: p.level,
+        category: p.topic,
+        content: p.content,
+        translation: p.translation,
+      })),
+      ...LISTENING_READING_LESSONS.map((l) => ({
+        id: l.id,
+        title: l.title,
+        level: l.level,
+        category: l.category,
+        content: l.transcript,
+        translation: l.translation,
+      })),
+    ],
+    []
+  );
+
+  const filteredPassages = useMemo(() => {
+    const q = passageSearch.trim().toLowerCase();
+    const matched = allReadingItems.filter((item) => {
+      const okLv = passageLevelFilter === 'ALL' || item.level === passageLevelFilter;
+      const okCat = passageCatFilter === 'Tất cả' || item.category === passageCatFilter;
+      const okQ =
+        !q ||
+        item.title.toLowerCase().includes(q) ||
+        item.content.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q);
+      return okLv && okCat && okQ;
+    });
+    return matched.length > 0 ? matched : allReadingItems;
+  }, [allReadingItems, passageLevelFilter, passageCatFilter, passageSearch]);
+
+  const selectPassageById = (id: string) => {
+    const found = filteredPassages.find((p) => p.id === id) || allReadingItems.find((p) => p.id === id);
+    if (!found) return;
+    setSelectedPassageId(found.id);
+    setText(found.content);
+    setTranslation(found.translation);
+    setOcrPreview(null);
+  };
 
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -81,40 +133,92 @@ export const OcrSmartReader: React.FC<OcrSmartReaderProps> = ({
         </p>
       </div>
 
-      {/* Source Bar: Passages + Upload Image */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-            <FileText className="w-3.5 h-3.5" /> Bài đọc phân cấp:
+      {/* Source Bar: 243 Passages Browser + Upload Image */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+            <FileText className="w-4 h-4 text-indigo-500" /> Kho bài đọc phân cấp ({allReadingItems.length} bài thực chiến):
           </span>
-          {READING_PASSAGES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                setText(p.content);
-                setTranslation(p.translation);
-                setOcrPreview(null);
+
+          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer shadow-sm transition">
+            <Camera className="w-4 h-4" />
+            <span>Quét chữ từ Ảnh (OCR)</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImageUpload(f);
               }}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-300 transition"
-            >
-              [{p.level}] {p.title}
-            </button>
-          ))}
+            />
+          </label>
         </div>
 
-        <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer shadow-sm transition">
-          <Camera className="w-4 h-4" />
-          <span>Quét chữ từ Ảnh (OCR)</span>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleImageUpload(f);
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+          <div className="md:col-span-4 relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              value={passageSearch}
+              onChange={(e) => setPassageSearch(e.target.value)}
+              placeholder={`Tìm trong ${allReadingItems.length} bài đọc...`}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+            />
+          </div>
+          <div className="md:col-span-3">
+            <select
+              value={passageCatFilter}
+              onChange={(e) => setPassageCatFilter(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold"
+            >
+              {LISTENING_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  Thể loại: {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-5 flex flex-wrap items-center gap-1">
+            {(['ALL', 'A1', 'A2', 'B1', 'B2'] as const).map((lv) => (
+              <button
+                key={lv}
+                onClick={() => setPassageLevelFilter(lv)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  passageLevelFilter === lv
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {lv === 'ALL' ? 'Mọi cấp' : lv}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filteredPassages.some((p) => p.id === selectedPassageId) ? selectedPassageId : filteredPassages[0]?.id}
+            onChange={(e) => selectPassageById(e.target.value)}
+            className="flex-1 min-w-[240px] px-3 py-2 rounded-xl border border-indigo-200 dark:border-slate-700 bg-indigo-50/50 dark:bg-slate-800 text-xs font-bold"
+          >
+            {filteredPassages.map((p, idx) => (
+              <option key={p.id} value={p.id}>
+                [{p.level}] {idx + 1}/{filteredPassages.length} • {p.title} ({p.category})
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              const curIdx = filteredPassages.findIndex((p) => p.id === selectedPassageId);
+              const nextIdx = (curIdx + 1) % filteredPassages.length;
+              if (filteredPassages[nextIdx]) selectPassageById(filteredPassages[nextIdx].id);
             }}
-          />
-        </label>
+            className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-slate-700 hover:bg-indigo-600 text-white text-xs font-bold transition"
+          >
+            Bài đọc tiếp theo →
+          </button>
+        </div>
       </div>
 
       {ocrLoading && (

@@ -1,7 +1,36 @@
-import { SrsCardState, UserAccount, UserProgress, WordEntry } from '../types/learning';
+import { AudienceId, LearnerProfile, SrsCardState, UserAccount, UserProgress, WordEntry } from '../types/learning';
 
 const TOKEN_KEY = 'myenglish_token_v1';
+const LOCAL_PROFILE_KEY_PREFIX = 'myenglish_profile_v1_';
 export const DEV_EMAIL = 'admin';
+
+function profileStorageKey(email?: string | null): string | null {
+  const clean = (email ?? '').trim().toLowerCase();
+  return clean ? `${LOCAL_PROFILE_KEY_PREFIX}${clean}` : null;
+}
+
+export function getCachedLocalProfile(email?: string | null): LearnerProfile | null {
+  try {
+    const key = profileStorageKey(email);
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as LearnerProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedLocalProfile(profile: LearnerProfile | null, email?: string | null): void {
+  try {
+    localStorage.removeItem('myenglish_profile_v1');
+    const key = profileStorageKey(email);
+    if (!key) return;
+    if (profile) localStorage.setItem(key, JSON.stringify(profile));
+    else localStorage.removeItem(key);
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function getTodayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -58,6 +87,7 @@ export function getDefaultProgress(): UserProgress {
     streakDays: 1,
     lastActiveDate: getTodayStr(),
     unlockedStepIndex: 0,
+    trackUnlocks: {},
     passedLetters: [],
     passedIpaPairs: [],
     completedGrammarIds: [],
@@ -95,13 +125,22 @@ export async function fetchSessionState(): Promise<{
   const token = getAuthToken();
   if (!token) return null;
   try {
-    return await apiRequest<{
+    const state = await apiRequest<{
       user: UserAccount;
       progress: UserProgress;
       hasApiKey: boolean;
       sttProvider?: SttProviderMode;
       sttModel?: string;
     }>('/api/auth/me');
+    if (state?.user?.profile) {
+      setCachedLocalProfile(state.user.profile, state.user.email);
+    } else if (state?.user) {
+      const cached = getCachedLocalProfile(state.user.email);
+      if (cached) {
+        state.user.profile = cached;
+      }
+    }
+    return state;
   } catch {
     setAuthToken('');
     return null;
@@ -111,7 +150,8 @@ export async function fetchSessionState(): Promise<{
 export async function registerAccount(
   emailRaw: string,
   displayNameRaw: string,
-  password: string
+  password: string,
+  profile?: LearnerProfile
 ): Promise<{ ok: true; user: UserAccount; progress: UserProgress } | { ok: false; error: string }> {
   try {
     const data = await apiRequest<{ user: UserAccount; token: string; progress: UserProgress }>(
@@ -122,14 +162,46 @@ export async function registerAccount(
           email: emailRaw.trim().toLowerCase(),
           displayName: displayNameRaw.trim(),
           password,
+          ...(profile ? { profile } : {}),
         }),
       }
     );
     setAuthToken(data.token);
+    if (data.user?.profile) {
+      setCachedLocalProfile(data.user.profile, data.user.email);
+    } else if (profile) {
+      setCachedLocalProfile(profile, data.user?.email || emailRaw);
+      data.user.profile = profile;
+    }
     return { ok: true, user: data.user, progress: data.progress };
   } catch (err: any) {
     return { ok: false, error: err?.message || 'Đăng ký thất bại.' };
   }
+}
+
+export async function fetchLearnerProfileApi(email?: string | null): Promise<LearnerProfile | null> {
+  if (!getAuthToken()) return getCachedLocalProfile(email);
+  try {
+    const data = await apiRequest<{ profile: LearnerProfile | null }>('/api/profile');
+    if (data.profile) setCachedLocalProfile(data.profile, email);
+    return data.profile ?? getCachedLocalProfile(email);
+  } catch {
+    return getCachedLocalProfile(email);
+  }
+}
+
+export async function saveLearnerProfileApi(
+  profile: LearnerProfile,
+  email?: string | null
+): Promise<LearnerProfile> {
+  const stamped: LearnerProfile = { ...profile, updatedAt: new Date().toISOString() };
+  const data = await apiRequest<{ ok: boolean; profile: LearnerProfile }>('/api/profile', {
+    method: 'PUT',
+    body: JSON.stringify({ profile: stamped }),
+  });
+  const saved = data?.profile || stamped;
+  setCachedLocalProfile(saved, email);
+  return saved;
 }
 
 export async function loginAccount(
@@ -148,6 +220,7 @@ export async function loginAccount(
       }
     );
     setAuthToken(data.token);
+    setCachedLocalProfile(data.user?.profile ?? null, data.user?.email);
     return { ok: true, user: data.user, progress: data.progress };
   } catch (err: any) {
     return { ok: false, error: err?.message || 'Đăng nhập thất bại.' };
@@ -157,6 +230,7 @@ export async function loginAccount(
 export async function logoutAccount(): Promise<void> {
   const token = getAuthToken();
   setAuthToken('');
+  setCachedLocalProfile(null);
   if (!token) return;
   try {
     await fetch('/api/auth/logout', {
@@ -190,6 +264,8 @@ export interface AdminUserSummary {
   xp: number;
   unlockedStepIndex: number;
   completedLessonsCount: number;
+  audience?: AudienceId | null;
+  profile?: LearnerProfile | null;
 }
 
 export async function fetchAdminOverview(): Promise<{
@@ -294,6 +370,20 @@ export async function adminDeleteUser(email: string): Promise<void> {
   });
 }
 
+export async function adminUpdateUserProfile(
+  email: string,
+  profile: LearnerProfile
+): Promise<LearnerProfile> {
+  const res = await apiRequest<{ ok: boolean; profile: LearnerProfile }>(
+    `/api/admin/users/${encodeURIComponent(email)}/profile`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ profile }),
+    }
+  );
+  return res.profile;
+}
+
 // ---------------- CUSTOM LESSONS SQLITE API ----------------
 
 export type CustomLessonKind = 'sentence' | 'listening' | 'roleplay' | 'writing';
@@ -302,6 +392,7 @@ export interface CustomLessonRecord {
   id: string;
   kind: CustomLessonKind;
   payload: any;
+  audiences?: AudienceId[];
   createdAt: string;
 }
 
@@ -317,17 +408,70 @@ export async function fetchCustomLessons(): Promise<CustomLessonRecord[]> {
 
 export async function adminCreateCustomLesson(
   kind: CustomLessonKind,
-  payload: Record<string, any>
+  payload: Record<string, any>,
+  audiences: AudienceId[] = []
 ): Promise<CustomLessonRecord> {
   const res = await apiRequest<{ lesson: CustomLessonRecord }>('/api/admin/lessons', {
     method: 'POST',
-    body: JSON.stringify({ kind, payload }),
+    body: JSON.stringify({ kind, payload, audiences }),
   });
   return res.lesson;
 }
 
 export async function adminDeleteCustomLesson(id: string): Promise<void> {
   await apiRequest(`/api/admin/lessons/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+// ---------------- KIDS SONG MEDIA (VOCAL MP3 / YOUTUBE) ----------------
+
+export interface KidsSongMediaEntry {
+  audioUrl?: string;
+  youtubeId?: string;
+  isUploaded?: boolean;
+  mimeType?: string;
+  updatedAt?: string;
+}
+
+export async function fetchKidsSongsMedia(): Promise<Record<string, KidsSongMediaEntry>> {
+  try {
+    const res = await fetch('/api/kids/songs-media', {
+      headers: getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {},
+    });
+    if (!res.ok) return {};
+    const data = await res.json().catch(() => ({}));
+    return data?.media && typeof data.media === 'object' ? data.media : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function adminSaveKidsSongMedia(payload: {
+  unitId: string;
+  audioBase64?: string;
+  fileName?: string;
+  mimeType?: string;
+  audioUrl?: string;
+  youtubeId?: string;
+}): Promise<{
+  ok: boolean;
+  unitId: string;
+  entry: KidsSongMediaEntry | null;
+  media: Record<string, KidsSongMediaEntry>;
+}> {
+  return apiRequest('/api/admin/kids-song-media', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminDeleteKidsSongMedia(unitId: string): Promise<{
+  ok: boolean;
+  unitId: string;
+  media: Record<string, KidsSongMediaEntry>;
+}> {
+  return apiRequest(`/api/admin/kids-song-media/${encodeURIComponent(unitId)}`, {
     method: 'DELETE',
   });
 }

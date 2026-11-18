@@ -16,10 +16,23 @@ import {
   BookOpen,
   ArrowRight,
   PlusCircle,
+  Search,
 } from 'lucide-react';
-import { LISTENING_READING_LESSONS, ListeningReadingLesson } from '../data/listeningReadingLessons';
+import {
+  LISTENING_CATEGORIES,
+  LISTENING_READING_LESSONS,
+  ListeningReadingLesson,
+} from '../data/listeningReadingLessons';
+import { PRACTICAL_CATEGORIES } from '../data/practicalCategories';
+import {
+  PRACTICE_SENTENCES,
+  SPEAKING_TOPICS,
+  SpeakingPracticeItem,
+} from '../data/speakingPracticeData';
 import { ROLEPLAY_SCENARIOS } from '../data/curriculumData';
 import { AccentMode, CefrLevel, RoleplayScenario, WordEntry } from '../types/learning';
+import { LearnerProfile } from '../types/audience';
+import { filterAndSortByProfile, getAllowedCategoriesForProfile } from '../utils/audienceFilter';
 import { analyzeWordFull } from '../utils/wordAnalyzer';
 import { callGeminiText } from '../utils/geminiClient';
 import {
@@ -43,50 +56,8 @@ interface ListeningSpeakingLabProps {
   onAddXp: (amount: number) => void;
   isNextUnlocked?: boolean;
   onUnlockNext?: () => void;
+  learnerProfile?: LearnerProfile | null;
 }
-
-interface SpeakingPracticeItem {
-  id: string;
-  level: CefrLevel;
-  topic: string;
-  en: string;
-  vi: string;
-}
-
-const SPEAKING_TOPICS = [
-  'Tất cả',
-  'Giao tiếp cơ bản',
-  'Đời sống & Du lịch',
-  'Công việc & Phỏng vấn',
-] as const;
-
-const PRACTICE_SENTENCES: SpeakingPracticeItem[] = [
-  { id: 'sp-1', level: 'A1', topic: 'Giao tiếp cơ bản', en: 'Hello, my name is Minh and I am learning English every day.', vi: 'Xin chào, tên tôi là Minh và tôi đang học tiếng Anh mỗi ngày.' },
-  { id: 'sp-2', level: 'A1', topic: 'Giao tiếp cơ bản', en: 'Could you please speak a little bit more slowly?', vi: 'Bạn có thể nói chậm hơn một chút được không?' },
-  { id: 'sp-3', level: 'A1', topic: 'Đời sống & Du lịch', en: 'I would like a medium iced coffee and a cheese sandwich, please.', vi: 'Cho tôi một ly cà phê đá cỡ vừa và một bánh mì kẹp phô mai.' },
-  { id: 'sp-4', level: 'A2', topic: 'Đời sống & Du lịch', en: 'Excuse me, could you show me the way to the train station?', vi: 'Xin lỗi, bạn có thể chỉ cho tôi đường ra ga tàu không?' },
-  { id: 'sp-5', level: 'A2', topic: 'Đời sống & Du lịch', en: 'How much is this blue jacket, and do you have a medium size?', vi: 'Chiếc áo khoác xanh này bao nhiêu tiền và bạn có cỡ vừa không?' },
-  { id: 'sp-6', level: 'A2', topic: 'Đời sống & Du lịch', en: 'I have a reservation under the name Tuan Nguyen for three nights.', vi: 'Tôi có đặt phòng dưới tên Tuấn Nguyễn trong 3 đêm.' },
-  { id: 'sp-7', level: 'A2', topic: 'Đời sống & Du lịch', en: 'I have had a sore throat and a mild headache since yesterday.', vi: 'Tôi bị đau họng và đau đầu nhẹ từ hôm qua.' },
-  { id: 'sp-8', level: 'A2', topic: 'Đời sống & Du lịch', en: 'I need more information about the flight schedule and departure gate.', vi: 'Tôi cần thêm thông tin về lịch trình chuyến bay và cổng khởi hành.' },
-  { id: 'sp-9', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Could we reschedule our meeting to tomorrow morning at ten AM?', vi: 'Chúng ta có thể dời lịch họp sang 10 giờ sáng mai được không?' },
-  { id: 'sp-10', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'We have finished the first stage on schedule and are ready for review.', vi: 'Chúng tôi đã hoàn thành giai đoạn đầu đúng tiến độ và sẵn sàng kiểm tra.' },
-  { id: 'sp-11', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'I worked as a customer support specialist for three years.', vi: 'Tôi đã làm chuyên viên hỗ trợ khách hàng trong 3 năm.' },
-  { id: 'sp-12', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'My greatest strength is communicating clearly under high pressure.', vi: 'Điểm mạnh lớn nhất của tôi là giao tiếp rõ ràng dưới áp lực cao.' },
-  { id: 'sp-13', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Thank you for your patience while we checked the new system.', vi: 'Cảm ơn sự kiên nhẫn của bạn trong lúc chúng tôi kiểm tra hệ thống mới.' },
-  { id: 'sp-14', level: 'B1', topic: 'Giao tiếp cơ bản', en: 'Clear communication builds trust and opens new opportunities.', vi: 'Giao tiếp rõ ràng xây dựng niềm tin và mở ra nhiều cơ hội mới.' },
-  { id: 'sp-15', level: 'B2', topic: 'Giao tiếp cơ bản', en: 'Consistency leads to a major breakthrough in fluency.', vi: 'Sự đều đặn dẫn đến bước đột phá lớn về độ trôi chảy.' },
-  { id: 'sp-16', level: 'A2', topic: 'Đời sống & Du lịch', en: 'Would you like to pay by card or in cash today?', vi: 'Hôm nay bạn muốn thanh toán bằng thẻ hay tiền mặt ạ?' },
-  { id: 'sp-17', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Sorry, I think you are muted. Could you unmute your microphone?', vi: 'Xin lỗi, hình như bạn đang tắt mic. Bạn bật lại micro nhé?' },
-  { id: 'sp-18', level: 'A2', topic: 'Đời sống & Du lịch', en: 'May I exchange this shirt for a larger size, please?', vi: 'Tôi có thể đổi chiếc áo sơ mi này sang cỡ lớn hơn không ạ?' },
-  { id: 'sp-19', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'Let me share my screen so we can walk through the project plan.', vi: 'Để tôi chia sẻ màn hình để chúng ta cùng xem kế hoạch dự án.' },
-  { id: 'sp-20', level: 'B1', topic: 'Công việc & Phỏng vấn', en: 'I sincerely apologize for the delay in delivering your package.', vi: 'Tôi thành thật xin lỗi vì sự chậm trễ trong việc giao kiện hàng của bạn.' },
-  { id: 'sp-21', level: 'A2', topic: 'Đời sống & Du lịch', en: 'What is the purpose of your visit and how long will you stay?', vi: 'Mục đích chuyến đi của bạn là gì và bạn sẽ lưu trú bao lâu?' },
-  { id: 'sp-22', level: 'A2', topic: 'Giao tiếp cơ bản', en: 'Please arrive ten minutes early to complete the registration form.', vi: 'Vui lòng đến sớm 10 phút để hoàn tất phiếu đăng ký.' },
-  { id: 'sp-23', level: 'B2', topic: 'Công việc & Phỏng vấn', en: 'Listening carefully helps prevent unnecessary misunderstandings at work.', vi: 'Lắng nghe kỹ giúp tránh những hiểu lầm không đáng có trong công việc.' },
-  { id: 'sp-24', level: 'B2', topic: 'Công việc & Phỏng vấn', en: 'Given my five years of experience, could we discuss the salary package?', vi: 'Với 5 năm kinh nghiệm, chúng ta có thể trao đổi thêm về gói lương không?' },
-  { id: 'sp-25', level: 'B2', topic: 'Công việc & Phỏng vấn', en: 'We look forward to building a successful long-term partnership.', vi: 'Chúng tôi mong muốn xây dựng mối quan hệ hợp tác lâu dài thành công.' },
-];
 
 export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   accent,
@@ -99,6 +70,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   onAddXp,
   isNextUnlocked = false,
   onUnlockNext,
+  learnerProfile,
 }) => {
   const [subTab, setSubTab] = useState<'listen_read' | 'shadowing' | 'roleplay'>('listen_read');
 
@@ -112,6 +84,9 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   // Tab 1: Listen & Read state
   const [catFilter, setCatFilter] = useState<string>('Tất cả');
+  const [lessonLevelFilter, setLessonLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
+  const [lessonSearch, setLessonSearch] = useState('');
+  const [lessonPage, setLessonPage] = useState(0);
   const [lessonIdx, setLessonIdx] = useState(0);
   const [rate, setRate] = useState<number>(0.9);
   const [showTranscript, setShowTranscript] = useState(true);
@@ -151,26 +126,64 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     };
   }, [selfAudioUrl]);
 
+  const availableLevels = useMemo(
+    () =>
+      learnerProfile?.audience === 'kids'
+        ? (['ALL', 'A1'] as const)
+        : (['ALL', 'A1', 'A2', 'B1', 'B2'] as const),
+    [learnerProfile]
+  );
+
   // Tab 2: Standalone Speaking sentences (Focus Mode 1-by-1)
   const allSentences = useMemo(
-    () => [...customSentences, ...PRACTICE_SENTENCES],
-    [customSentences]
+    () => filterAndSortByProfile([...customSentences, ...PRACTICE_SENTENCES], learnerProfile),
+    [customSentences, learnerProfile]
+  );
+  const allowedSpeakingTopics = useMemo(
+    () => [
+      'Tất cả',
+      ...getAllowedCategoriesForProfile(
+        SPEAKING_TOPICS.filter((t) => t !== 'Tất cả'),
+        learnerProfile
+      ),
+    ],
+    [learnerProfile]
   );
   const [speakingTopicFilter, setSpeakingTopicFilter] = useState<string>('Tất cả');
+  const [speakingLevelFilter, setSpeakingLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
+  const [speakingSearch, setSpeakingSearch] = useState('');
+  const [speakingPage, setSpeakingPage] = useState(0);
   const [speakingStatusFilter, setSpeakingStatusFilter] = useState<'ALL' | 'passed' | 'need_fix' | 'todo'>('ALL');
   const [speakingIdx, setSpeakingIdx] = useState(0);
   const [customPracticeText, setCustomPracticeText] = useState<string | null>(null);
   const [sentenceScores, setSentenceScores] = useState<Record<string, number>>({});
   const [customInput, setCustomInput] = useState('');
 
+  useEffect(() => {
+    if (!allowedSpeakingTopics.includes(speakingTopicFilter)) {
+      setSpeakingTopicFilter('Tất cả');
+      setSpeakingIdx(0);
+    }
+  }, [allowedSpeakingTopics, speakingTopicFilter]);
+
   const filteredSpeakingList = useMemo(() => {
-    if (speakingTopicFilter === 'Tất cả') return allSentences;
-    const matched = allSentences.filter((item) => item.topic === speakingTopicFilter);
+    const q = speakingSearch.trim().toLowerCase();
+    const matched = allSentences.filter((item) => {
+      const okTopic = speakingTopicFilter === 'Tất cả' || item.topic === speakingTopicFilter;
+      const okLevel = speakingLevelFilter === 'ALL' || item.level === speakingLevelFilter;
+      const okQuery =
+        !q ||
+        item.en.toLowerCase().includes(q) ||
+        item.vi.toLowerCase().includes(q) ||
+        item.topic.toLowerCase().includes(q);
+      return okTopic && okLevel && okQuery;
+    });
     return matched.length > 0 ? matched : allSentences;
-  }, [allSentences, speakingTopicFilter]);
+  }, [allSentences, speakingTopicFilter, speakingLevelFilter, speakingSearch]);
 
   const safeSpeakingIdx = speakingIdx % Math.max(1, filteredSpeakingList.length);
-  const currentSpeakingItem = filteredSpeakingList[safeSpeakingIdx] || allSentences[0];
+  const currentSpeakingItem =
+    filteredSpeakingList[safeSpeakingIdx] || allSentences[0] || PRACTICE_SENTENCES[0];
   const activeTargetSentence = customPracticeText ?? currentSpeakingItem.en;
 
   useEffect(() => {
@@ -182,25 +195,92 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   // Tab 3: Roleplay
   const allScenarios = useMemo(
-    () => [...customScenarios, ...extraScenarios, ...ROLEPLAY_SCENARIOS],
-    [customScenarios, extraScenarios]
+    () =>
+      filterAndSortByProfile(
+        [...customScenarios, ...extraScenarios, ...ROLEPLAY_SCENARIOS],
+        learnerProfile
+      ),
+    [customScenarios, extraScenarios, learnerProfile]
   );
+  const allowedRoleplayCategories = useMemo(
+    () => ['Tất cả', ...getAllowedCategoriesForProfile(PRACTICAL_CATEGORIES, learnerProfile)],
+    [learnerProfile]
+  );
+  const [roleplayCatFilter, setRoleplayCatFilter] = useState<string>('Tất cả');
+  const [roleplayLevelFilter, setRoleplayLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
+  const [roleplaySearch, setRoleplaySearch] = useState('');
+  const [roleplayPage, setRoleplayPage] = useState(0);
   const [scenarioIdx, setScenarioIdx] = useState(0);
   const [turnIdx, setTurnIdx] = useState(0);
   const [roleplayFeedback, setRoleplayFeedback] = useState<PronunciationScoreResult | null>(null);
 
+  useEffect(() => {
+    if (!allowedRoleplayCategories.includes(roleplayCatFilter)) {
+      setRoleplayCatFilter('Tất cả');
+      setScenarioIdx(0);
+    }
+  }, [allowedRoleplayCategories, roleplayCatFilter]);
+
+  const filteredScenarios = useMemo(() => {
+    const q = roleplaySearch.trim().toLowerCase();
+    const matched = allScenarios.filter((sc) => {
+      const okCat = roleplayCatFilter === 'Tất cả' || (sc.category || 'Đời sống & Giao tiếp') === roleplayCatFilter;
+      const okLevel = roleplayLevelFilter === 'ALL' || sc.level === roleplayLevelFilter;
+      const okQuery =
+        !q ||
+        sc.title.toLowerCase().includes(q) ||
+        sc.context.toLowerCase().includes(q);
+      return okCat && okLevel && okQuery;
+    });
+    return matched.length > 0 ? matched : allScenarios;
+  }, [allScenarios, roleplayCatFilter, roleplayLevelFilter, roleplaySearch]);
+
   const allLessons = useMemo(
-    () => [...customLessons, ...extraLessons, ...LISTENING_READING_LESSONS],
-    [customLessons, extraLessons]
+    () =>
+      filterAndSortByProfile(
+        [...customLessons, ...extraLessons, ...LISTENING_READING_LESSONS],
+        learnerProfile
+      ),
+    [customLessons, extraLessons, learnerProfile]
+  );
+  const allowedListeningCategories = useMemo(
+    () => [
+      'Tất cả',
+      ...getAllowedCategoriesForProfile(
+        LISTENING_CATEGORIES.filter((c) => c !== 'Tất cả'),
+        learnerProfile
+      ),
+    ],
+    [learnerProfile]
   );
 
-  const filteredLessons = useMemo(() => {
-    if (catFilter === 'Tất cả') return allLessons;
-    const list = allLessons.filter((l) => l.category === catFilter);
-    return list.length > 0 ? list : allLessons;
-  }, [allLessons, catFilter]);
+  useEffect(() => {
+    if (!allowedListeningCategories.includes(catFilter)) {
+      setCatFilter('Tất cả');
+      setLessonIdx(0);
+    }
+  }, [allowedListeningCategories, catFilter]);
 
-  const currentLesson = filteredLessons[lessonIdx % filteredLessons.length] || allLessons[0];
+  const filteredLessons = useMemo(() => {
+    const q = lessonSearch.trim().toLowerCase();
+    const list = allLessons.filter((l) => {
+      const okCat = catFilter === 'Tất cả' || l.category === catFilter;
+      const okLevel = lessonLevelFilter === 'ALL' || l.level === lessonLevelFilter;
+      const okQuery =
+        !q ||
+        l.title.toLowerCase().includes(q) ||
+        l.transcript.toLowerCase().includes(q) ||
+        l.translation.toLowerCase().includes(q) ||
+        l.category.toLowerCase().includes(q);
+      return okCat && okLevel && okQuery;
+    });
+    return list.length > 0 ? list : allLessons;
+  }, [allLessons, catFilter, lessonLevelFilter, lessonSearch]);
+
+  const currentLesson =
+    filteredLessons[lessonIdx % Math.max(1, filteredLessons.length)] ||
+    allLessons[0] ||
+    LISTENING_READING_LESSONS[0];
   const lessonSentences = useMemo(
     () =>
       currentLesson.transcript
@@ -224,6 +304,7 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     window.speechSynthesis?.cancel();
     stopActiveMic();
     setLessonIdx(idx);
+    setLessonPage(Math.floor(idx / 20));
     setSelectedAns(null);
     setShadowSentenceIdx(0);
     setScoreResult(null);
@@ -311,7 +392,9 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     window.speechSynthesis?.cancel();
     stopActiveMic();
     const len = Math.max(1, filteredSpeakingList.length);
-    setSpeakingIdx(((idx % len) + len) % len);
+    const nextIdx = ((idx % len) + len) % len;
+    setSpeakingIdx(nextIdx);
+    setSpeakingPage(Math.floor(nextIdx / 20));
     setCustomPracticeText(null);
     setScoreResult(null);
     setSpeechError(null);
@@ -366,13 +449,15 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
     );
   };
 
-  const currentScenario = allScenarios[scenarioIdx % allScenarios.length];
+  const safeScenarioIdx = scenarioIdx % Math.max(1, filteredScenarios.length);
+  const currentScenario =
+    filteredScenarios[safeScenarioIdx] || allScenarios[0] || ROLEPLAY_SCENARIOS[0];
   const currentTurn = currentScenario.turns[turnIdx] || currentScenario.turns[0];
 
   const callGeminiJson = async (promptText: string) => {
     const key = (geminiApiKey || '').trim();
     if (!key) {
-      setAiGenError('Tính năng AI chưa được Admin cấu hình API Key. Bạn hãy học kho 30 bài có sẵn nhé!');
+      setAiGenError(`Tính năng AI chưa được Admin cấu hình API Key. Bạn hãy học kho ${allLessons.length} bài có sẵn nhé!`);
       return null;
     }
     setAiGenError(null);
@@ -392,15 +477,22 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
 
   const handleAiCreateLesson = async () => {
     const topic = aiTopicInput.trim() || 'Giao tiếp hàng ngày & công việc';
+    const defaultCategory =
+      learnerProfile?.audience === 'kids' || learnerProfile?.audience === 'teen'
+        ? 'Hội thoại đời sống'
+        : 'Giao tiếp công việc';
     const parsed = await callGeminiJson(
       `Tạo 1 bài luyện Nghe & Đọc tiếng Anh trình độ A2-B1 về chủ đề: "${topic}". Trả về JSON thuần theo cấu trúc:
-{"title":"✨ Tiêu đề ngắn tiếng Việt","level":"A2","category":"Giao tiếp công việc","transcript":"Đoạn tiếng Anh 3-4 câu rõ ràng tự nhiên","translation":"Bản dịch tiếng Việt chuẩn","keyPhrases":[{"en":"cụm từ 1","vi":"nghĩa 1"},{"en":"cụm từ 2","vi":"nghĩa 2"}],"question":{"q":"Câu hỏi đọc hiểu ngắn bằng tiếng Anh","options":["Đáp án A","Đáp án B","Đáp án C"],"correctIdx":0}}`
+{"title":"✨ Tiêu đề ngắn tiếng Việt","level":"A2","category":"${defaultCategory}","transcript":"Đoạn tiếng Anh 3-4 câu rõ ràng tự nhiên","translation":"Bản dịch tiếng Việt chuẩn","keyPhrases":[{"en":"cụm từ 1","vi":"nghĩa 1"},{"en":"cụm từ 2","vi":"nghĩa 2"}],"question":{"q":"Câu hỏi đọc hiểu ngắn bằng tiếng Anh","options":["Đáp án A","Đáp án B","Đáp án C"],"correctIdx":0}}`
     );
     if (!parsed || !parsed.transcript) return;
     const newLesson: ListeningReadingLesson = {
       id: `ai-lr-${Date.now()}`,
-      level: parsed.level || 'A2',
-      category: parsed.category || 'Giao tiếp công việc',
+      level: parsed.level || (learnerProfile?.audience === 'kids' ? 'A1' : 'A2'),
+      category:
+        learnerProfile?.audience === 'kids' || learnerProfile?.audience === 'teen'
+          ? defaultCategory
+          : parsed.category || defaultCategory,
       title: parsed.title || `✨ Bài AI: ${topic}`,
       sourceStyle: 'Gemini AI • Thực hành tùy chỉnh',
       transcript: parsed.transcript,
@@ -542,73 +634,152 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
               {aiGenError && <p className="text-[11px] text-rose-600 font-semibold">{aiGenError}</p>}
             </div>
 
-            <div className="flex flex-wrap gap-1">
-              {['Tất cả', 'Hội thoại đời sống', 'Bài đọc cơ bản', 'Giao tiếp công việc'].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setCatFilter(cat);
+            {/* Search & Level Filter */}
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                <input
+                  value={lessonSearch}
+                  onChange={(e) => {
+                    setLessonSearch(e.target.value);
                     handleSelectLesson(0);
                   }}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold ${
-                    catFilter === cat
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-1.5 max-h-52 lg:max-h-[480px] overflow-y-auto pr-1">
-              {filteredLessons.map((item, idx) => {
-                const active = item.id === currentLesson.id;
-                const done = completedIds.includes(item.id);
-                const quizWrong = !done && quizResults[item.id] === 'wrong';
-                const passageScore = passageScores[item.id];
-                return (
+                  placeholder={`Tìm trong ${allLessons.length} bài Nghe & Đọc...`}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {availableLevels.map((lv) => (
                   <button
-                    key={item.id}
-                    onClick={() => handleSelectLesson(idx)}
-                    className={`w-full text-left p-2.5 rounded-xl border transition flex items-start justify-between gap-2 ${
-                      active
-                        ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-400 text-indigo-900 dark:text-indigo-200'
-                        : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 hover:border-indigo-300'
+                    key={lv}
+                    onClick={() => {
+                      setLessonLevelFilter(lv);
+                      handleSelectLesson(0);
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                      lessonLevelFilter === lv
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                     }`}
                   >
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold">{item.title}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
-                        <span>{item.level} • {item.category}</span>
-                        {passageScore !== undefined && (
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
-                              passageScore >= 80
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : passageScore >= 55
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-rose-100 text-rose-700'
-                            }`}
-                          >
-                            Đọc: {passageScore}đ
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {done ? (
-                      <span title="Đã làm đúng Quiz" className="shrink-0 mt-0.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      </span>
-                    ) : quizWrong ? (
-                      <span title="Quiz đang chọn sai" className="shrink-0 mt-0.5">
-                        <XCircle className="w-4 h-4 text-rose-500" />
-                      </span>
-                    ) : null}
+                    {lv === 'ALL' ? 'Mọi cấp' : lv}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto pr-1">
+              {allowedListeningCategories.map((cat) => {
+                const isPreferred =
+                  learnerProfile?.audience === 'worker' &&
+                  learnerProfile.worker?.industries?.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setCatFilter(cat);
+                      handleSelectLesson(0);
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-semibold ${
+                      catFilter === cat
+                        ? 'bg-indigo-600 text-white'
+                        : isPreferred
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {isPreferred ? `⭐ ${cat}` : cat}
                   </button>
                 );
               })}
             </div>
+
+            {(() => {
+              const PAGE_SIZE = 20;
+              const totalPages = Math.max(1, Math.ceil(filteredLessons.length / PAGE_SIZE));
+              const safePage = Math.min(lessonPage, totalPages - 1);
+              const pageItems = filteredLessons.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+              return (
+                <>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                    <span>Đang lọc: {filteredLessons.length} bài</span>
+                    {totalPages > 1 && <span>Trang {safePage + 1}/{totalPages}</span>}
+                  </div>
+                  <div className="space-y-1.5 max-h-52 lg:max-h-[420px] overflow-y-auto pr-1">
+                    {pageItems.map((item, offset) => {
+                      const idx = safePage * PAGE_SIZE + offset;
+                      const active = item.id === currentLesson.id;
+                      const done = completedIds.includes(item.id);
+                      const quizWrong = !done && quizResults[item.id] === 'wrong';
+                      const passageScore = passageScores[item.id];
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleSelectLesson(idx)}
+                          className={`w-full text-left p-2.5 rounded-xl border transition flex items-start justify-between gap-2 ${
+                            active
+                              ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-400 text-indigo-900 dark:text-indigo-200'
+                              : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 hover:border-indigo-300'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold">{item.title}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+                              <span>{item.level} • {item.category}</span>
+                              {passageScore !== undefined && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                    passageScore >= 80
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : passageScore >= 55
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-rose-100 text-rose-700'
+                                  }`}
+                                >
+                                  Đọc: {passageScore}đ
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {done ? (
+                            <span title="Đã làm đúng Quiz" className="shrink-0 mt-0.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            </span>
+                          ) : quizWrong ? (
+                            <span title="Quiz đang chọn sai" className="shrink-0 mt-0.5">
+                              <XCircle className="w-4 h-4 text-rose-500" />
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
+                      <button
+                        type="button"
+                        disabled={safePage <= 0}
+                        onClick={() => setLessonPage((p) => Math.max(0, p - 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                      >
+                        ← Trước
+                      </button>
+                      <span className="text-slate-500">
+                        {safePage + 1} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={safePage >= totalPages - 1}
+                        onClick={() => setLessonPage((p) => Math.min(totalPages - 1, p + 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                      >
+                        Sau →
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Right: Active Lesson Player + Reader + Quiz + Shadowing */}
@@ -1147,25 +1318,67 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                     </div>
                   </div>
 
-                  {/* Topic filter */}
-                  <div className="flex flex-wrap gap-1">
-                    {SPEAKING_TOPICS.map((tp) => (
-                      <button
-                        key={tp}
-                        type="button"
-                        onClick={() => {
-                          setSpeakingTopicFilter(tp);
+                  {/* Search & Level filter */}
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                      <input
+                        value={speakingSearch}
+                        onChange={(e) => {
+                          setSpeakingSearch(e.target.value);
                           selectSpeakingLesson(0);
                         }}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
-                          speakingTopicFilter === tp
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                        }`}
-                      >
-                        {tp}
-                      </button>
-                    ))}
+                        placeholder={`Tìm trong ${allSentences.length} câu luyện nói...`}
+                        className="w-full pl-8 pr-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {availableLevels.map((lv) => (
+                        <button
+                          key={lv}
+                          type="button"
+                          onClick={() => {
+                            setSpeakingLevelFilter(lv);
+                            selectSpeakingLesson(0);
+                          }}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                            speakingLevelFilter === lv
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {lv === 'ALL' ? 'Mọi cấp' : lv}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Topic filter */}
+                  <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
+                    {allowedSpeakingTopics.map((tp) => {
+                      const isPreferred =
+                        learnerProfile?.audience === 'worker' &&
+                        learnerProfile.worker?.industries?.includes(tp);
+                      return (
+                        <button
+                          key={tp}
+                          type="button"
+                          onClick={() => {
+                            setSpeakingTopicFilter(tp);
+                            selectSpeakingLesson(0);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
+                            speakingTopicFilter === tp
+                              ? 'bg-indigo-600 text-white'
+                              : isPreferred
+                              ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {isPreferred ? `⭐ ${tp}` : tp}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Status filter */}
@@ -1179,7 +1392,10 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
                       <button
                         key={st.id}
                         type="button"
-                        onClick={() => setSpeakingStatusFilter(st.id as any)}
+                        onClick={() => {
+                          setSpeakingStatusFilter(st.id as any);
+                          setSpeakingPage(0);
+                        }}
                         className={`px-2 py-1 rounded-lg border transition ${
                           speakingStatusFilter === st.id
                             ? 'bg-indigo-600 text-white border-indigo-600'
@@ -1194,67 +1410,110 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
               );
             })()}
 
-            {/* Compact Scrollable Single-Line Lesson Picker */}
-            <div className="space-y-1.5 max-h-60 lg:max-h-[380px] overflow-y-auto pr-1">
-              {filteredSpeakingList.map((item, idx) => {
-                const sc = sentenceScores[item.en];
-                const isPassed = sc !== undefined && sc >= 80;
-                const isNeedFix = sc !== undefined && sc < 80;
-                if (
-                  (speakingStatusFilter === 'passed' && !isPassed) ||
-                  (speakingStatusFilter === 'need_fix' && !isNeedFix) ||
-                  (speakingStatusFilter === 'todo' && sc !== undefined)
-                ) {
-                  return null;
-                }
-                const active = !customPracticeText && idx === safeSpeakingIdx;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => selectSpeakingLesson(idx)}
-                    className={`w-full text-left px-3 py-2 rounded-xl border transition flex items-center justify-between gap-2 ${
-                      active
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : isPassed
-                        ? 'bg-emerald-50/70 border-emerald-300 text-slate-800 dark:bg-emerald-950/30 dark:text-slate-100'
-                        : isNeedFix
-                        ? 'bg-rose-50/70 border-rose-300 text-slate-800 dark:bg-rose-950/30 dark:text-slate-100'
-                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-400'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="text-xs font-extrabold flex items-center gap-1.5">
-                        <span>Bài {idx + 1}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded ${
-                            active ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+            {/* Paginated Single-Line Lesson Picker */}
+            {(() => {
+              const SP_PAGE_SIZE = 20;
+              const visibleEntries = filteredSpeakingList
+                .map((item, idx) => ({ item, idx }))
+                .filter(({ item }) => {
+                  const sc = sentenceScores[item.en];
+                  const isPassed = sc !== undefined && sc >= 80;
+                  const isNeedFix = sc !== undefined && sc < 80;
+                  if (speakingStatusFilter === 'passed') return isPassed;
+                  if (speakingStatusFilter === 'need_fix') return isNeedFix;
+                  if (speakingStatusFilter === 'todo') return sc === undefined;
+                  return true;
+                });
+              const totalPages = Math.max(1, Math.ceil(visibleEntries.length / SP_PAGE_SIZE));
+              const safePage = Math.min(speakingPage, totalPages - 1);
+              const pageEntries = visibleEntries.slice(
+                safePage * SP_PAGE_SIZE,
+                (safePage + 1) * SP_PAGE_SIZE
+              );
+
+              return (
+                <>
+                  <div className="space-y-1.5 max-h-60 lg:max-h-[340px] overflow-y-auto pr-1">
+                    {pageEntries.map(({ item, idx }) => {
+                      const sc = sentenceScores[item.en];
+                      const isPassed = sc !== undefined && sc >= 80;
+                      const isNeedFix = sc !== undefined && sc < 80;
+                      const active = !customPracticeText && idx === safeSpeakingIdx;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => selectSpeakingLesson(idx)}
+                          className={`w-full text-left px-3 py-2 rounded-xl border transition flex items-center justify-between gap-2 ${
+                            active
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                              : isPassed
+                              ? 'bg-emerald-50/70 border-emerald-300 text-slate-800 dark:bg-emerald-950/30 dark:text-slate-100'
+                              : isNeedFix
+                              ? 'bg-rose-50/70 border-rose-300 text-slate-800 dark:bg-rose-950/30 dark:text-slate-100'
+                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-400'
                           }`}
                         >
-                          {item.level}
-                        </span>
-                      </div>
-                      <div className={`text-[11px] truncate mt-0.5 ${active ? 'text-indigo-100' : 'text-slate-500'}`}>
-                        {item.en}
-                      </div>
-                    </div>
-                    {sc !== undefined && (
-                      <span
-                        className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-black ${
-                          active
-                            ? 'bg-white text-indigo-700'
-                            : isPassed
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-rose-100 text-rose-700'
-                        }`}
+                          <div className="min-w-0">
+                            <div className="text-xs font-extrabold flex items-center gap-1.5">
+                              <span>Bài {idx + 1}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded ${
+                                  active
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                }`}
+                              >
+                                {item.level}
+                              </span>
+                            </div>
+                            <div className={`text-[11px] truncate mt-0.5 ${active ? 'text-indigo-100' : 'text-slate-500'}`}>
+                              {item.en}
+                            </div>
+                          </div>
+                          {sc !== undefined && (
+                            <span
+                              className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-black ${
+                                active
+                                  ? 'bg-white text-indigo-700'
+                                  : isPassed
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}
+                            >
+                              {isPassed ? `✓ ${sc}đ` : `${sc}đ`}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
+                      <button
+                        type="button"
+                        disabled={safePage <= 0}
+                        onClick={() => setSpeakingPage((p) => Math.max(0, p - 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
                       >
-                        {isPassed ? `✓ ${sc}đ` : `${sc}đ`}
+                        ← Trước
+                      </button>
+                      <span className="text-slate-500">
+                        Trang {safePage + 1}/{totalPages}
                       </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                      <button
+                        type="button"
+                        disabled={safePage >= totalPages - 1}
+                        onClick={() => setSpeakingPage((p) => Math.min(totalPages - 1, p + 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                      >
+                        Sau →
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1283,24 +1542,153 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
             {aiGenError && <p className="text-xs text-rose-600 font-semibold">{aiGenError}</p>}
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {allScenarios.map((sc, idx) => (
-              <button
-                key={sc.id}
-                onClick={() => {
-                  setScenarioIdx(idx);
-                  setTurnIdx(0);
-                  setRoleplayFeedback(null);
-                }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition ${
-                  scenarioIdx === idx
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5 inline mr-1" /> {sc.title}
-              </button>
-            ))}
+          {/* Filter & Paginated Scenario Picker */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[220px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  value={roleplaySearch}
+                  onChange={(e) => {
+                    setRoleplaySearch(e.target.value);
+                    setScenarioIdx(0);
+                    setRoleplayPage(0);
+                    setTurnIdx(0);
+                    setRoleplayFeedback(null);
+                  }}
+                  placeholder={`Tìm trong ${allScenarios.length} kịch bản hội thoại thực tế...`}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {availableLevels.map((lv) => (
+                  <button
+                    key={lv}
+                    onClick={() => {
+                      setRoleplayLevelFilter(lv);
+                      setScenarioIdx(0);
+                      setRoleplayPage(0);
+                      setTurnIdx(0);
+                      setRoleplayFeedback(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                      roleplayLevelFilter === lv
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {lv === 'ALL' ? 'Mọi cấp' : lv}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {allowedRoleplayCategories.map((cat) => {
+                const isPreferred =
+                  learnerProfile?.audience === 'worker' &&
+                  learnerProfile.worker?.industries?.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setRoleplayCatFilter(cat);
+                      setScenarioIdx(0);
+                      setRoleplayPage(0);
+                      setTurnIdx(0);
+                      setRoleplayFeedback(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
+                      roleplayCatFilter === cat
+                        ? 'bg-indigo-600 text-white'
+                        : isPreferred
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {isPreferred ? `⭐ ${cat}` : cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const RP_PAGE_SIZE = 12;
+              const totalPages = Math.max(1, Math.ceil(filteredScenarios.length / RP_PAGE_SIZE));
+              const safePage = Math.min(roleplayPage, totalPages - 1);
+              const pageItems = filteredScenarios.slice(
+                safePage * RP_PAGE_SIZE,
+                (safePage + 1) * RP_PAGE_SIZE
+              );
+
+              return (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                    <span>
+                      Kịch bản {safeScenarioIdx + 1}/{filteredScenarios.length} ({currentScenario.level}
+                      {currentScenario.category ? ` • ${currentScenario.category}` : ''})
+                    </span>
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={safePage <= 0}
+                          onClick={() => setRoleplayPage((p) => Math.max(0, p - 1))}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                        >
+                          ← Trước
+                        </button>
+                        <span>
+                          Trang {safePage + 1}/{totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={safePage >= totalPages - 1}
+                          onClick={() => setRoleplayPage((p) => Math.min(totalPages - 1, p + 1))}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                        >
+                          Sau →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {pageItems.map((sc, offset) => {
+                      const idx = safePage * RP_PAGE_SIZE + offset;
+                      return (
+                        <button
+                          key={sc.id}
+                          onClick={() => {
+                            setScenarioIdx(idx);
+                            setTurnIdx(0);
+                            setRoleplayFeedback(null);
+                            setSelfAudioUrl(null);
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border text-left transition ${
+                            safeScenarioIdx === idx
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{sc.title}</span>
+                          </div>
+                          <div
+                            className={`text-[10px] mt-0.5 ${
+                              safeScenarioIdx === idx ? 'text-indigo-100' : 'text-slate-500'
+                            }`}
+                          >
+                            {sc.level} • {sc.category || 'Hội thoại chung'}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">

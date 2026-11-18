@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeftRight,
   CheckCircle2,
   Loader2,
   PenTool,
   PlusCircle,
+  Search,
   Sparkles,
   Volume2,
 } from 'lucide-react';
@@ -14,7 +15,9 @@ import {
   JOB_CATEGORIES,
   JobCategory,
 } from '../data/bilingualWritingPrompts';
-import { AccentMode } from '../types/learning';
+import { LearnerProfile } from '../types/audience';
+import { AccentMode, CefrLevel } from '../types/learning';
+import { filterAndSortByProfile, getAllowedCategoriesForProfile } from '../utils/audienceFilter';
 import { callGeminiText } from '../utils/geminiClient';
 import { speakText } from '../utils/speechEngine';
 
@@ -23,6 +26,7 @@ interface BilingualWritingLabProps {
   geminiApiKey?: string;
   extraPrompts?: BilingualPrompt[];
   onAddXp: (amount: number) => void;
+  learnerProfile?: LearnerProfile | null;
 }
 
 interface GradeResult {
@@ -104,9 +108,13 @@ export const BilingualWritingLab: React.FC<BilingualWritingLabProps> = ({
   geminiApiKey,
   extraPrompts = [],
   onAddXp,
+  learnerProfile,
 }) => {
   const [direction, setDirection] = useState<'vi2en' | 'en2vi'>('vi2en');
   const [catFilter, setCatFilter] = useState<'Tất cả' | JobCategory>('Tất cả');
+  const [levelFilter, setLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [promptPage, setPromptPage] = useState(0);
   const [customPrompts, setCustomPrompts] = useState<BilingualPrompt[]>([]);
   const [promptIdx, setPromptIdx] = useState(0);
   const [userText, setUserText] = useState('');
@@ -121,20 +129,70 @@ export const BilingualWritingLab: React.FC<BilingualWritingLabProps> = ({
   const [aiError, setAiError] = useState<string | null>(null);
 
   const allPrompts = useMemo(
-    () => [...customPrompts, ...extraPrompts, ...BILINGUAL_WRITING_PROMPTS],
-    [customPrompts, extraPrompts]
+    () =>
+      filterAndSortByProfile(
+        [...customPrompts, ...extraPrompts, ...BILINGUAL_WRITING_PROMPTS],
+        learnerProfile
+      ),
+    [customPrompts, extraPrompts, learnerProfile]
   );
 
-  const filteredPrompts = useMemo(() => {
-    if (catFilter === 'Tất cả') return allPrompts;
-    const list = allPrompts.filter((p) => p.category === catFilter);
-    return list.length > 0 ? list : allPrompts;
-  }, [allPrompts, catFilter]);
+  const allowedCategories = useMemo(
+    () => [
+      'Tất cả' as const,
+      ...(getAllowedCategoriesForProfile(
+        JOB_CATEGORIES.filter((c) => c !== 'Tất cả'),
+        learnerProfile
+      ) as JobCategory[]),
+    ],
+    [learnerProfile]
+  );
 
-  const currentPrompt = filteredPrompts[promptIdx % filteredPrompts.length] || allPrompts[0];
+  const availableLevels = useMemo(
+    () =>
+      learnerProfile?.audience === 'kids'
+        ? (['ALL', 'A1'] as const)
+        : (['ALL', 'A1', 'A2', 'B1', 'B2'] as const),
+    [learnerProfile]
+  );
+
+  useEffect(() => {
+    if (!allowedCategories.includes(catFilter)) {
+      setCatFilter('Tất cả');
+      setPromptIdx(0);
+    }
+  }, [allowedCategories, catFilter]);
+
+  useEffect(() => {
+    if (learnerProfile?.audience === 'kids' && levelFilter !== 'ALL' && levelFilter !== 'A1') {
+      setLevelFilter('ALL');
+      setPromptIdx(0);
+    }
+  }, [learnerProfile, levelFilter]);
+
+  const filteredPrompts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const list = allPrompts.filter((p) => {
+      const okCat = catFilter === 'Tất cả' || p.category === catFilter;
+      const okLevel = levelFilter === 'ALL' || p.level === levelFilter;
+      const okQuery =
+        !q ||
+        p.title.toLowerCase().includes(q) ||
+        p.vi.toLowerCase().includes(q) ||
+        p.en.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q);
+      return okCat && okLevel && okQuery;
+    });
+    return list.length > 0 ? list : allPrompts;
+  }, [allPrompts, catFilter, levelFilter, searchQuery]);
+
+  const safePromptIdx = promptIdx % Math.max(1, filteredPrompts.length);
+  const currentPrompt =
+    filteredPrompts[safePromptIdx] || allPrompts[0] || BILINGUAL_WRITING_PROMPTS[0];
 
   const handleSelectPrompt = (idx: number) => {
     setPromptIdx(idx);
+    setPromptPage(Math.floor(idx / 20));
     setUserText('');
     setShowSample(false);
     setOfflineResult(null);
@@ -154,7 +212,7 @@ export const BilingualWritingLab: React.FC<BilingualWritingLabProps> = ({
   const handleAiGeneratePrompt = async () => {
     const key = (geminiApiKey || '').trim();
     if (!key) {
-      setAiError('Tính năng AI chưa được Admin cấu hình API Key. Hãy chọn từ 16 bài mẫu có sẵn bên dưới nhé!');
+      setAiError(`Tính năng AI chưa được Admin cấu hình API Key. Hãy chọn từ ${allPrompts.length} bài mẫu có sẵn bên dưới nhé!`);
       return;
     }
     setAiError(null);
@@ -172,8 +230,11 @@ Trả về ĐÚNG JSON thuần (không markdown) theo format:
       const parsed = JSON.parse(jsonMatch[0]);
       const newItem: BilingualPrompt = {
         id: `ai-${Date.now()}`,
-        level: parsed.level || 'B1',
-        category: 'Văn phòng & Email',
+        level: parsed.level || (learnerProfile?.audience === 'kids' ? 'A1' : 'B1'),
+        category:
+          learnerProfile?.audience === 'kids' || learnerProfile?.audience === 'teen'
+            ? 'Đời sống & Giao tiếp'
+            : 'Văn phòng & Email',
         title: `✨ ${parsed.title || topic}`,
         vi: parsed.vi,
         en: parsed.en,
@@ -269,26 +330,66 @@ Trả về ĐÚNG JSON thuần (không markdown) theo format:
         </div>
       </div>
 
-      {/* Category Filter + AI Generator Bar */}
+      {/* Category Filter + Search + AI Generator Bar */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-bold text-slate-500 mr-1">Ngành nghề / Công việc:</span>
-          {JOB_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                setCatFilter(cat);
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
                 handleSelectPrompt(0);
               }}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                catFilter === cat
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+              placeholder={`Tìm trong ${allPrompts.length} bài luyện viết thực chiến...`}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {availableLevels.map((lv) => (
+              <button
+                key={lv}
+                onClick={() => {
+                  setLevelFilter(lv);
+                  handleSelectPrompt(0);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                  levelFilter === lv
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {lv === 'ALL' ? 'Mọi cấp' : lv}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-slate-500 mr-1">Thể loại / Ngành nghề:</span>
+          {allowedCategories.map((cat) => {
+            const isPreferred =
+              learnerProfile?.audience === 'worker' &&
+              learnerProfile.worker?.industries?.includes(cat);
+            return (
+              <button
+                key={cat}
+                onClick={() => {
+                  setCatFilter(cat);
+                  handleSelectPrompt(0);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                  catFilter === cat
+                    ? 'bg-indigo-600 text-white'
+                    : isPreferred
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {isPreferred ? `⭐ ${cat}` : cat}
+              </button>
+            );
+          })}
         </div>
 
         {/* AI Custom Topic + Optional API Key */}
@@ -313,30 +414,71 @@ Trả về ĐÚNG JSON thuần (không markdown) theo format:
 
       {/* Main 2-column Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left: Prompt list */}
-        <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 h-fit max-h-56 lg:max-h-[calc(100vh-12rem)] lg:sticky lg:top-28 overflow-y-auto">
-          <div className="text-xs font-extrabold uppercase text-slate-500 pb-1 border-b border-slate-100 dark:border-slate-800">
-            Danh sách bài mẫu ({filteredPrompts.length} bài)
-          </div>
-          {filteredPrompts.map((p, idx) => {
-            const active = p.id === currentPrompt.id;
+        {/* Left: Paginated Prompt list */}
+        <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 h-fit lg:sticky lg:top-28">
+          {(() => {
+            const PAGE_SIZE = 20;
+            const totalPages = Math.max(1, Math.ceil(filteredPrompts.length / PAGE_SIZE));
+            const safePage = Math.min(promptPage, totalPages - 1);
+            const pagePrompts = filteredPrompts.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
             return (
-              <button
-                key={p.id}
-                onClick={() => handleSelectPrompt(idx)}
-                className={`w-full text-left p-3 rounded-xl border transition ${
-                  active
-                    ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-400 text-indigo-900 dark:text-indigo-200'
-                    : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 hover:border-indigo-300'
-                }`}
-              >
-                <div className="text-xs font-bold">{p.title}</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
-                  Cấp {p.level} • {p.category}
+              <>
+                <div className="flex items-center justify-between text-xs font-extrabold uppercase text-slate-500 pb-1 border-b border-slate-100 dark:border-slate-800">
+                  <span>Danh sách bài mẫu ({filteredPrompts.length} bài)</span>
+                  {totalPages > 1 && (
+                    <span className="text-[11px] font-bold">
+                      Trang {safePage + 1}/{totalPages}
+                    </span>
+                  )}
                 </div>
-              </button>
+                <div className="space-y-2 max-h-56 lg:max-h-[430px] overflow-y-auto pr-1">
+                  {pagePrompts.map((p, offset) => {
+                    const idx = safePage * PAGE_SIZE + offset;
+                    const active = p.id === currentPrompt.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => handleSelectPrompt(idx)}
+                        className={`w-full text-left p-3 rounded-xl border transition ${
+                          active
+                            ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-400 text-indigo-900 dark:text-indigo-200'
+                            : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/70 dark:border-slate-800 hover:border-indigo-300'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{idx + 1}. {p.title}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Cấp {p.level} • {p.category}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
+                    <button
+                      type="button"
+                      disabled={safePage <= 0}
+                      onClick={() => setPromptPage((p) => Math.max(0, p - 1))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                    >
+                      ← Trước
+                    </button>
+                    <span className="text-slate-500">
+                      {safePage + 1} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safePage >= totalPages - 1}
+                      onClick={() => setPromptPage((p) => Math.min(totalPages - 1, p + 1))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40"
+                    >
+                      Sau →
+                    </button>
+                  </div>
+                )}
+              </>
             );
-          })}
+          })()}
         </div>
 
         {/* Right: Active Writing Exercise + Grading */}

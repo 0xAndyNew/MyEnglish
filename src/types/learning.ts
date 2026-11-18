@@ -1,3 +1,7 @@
+import type { AudienceId, LearnerProfile } from './audience';
+
+export type { AudienceId, ExamType, LearnerProfile, PageKey } from './audience';
+
 export type CefrLevel = 'A0' | 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
 
 export type AccentMode = 'en-US' | 'en-GB';
@@ -66,6 +70,7 @@ export interface WordEntry {
   examples: WordExample[];
   topicId?: string;
   audioUrl?: string;
+  audiences?: AudienceId[];
 }
 
 export interface LessonModule {
@@ -75,6 +80,7 @@ export interface LessonModule {
   title: string;
   subtitle: string;
   description: string;
+  audiences?: AudienceId[];
   grammarNote?: {
     title: string;
     formula: string;
@@ -111,8 +117,10 @@ export interface RoleplayScenario {
   id: string;
   title: string;
   level: CefrLevel;
+  category?: string;
   context: string;
   turns: RoleplayTurn[];
+  audiences?: AudienceId[];
 }
 
 export interface ReadingPassage {
@@ -122,6 +130,7 @@ export interface ReadingPassage {
   topic: string;
   content: string;
   translation: string;
+  audiences?: AudienceId[];
 }
 
 export interface SrsCardState {
@@ -139,6 +148,7 @@ export interface UserAccount {
   passwordHash?: string;
   role?: 'admin' | 'user';
   createdAt: string;
+  profile?: LearnerProfile | null;
 }
 
 export interface UserProgress {
@@ -146,6 +156,7 @@ export interface UserProgress {
   streakDays: number;
   lastActiveDate: string;
   unlockedStepIndex: number; // 0: 1A Alphabet -> 1: 1B IPA -> 2: 2A Vocab -> 3: 2B Grammar -> 4: 3 Listening -> 5: 4 Speaking -> 6: 5 Read/Write/SRS
+  trackUnlocks?: Partial<Record<AudienceId, number>>;
   passedLetters?: string[];
   passedIpaPairs?: string[];
   completedGrammarIds?: string[];

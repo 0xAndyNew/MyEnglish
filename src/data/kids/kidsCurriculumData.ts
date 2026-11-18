@@ -106,18 +106,20 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-200',
     melodyId: 'colors',
     originalTuneName: 'Twinkle, Twinkle, Little Star',
-    songChantTitle: 'Rainbow Magic Song',
+    songAudioUrl: '/audio/kids-songs/colors.mp3',
+    youtubeId: 'yCjJyiqpAuU',
+    songChantTitle: 'Twinkle, Twinkle, Little Star',
     songChant:
-      'Red and yellow, green and blue,\\nPurple, pink and orange too!\\nShining brightly in the sky,\\nWatch the rainbow flying high.\\nRed and yellow, green and blue,\\nAll the colors smile at you!',
+      'Twinkle, twinkle, little star,\nHow I wonder what you are!\nUp above the world so high,\nLike a diamond in the sky.\nTwinkle, twinkle, little star,\nHow I wonder what you are!',
     songChantVi:
-      'Đỏ rồi vàng, xanh lá, xanh dương,\\nTím mộng mơ và cam rạng ngời!\\nTỏa ánh sáng rực rỡ trên cao,\\nNgắm cầu vồng bay vút trời sao.\\nĐỏ rồi vàng, xanh lá, xanh dương,\\nMuôn sắc màu mỉm cười với bé!',
+      'Lấp lánh, lấp lánh, hỡi ngôi sao nhỏ xinh,\nBé tự hỏi bạn là ai giữa trời lung linh!\nỞ tít trên cao của thế giới bao la,\nTựa như viên kim cương sáng ngời phương xa.\nLấp lánh, lấp lánh, hỡi ngôi sao nhỏ xinh,\nBé tự hỏi bạn là ai giữa trời lung linh!',
     songLines: [
-      { en: 'Red and yellow, green and blue,', vi: 'Đỏ rồi vàng, xanh lá, xanh dương,' },
-      { en: 'Purple, pink and orange too!', vi: 'Tím mộng mơ và cam rạng ngời!' },
-      { en: 'Shining brightly in the sky,', vi: 'Tỏa ánh sáng rực rỡ trên cao,' },
-      { en: 'Watch the rainbow flying high.', vi: 'Ngắm cầu vồng bay vút trời sao.' },
-      { en: 'Red and yellow, green and blue,', vi: 'Đỏ rồi vàng, xanh lá, xanh dương,' },
-      { en: 'All the colors smile at you!', vi: 'Muôn sắc màu mỉm cười với bé!' },
+      { en: 'Twinkle, twinkle, little star,', vi: 'Lấp lánh, lấp lánh, hỡi ngôi sao nhỏ xinh,' },
+      { en: 'How I wonder what you are!', vi: 'Bé tự hỏi bạn là ai giữa trời lung linh!' },
+      { en: 'Up above the world so high,', vi: 'Ở tít trên cao của thế giới bao la,' },
+      { en: 'Like a diamond in the sky.', vi: 'Tựa như viên kim cương sáng ngời phương xa.' },
+      { en: 'Twinkle, twinkle, little star,', vi: 'Lấp lánh, lấp lánh, hỡi ngôi sao nhỏ xinh,' },
+      { en: 'How I wonder what you are!', vi: 'Bé tự hỏi bạn là ai giữa trời lung linh!' },
     ],
     words: [
       {
@@ -258,16 +260,18 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
     melodyId: 'numbers',
     originalTuneName: 'Ten Little Indians',
-    songChantTitle: 'Ten Little Numbers',
+    songAudioUrl: '/audio/kids-songs/numbers.mp3',
+    youtubeId: '9m32j8eY-V4',
+    songChantTitle: 'Ten Little Indians',
     songChant:
-      'One little, two little, three little fingers,\\nFour little, five little, six little fingers,\\nSeven little, eight little, nine little fingers,\\nTen little fingers clap with me!',
+      'One little, two little, three little Indians,\nFour little, five little, six little Indians,\nSeven little, eight little, nine little Indians,\nTen little Indian boys!',
     songChantVi:
-      'Một ngón xinh, hai ngón xinh, ba ngón tay nhỏ,\\nBốn ngón xinh, năm ngón xinh, sáu ngón tay nhỏ,\\nBảy ngón xinh, tám ngón xinh, chín ngón tay nhỏ,\\nMười ngón tay vỗ nhịp cùng bé nha!',
+      'Một bạn nhỏ, hai bạn nhỏ, ba bạn nhỏ dễ thương,\nBốn bạn nhỏ, năm bạn nhỏ, sáu bạn nhỏ kiên cường,\nBảy bạn nhỏ, tám bạn nhỏ, chín bạn nhỏ thân thương,\nMười bạn nhỏ cùng reo vui rộn ràng!',
     songLines: [
-      { en: 'One little, two little, three little fingers,', vi: 'Một ngón xinh, hai ngón xinh, ba ngón tay nhỏ,' },
-      { en: 'Four little, five little, six little fingers,', vi: 'Bốn ngón xinh, năm ngón xinh, sáu ngón tay nhỏ,' },
-      { en: 'Seven little, eight little, nine little fingers,', vi: 'Bảy ngón xinh, tám ngón xinh, chín ngón tay nhỏ,' },
-      { en: 'Ten little fingers clap with me!', vi: 'Mười ngón tay vỗ nhịp cùng bé nha!' },
+      { en: 'One little, two little, three little Indians,', vi: 'Một bạn nhỏ, hai bạn nhỏ, ba bạn nhỏ dễ thương,' },
+      { en: 'Four little, five little, six little Indians,', vi: 'Bốn bạn nhỏ, năm bạn nhỏ, sáu bạn nhỏ kiên cường,' },
+      { en: 'Seven little, eight little, nine little Indians,', vi: 'Bảy bạn nhỏ, tám bạn nhỏ, chín bạn nhỏ thân thương,' },
+      { en: 'Ten little Indian boys!', vi: 'Mười bạn nhỏ cùng reo vui rộn ràng!' },
     ],
     words: [
       {
@@ -572,18 +576,20 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200',
     melodyId: 'animals',
     originalTuneName: 'Old MacDonald Had a Farm',
+    songAudioUrl: '/audio/kids-songs/animals.mp3',
+    youtubeId: '_6HzoUcx3eo',
     songChantTitle: 'Old MacDonald Had a Farm',
     songChant:
-      'Old MacDonald had a farm,\\nE - I - E - I - O! Yay!\\nOn that farm he has a cow,\\nE - I - E - I - O!\\nWith a moo-moo here and a woof-woof there,\\nCats and birds sing E - I - E - I - O!',
+      'Old MacDonald had a farm,\nE - I - E - I - O!\nAnd on his farm he had some chicks,\nE - I - E - I - O!\nWith a chick-chick here and a chick-chick there,\nOld MacDonald had a farm, E - I - E - I - O!',
     songChantVi:
-      'Bác MacDonald có trang trại vui,\\nI - Ai - I - Ai - Ô! Nào!\\nTrên nông trại bác nuôi bò sữa,\\nI - Ai - I - Ai - Ô!\\nBò kêu ùm bò bên đây, cún gâu gâu bên kia,\\nMèo cùng chim hót I - Ai - I - Ai - Ô!',
+      'Bác MacDonald có một trang trại,\nI - Ai - I - Ai - Ô!\nVà trên nông trại bác nuôi đàn gà con,\nI - Ai - I - Ai - Ô!\nGà kêu chíp chíp bên này và chíp chíp bên kia,\nBác MacDonald có một trang trại, I - Ai - I - Ai - Ô!',
     songLines: [
-      { en: 'Old MacDonald had a farm,', vi: 'Bác MacDonald có trang trại vui,' },
-      { en: 'E - I - E - I - O! Yay!', vi: 'I - Ai - I - Ai - Ô! Nào!' },
-      { en: 'On that farm he has a cow,', vi: 'Trên nông trại bác nuôi bò sữa,' },
+      { en: 'Old MacDonald had a farm,', vi: 'Bác MacDonald có một trang trại,' },
       { en: 'E - I - E - I - O!', vi: 'I - Ai - I - Ai - Ô!' },
-      { en: 'With a moo-moo here and a woof-woof there,', vi: 'Bò kêu ùm bò bên đây, cún gâu gâu bên kia,' },
-      { en: 'Cats and birds sing E - I - E - I - O!', vi: 'Mèo cùng chim hót I - Ai - I - Ai - Ô!' },
+      { en: 'And on his farm he had some chicks,', vi: 'Và trên nông trại bác nuôi đàn gà con,' },
+      { en: 'E - I - E - I - O!', vi: 'I - Ai - I - Ai - Ô!' },
+      { en: 'With a chick-chick here and a chick-chick there,', vi: 'Gà kêu chíp chíp bên này và chíp chíp bên kia,' },
+      { en: 'Old MacDonald had a farm, E - I - E - I - O!', vi: 'Bác MacDonald có một trang trại, I - Ai - I - Ai - Ô!' },
     ],
     words: [
       {
@@ -707,17 +713,19 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     cardBg: 'bg-violet-50/80 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800/70',
     badgeClass: 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200',
     melodyId: 'family',
-    originalTuneName: 'Frère Jacques (Are You Sleeping)',
-    songChantTitle: 'Happy Family Song',
+    originalTuneName: 'Are You Sleeping? (Frère Jacques)',
+    songAudioUrl: '/audio/kids-songs/family.mp3',
+    youtubeId: 'k8hTqLw7k_I',
+    songChantTitle: 'Are You Sleeping? (Brother John)',
     songChant:
-      'I love Mommy, I love Daddy,\\nYes I do! Yes I do!\\nSister and my brother, Grandma and my Grandpa,\\nLove you all! Love you all!',
+      'Are you sleeping, are you sleeping,\nBrother John, Brother John?\nMorning bells are ringing, morning bells are ringing,\nDing, dang, dong! Ding, dang, dong!',
     songChantVi:
-      'Con yêu Mẹ hiền, con yêu Bố nhiều,\\nYêu thật nhiều! Yêu thật nhiều!\\nChị gái và anh trai nhé, Ông Nội với Bà Ngoại nữa,\\nThương cả nhà! Thương cả nhà!',
+      'Anh còn ngủ say sao, anh còn ngủ say sao,\nAnh John ơi, anh John ơi?\nChuông buổi sáng đang reo vang, chuông sớm đang reo vang,\nĐinh, đang, đoong! Đinh, đang, đoong!',
     songLines: [
-      { en: 'I love Mommy, I love Daddy,', vi: 'Con yêu Mẹ hiền, con yêu Bố nhiều,' },
-      { en: 'Yes I do! Yes I do!', vi: 'Yêu thật nhiều! Yêu thật nhiều!' },
-      { en: 'Sister and my brother, Grandma and my Grandpa,', vi: 'Chị gái và anh trai nhé, Ông Nội với Bà Ngoại nữa,' },
-      { en: 'Love you all! Love you all!', vi: 'Thương cả nhà! Thương cả nhà!' },
+      { en: 'Are you sleeping, are you sleeping,', vi: 'Anh còn ngủ say sao, anh còn ngủ say sao,' },
+      { en: 'Brother John, Brother John?', vi: 'Anh John ơi, anh John ơi?' },
+      { en: 'Morning bells are ringing, morning bells are ringing,', vi: 'Chuông buổi sáng đang reo vang, chuông sớm đang reo vang,' },
+      { en: 'Ding, dang, dong! Ding, dang, dong!', vi: 'Đinh, đang, đoong! Đinh, đang, đoong!' },
     ],
     words: [
       {
@@ -842,15 +850,17 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200',
     melodyId: 'body-parts',
     originalTuneName: 'Head, Shoulders, Knees and Toes',
+    songAudioUrl: '/audio/kids-songs/body-parts.mp3',
+    youtubeId: 'WX8HmogNyCY',
     songChantTitle: 'Head, Shoulders, Knees and Toes',
     songChant:
-      'Head, shoulders, knees and toes, knees and toes,\\nHead, shoulders, knees and toes, knees and toes,\\nAnd eyes and ears and mouth and nose!\\nHead, shoulders, knees and toes, knees and toes!',
+      'Head, shoulders, knees and toes, knees and toes,\nHead, shoulders, knees and toes, knees and toes,\nAnd eyes and ears and mouth and nose,\nHead, shoulders, knees and toes, knees and toes!',
     songChantVi:
-      'Đầu này, vai này, gối và ngón chân xinh,\\nĐầu này, vai này, gối và ngón chân xinh,\\nĐôi mắt, đôi tai, cái miệng và chiếc mũi!\\nĐầu này, vai này, gối và ngón chân xinh!',
+      'Đầu này, vai này, gối và ngón chân xinh,\nĐầu này, vai này, gối và ngón chân xinh,\nĐôi mắt, đôi tai, cái miệng và chiếc mũi,\nĐầu này, vai này, gối và ngón chân xinh!',
     songLines: [
       { en: 'Head, shoulders, knees and toes, knees and toes,', vi: 'Đầu này, vai này, gối và ngón chân xinh,' },
       { en: 'Head, shoulders, knees and toes, knees and toes,', vi: 'Đầu này, vai này, gối và ngón chân xinh,' },
-      { en: 'And eyes and ears and mouth and nose!', vi: 'Đôi mắt, đôi tai, cái miệng và chiếc mũi!' },
+      { en: 'And eyes and ears and mouth and nose,', vi: 'Đôi mắt, đôi tai, cái miệng và chiếc mũi,' },
       { en: 'Head, shoulders, knees and toes, knees and toes!', vi: 'Đầu này, vai này, gối và ngón chân xinh!' },
     ],
     words: [
@@ -975,17 +985,19 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     cardBg: 'bg-lime-50/80 dark:bg-lime-950/30 border-lime-200 dark:border-lime-800/70',
     badgeClass: 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-200',
     melodyId: 'food-drinks',
-    originalTuneName: 'The Muffin Man',
-    songChantTitle: 'Yummy Picnic Song',
+    originalTuneName: 'Pat-a-Cake',
+    songAudioUrl: '/audio/kids-songs/food-drinks.mp3',
+    youtubeId: 'Q5vjC3t2W-g',
+    songChantTitle: 'Pat-a-Cake (Baker’s Man)',
     songChant:
-      'Oh, do you like fresh apple sweet,\\nWarm bread and cool milk to drink?\\nOh, let us share our fruit and cake,\\nSweet picnic today!',
+      'Pat-a-cake, pat-a-cake, baker’s man,\nBake me a cake just as fast as you can!\nRoll it and pat it and mark it with a B,\nAnd put it in the oven for baby and me!',
     songChantVi:
-      'Ồ bé có thích quả táo ngọt thơm,\\nBánh mì ấm cùng sữa mát lành?\\nNào cùng sẻ chia trái cây với kem,\\nBữa tiệc ngon tuyệt vời!',
+      'Nướng chiếc bánh thơm, nướng bánh nhé bác thợ,\nHãy nướng cho bé chiếc bánh thật nhanh nha!\nLăn bột, vỗ tròn và khắc chữ B xinh xắn,\nRồi đưa vào lò nướng cho bé và mẹ thưởng thức nào!',
     songLines: [
-      { en: 'Oh, do you like fresh apple sweet,', vi: 'Ồ bé có thích quả táo ngọt thơm,' },
-      { en: 'Warm bread and cool milk to drink?', vi: 'Bánh mì ấm cùng sữa mát lành?' },
-      { en: 'Oh, let us share our fruit and cake,', vi: 'Nào cùng sẻ chia trái cây với kem,' },
-      { en: 'Sweet picnic today!', vi: 'Bữa tiệc ngon tuyệt vời!' },
+      { en: 'Pat-a-cake, pat-a-cake, baker’s man,', vi: 'Nướng chiếc bánh thơm, nướng bánh nhé bác thợ,' },
+      { en: 'Bake me a cake just as fast as you can!', vi: 'Hãy nướng cho bé chiếc bánh thật nhanh nha!' },
+      { en: 'Roll it and pat it and mark it with a B,', vi: 'Lăn bột, vỗ tròn và khắc chữ B xinh xắn,' },
+      { en: 'And put it in the oven for baby and me!', vi: 'Rồi đưa vào lò nướng cho bé và mẹ thưởng thức nào!' },
     ],
     words: [
       {
@@ -1109,17 +1121,19 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     cardBg: 'bg-fuchsia-50/80 dark:bg-fuchsia-950/30 border-fuchsia-200 dark:border-fuchsia-800/70',
     badgeClass: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-200',
     melodyId: 'toys',
-    originalTuneName: 'The Wheels on the Bus',
-    songChantTitle: 'My Happy Toy Box',
+    originalTuneName: 'Teddy Bear, Teddy Bear',
+    songAudioUrl: '/audio/kids-songs/toys.mp3',
+    youtubeId: '7682fXGZrqM',
+    songChantTitle: 'Teddy Bear, Teddy Bear',
     songChant:
-      'My little red car goes zoom, zoom, zoom,\\nRound and round, round and round!\\nMy happy teddy goes hug, hug, hug,\\nPlay with toys all day!',
+      'Teddy bear, teddy bear, turn around!\nTeddy bear, teddy bear, touch the ground!\nTeddy bear, teddy bear, show your shoe,\nTeddy bear, teddy bear, that will do!',
     songChantVi:
-      'Ô tô đỏ bé xinh chạy vút, vút, vút,\\nXoay vòng tròn, lăn vòng tròn!\\nGấu bông vui của bé ôm thật chặt nào,\\nCùng chơi vui suốt ngày!',
+      'Gấu bông ơi, gấu bông ơi, xoay vòng tròn nào!\nGấu bông ơi, gấu bông ơi, chạm tay xuống đất nào!\nGấu bông ơi, gấu bông ơi, chỉ vào đôi giày xinh,\nGấu bông ơi, gấu bông ơi, bé làm giỏi lắm rồi!',
     songLines: [
-      { en: 'My little red car goes zoom, zoom, zoom,', vi: 'Ô tô đỏ bé xinh chạy vút, vút, vút,' },
-      { en: 'Round and round, round and round!', vi: 'Xoay vòng tròn, lăn vòng tròn!' },
-      { en: 'My happy teddy goes hug, hug, hug,', vi: 'Gấu bông vui của bé ôm thật chặt nào,' },
-      { en: 'Play with toys all day!', vi: 'Cùng chơi vui suốt ngày!' },
+      { en: 'Teddy bear, teddy bear, turn around!', vi: 'Gấu bông ơi, gấu bông ơi, xoay vòng tròn nào!' },
+      { en: 'Teddy bear, teddy bear, touch the ground!', vi: 'Gấu bông ơi, gấu bông ơi, chạm tay xuống đất nào!' },
+      { en: 'Teddy bear, teddy bear, show your shoe,', vi: 'Gấu bông ơi, gấu bông ơi, chỉ vào đôi giày xinh,' },
+      { en: 'Teddy bear, teddy bear, that will do!', vi: 'Gấu bông ơi, gấu bông ơi, bé làm giỏi lắm rồi!' },
     ],
     words: [
       {
@@ -1244,18 +1258,20 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200',
     melodyId: 'school-things',
     originalTuneName: 'The ABC Song',
-    songChantTitle: 'The ABC & School Song',
+    songAudioUrl: '/audio/kids-songs/school-things.mp3',
+    youtubeId: '75p-NQuDnHs',
+    songChantTitle: 'The Alphabet Song (ABC Song)',
     songChant:
-      'A - B - C - D - E - F - G,\\nH - I - J - K, L - M - N - O - P!\\nQ - R - S, T - U - V,\\nBook and bag, pen for me,\\nCrayon, ruler, pencil too,\\nI love learning here with you!',
+      'A - B - C - D - E - F - G,\nH - I - J - K - L - M - N - O - P,\nQ - R - S, T - U - V,\nW - X - Y and Z!\nNow I know my ABCs,\nNext time won’t you sing with me!',
     songChantVi:
-      'A - B - C - D - E - F - G,\\nH - I - J - K, L - M - N - O - P!\\nQ - R - S, T - U - V,\\nSách với cặp, bút bi xinh,\\nSáp màu, thước kẻ, bút chì luôn,\\nEm yêu giờ học cùng với cô thầy!',
+      'A - B - C - D - E - F - G,\nH - I - J - K - L - M - N - O - P,\nQ - R - S, T - U - V,\nW - X - Y và Z!\nGiờ em đã thuộc bảng chữ cái ABC rồi,\nLần tới bạn cùng hòa giọng hát vang với tớ nhé!',
     songLines: [
       { en: 'A - B - C - D - E - F - G,', vi: 'A - B - C - D - E - F - G,' },
-      { en: 'H - I - J - K, L - M - N - O - P!', vi: 'H - I - J - K, L - M - N - O - P!' },
+      { en: 'H - I - J - K - L - M - N - O - P,', vi: 'H - I - J - K - L - M - N - O - P,' },
       { en: 'Q - R - S, T - U - V,', vi: 'Q - R - S, T - U - V,' },
-      { en: 'Book and bag, pen for me,', vi: 'Sách với cặp, bút bi xinh,' },
-      { en: 'Crayon, ruler, pencil too,', vi: 'Sáp màu, thước kẻ, bút chì luôn,' },
-      { en: 'I love learning here with you!', vi: 'Em yêu giờ học cùng với cô thầy!' },
+      { en: 'W - X - Y and Z!', vi: 'W - X - Y và Z!' },
+      { en: 'Now I know my ABCs,', vi: 'Giờ em đã thuộc bảng chữ cái ABC rồi,' },
+      { en: 'Next time won’t you sing with me!', vi: 'Lần tới bạn cùng hòa giọng hát vang với tớ nhé!' },
     ],
     words: [
       {
@@ -1380,16 +1396,18 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-200',
     melodyId: 'weather',
     originalTuneName: 'Rain, Rain, Go Away',
+    songAudioUrl: '/audio/kids-songs/weather.mp3',
+    youtubeId: 'c3v0rJqyCTM',
     songChantTitle: 'Rain, Rain, Go Away',
     songChant:
-      'Rain, rain, go away,\\nCome again another day.\\nSun, sun, shine on me,\\nLittle kids all want to play!',
+      'Rain, rain, go away,\nCome again another day!\nLittle children want to play,\nRain, rain, go away!',
     songChantVi:
-      'Mưa ơi mưa, đi chơi xa,\\nHẹn ngày mai hãy ghé thăm nhà.\\nNắng ơi nắng, chiếu sáng tươi,\\nCác bạn nhỏ đều muốn vui chơi!',
+      'Mưa ơi mưa, hãy đi xa mau,\nHẹn ngày khác hãy ghé thăm sau!\nCác bạn nhỏ đang rất muốn vui chơi,\nMưa ơi mưa, hãy đi xa mau!',
     songLines: [
-      { en: 'Rain, rain, go away,', vi: 'Mưa ơi mưa, đi chơi xa,' },
-      { en: 'Come again another day.', vi: 'Hẹn ngày mai hãy ghé thăm nhà.' },
-      { en: 'Sun, sun, shine on me,', vi: 'Nắng ơi nắng, chiếu sáng tươi,' },
-      { en: 'Little kids all want to play!', vi: 'Các bạn nhỏ đều muốn vui chơi!' },
+      { en: 'Rain, rain, go away,', vi: 'Mưa ơi mưa, hãy đi xa mau,' },
+      { en: 'Come again another day!', vi: 'Hẹn ngày khác hãy ghé thăm sau!' },
+      { en: 'Little children want to play,', vi: 'Các bạn nhỏ đang rất muốn vui chơi,' },
+      { en: 'Rain, rain, go away!', vi: 'Mưa ơi mưa, hãy đi xa mau!' },
     ],
     words: [
       {
@@ -1514,16 +1532,18 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200',
     melodyId: 'clothes',
     originalTuneName: 'Here We Go Round the Mulberry Bush',
-    songChantTitle: 'This Is the Way We Get Dressed',
+    songAudioUrl: '/audio/kids-songs/clothes.mp3',
+    youtubeId: '4XLQpRI_wOQ',
+    songChantTitle: 'This Is the Way (Mulberry Bush)',
     songChant:
-      'This is the way we wear our hat,\\nPut on shirt and shoes like that!\\nThis is the way we zip our coat,\\nNeat and ready for the day!',
+      'This is the way we wash our face,\nWash our face, wash our face!\nThis is the way we wash our face,\nSo early in the morning!',
     songChantVi:
-      'Đây là cách bé đội chiếc mũ xinh,\\nMặc áo thun, xỏ đôi giày nhanh!\\nĐây là cách bé kéo khóa áo khoác,\\nGọn gàng sẵn sàng đón ngày mới!',
+      'Đây là cách bé rửa khuôn mặt xinh,\nRửa khuôn mặt xinh, rửa khuôn mặt xinh!\nĐây là cách bé rửa khuôn mặt xinh,\nVào một buổi sớm mai rạng ngời!',
     songLines: [
-      { en: 'This is the way we wear our hat,', vi: 'Đây là cách bé đội chiếc mũ xinh,' },
-      { en: 'Put on shirt and shoes like that!', vi: 'Mặc áo thun, xỏ đôi giày nhanh!' },
-      { en: 'This is the way we zip our coat,', vi: 'Đây là cách bé kéo khóa áo khoác,' },
-      { en: 'Neat and ready for the day!', vi: 'Gọn gàng sẵn sàng đón ngày mới!' },
+      { en: 'This is the way we wash our face,', vi: 'Đây là cách bé rửa khuôn mặt xinh,' },
+      { en: 'Wash our face, wash our face!', vi: 'Rửa khuôn mặt xinh, rửa khuôn mặt xinh!' },
+      { en: 'This is the way we wash our face,', vi: 'Đây là cách bé rửa khuôn mặt xinh,' },
+      { en: 'So early in the morning!', vi: 'Vào một buổi sớm mai rạng ngời!' },
     ],
     words: [
       {
@@ -1648,16 +1668,18 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     badgeClass: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200',
     melodyId: 'my-home',
     originalTuneName: 'London Bridge Is Falling Down',
-    songChantTitle: 'Welcome to My Happy Home',
+    songAudioUrl: '/audio/kids-songs/my-home.mp3',
+    youtubeId: 'F4tNu5nKq8A',
+    songChantTitle: 'London Bridge Is Falling Down',
     songChant:
-      'Welcome to my happy home,\\nLiving room, bedroom too!\\nKitchen smells so warm and sweet,\\nI love my home!',
+      'London Bridge is falling down,\nFalling down, falling down!\nLondon Bridge is falling down,\nMy fair lady!',
     songChantVi:
-      'Chào mừng tới ngôi nhà hạnh phúc,\\nCó phòng khách, có phòng ngủ xinh!\\nGian bếp nhỏ thơm lừng ấm áp,\\nYêu mái nhà mình!',
+      'Cầu Luân Đôn đang nghiêng ngả rồi,\nĐang nghiêng xuống, đang nghiêng xuống!\nCầu Luân Đôn đang nghiêng ngả rồi,\nHỡi quý cô duyên dáng của tôi!',
     songLines: [
-      { en: 'Welcome to my happy home,', vi: 'Chào mừng tới ngôi nhà hạnh phúc,' },
-      { en: 'Living room, bedroom too!', vi: 'Có phòng khách, có phòng ngủ xinh!' },
-      { en: 'Kitchen smells so warm and sweet,', vi: 'Gian bếp nhỏ thơm lừng ấm áp,' },
-      { en: 'I love my home!', vi: 'Yêu mái nhà mình!' },
+      { en: 'London Bridge is falling down,', vi: 'Cầu Luân Đôn đang nghiêng ngả rồi,' },
+      { en: 'Falling down, falling down!', vi: 'Đang nghiêng xuống, đang nghiêng xuống!' },
+      { en: 'London Bridge is falling down,', vi: 'Cầu Luân Đôn đang nghiêng ngả rồi,' },
+      { en: 'My fair lady!', vi: 'Hỡi quý cô duyên dáng của tôi!' },
     ],
     words: [
       {
@@ -1781,17 +1803,19 @@ const BASE_KIDS_UNITS: KidsUnit[] = [
     cardBg: 'bg-yellow-50/80 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800/70',
     badgeClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200',
     melodyId: 'feelings',
-    originalTuneName: 'If You\'re Happy and You Know It',
-    songChantTitle: 'If You\'re Happy and You Know It',
+    originalTuneName: "If You're Happy and You Know It",
+    songAudioUrl: '/audio/kids-songs/feelings.mp3',
+    youtubeId: 'l4WNrvVjiTW',
+    songChantTitle: "If You're Happy and You Know It",
     songChant:
-      'If you\'re happy and you know it, clap your hands!\\nIf you\'re happy and you know it, clap your hands!\\nThen your happy face will show it now!\\nIf you\'re happy and you know it, shout hooray!',
+      "If you're happy and you know it, clap your hands!\nIf you're happy and you know it, clap your hands!\nIf you're happy and you know it, and you really want to show it,\nIf you're happy and you know it, clap your hands!",
     songChantVi:
-      'Nếu bạn vui và biết mình vui, vỗ tay lên!\\nNếu bạn vui và biết mình vui, vỗ tay lên!\\nHãy cười tươi cho mọi người cùng thấy!\\nNếu bạn vui và biết mình vui, hô hoan hô!',
+      'Nếu bạn đang vui và biết mình vui, hãy vỗ tay nào!\nNếu bạn đang vui và biết mình vui, hãy vỗ tay nào!\nNếu bạn đang vui và muốn nụ cười rạng rỡ cho mọi người thấy,\nNếu bạn đang vui và biết mình vui, hãy vỗ tay nào!',
     songLines: [
-      { en: 'If you\'re happy and you know it, clap your hands!', vi: 'Nếu bạn vui và biết mình vui, vỗ tay lên!' },
-      { en: 'If you\'re happy and you know it, clap your hands!', vi: 'Nếu bạn vui và biết mình vui, vỗ tay lên!' },
-      { en: 'Then your happy face will show it now!', vi: 'Hãy cười tươi cho mọi người cùng thấy!' },
-      { en: 'If you\'re happy and you know it, shout hooray!', vi: 'Nếu bạn vui và biết mình vui, hô hoan hô!' },
+      { en: "If you're happy and you know it, clap your hands!", vi: 'Nếu bạn đang vui và biết mình vui, hãy vỗ tay nào!' },
+      { en: "If you're happy and you know it, clap your hands!", vi: 'Nếu bạn đang vui và biết mình vui, hãy vỗ tay nào!' },
+      { en: "If you're happy and you know it, and you really want to show it,", vi: 'Nếu bạn đang vui và muốn nụ cười rạng rỡ cho mọi người thấy,' },
+      { en: "If you're happy and you know it, clap your hands!", vi: 'Nếu bạn đang vui và biết mình vui, hãy vỗ tay nào!' },
     ],
     words: [
       {

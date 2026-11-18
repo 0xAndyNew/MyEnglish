@@ -9,12 +9,14 @@ import {
   BookmarkPlus,
   CheckCheck,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   FileText,
   Filter,
   GraduationCap,
   HelpCircle,
+  ListChecks,
   Pause,
   Play,
   RotateCcw,
@@ -48,7 +50,10 @@ export interface SchoolCurriculumProps {
   onSaveWord?: (word: WordEntry) => void;
   initialMode?: 'units' | 'exams';
   allowAllOptions?: boolean;
+  hideHeaderNav?: boolean;
 }
+
+type UnitStepId = 'vocab' | 'grammar' | 'quiz' | 'exercises';
 
 interface SectionBreakdown {
   section: string;

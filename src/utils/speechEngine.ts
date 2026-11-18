@@ -93,6 +93,7 @@ export interface SpeechRecognitionResultMeta {
 let ttsScheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let activeAudioPlayer: HTMLAudioElement | null = null;
 let activeAudioCtx: AudioContext | null = null;
+let activeUtterance: SpeechSynthesisUtterance | null = null;
 
 // Pre-warm speechSynthesis voice list on browser load
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -238,6 +239,14 @@ function fallbackTTS(text: string, accent: AccentMode, rate: number): void {
     if (preferred) {
       utterance.voice = preferred;
     }
+
+    activeUtterance = utterance;
+    utterance.onend = () => {
+      if (activeUtterance === utterance) activeUtterance = null;
+    };
+    utterance.onerror = () => {
+      if (activeUtterance === utterance) activeUtterance = null;
+    };
 
     synth.speak(utterance);
   };

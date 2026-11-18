@@ -1,18 +1,13 @@
 import { CefrLevel } from '../types/learning';
+import { PRACTICAL_CATEGORIES, PracticalCategory } from './practicalCategories';
+import { WRITING_BANK_PART1 } from './writingBankPart1';
+import { WRITING_BANK_PART2 } from './writingBankPart2';
 
-export type JobCategory =
-  | 'Văn phòng & Email'
-  | 'IT / Kỹ thuật'
-  | 'Kinh doanh & CSKH'
-  | 'Phỏng vấn & Nhân sự'
-  | 'Dịch vụ & Đời sống';
+export type JobCategory = 'Dịch vụ & Đời sống' | PracticalCategory;
 
 export const JOB_CATEGORIES: ('Tất cả' | JobCategory)[] = [
   'Tất cả',
-  'Văn phòng & Email',
-  'IT / Kỹ thuật',
-  'Kinh doanh & CSKH',
-  'Phỏng vấn & Nhân sự',
+  ...PRACTICAL_CATEGORIES,
   'Dịch vụ & Đời sống',
 ];
 
@@ -27,7 +22,7 @@ export interface BilingualPrompt {
   keywordsVi: string[];
 }
 
-export const BILINGUAL_WRITING_PROMPTS: BilingualPrompt[] = [
+const BASE_BILINGUAL_WRITING_PROMPTS: BilingualPrompt[] = [
   {
     id: 'bw-1',
     level: 'A1',
@@ -268,4 +263,10 @@ export const BILINGUAL_WRITING_PROMPTS: BilingualPrompt[] = [
     keywordsEn: ['appreciate', 'job offer', 'two weeks', 'complete', 'handover', 'next month'],
     keywordsVi: ['trân trọng', 'thư mời', 'hai tuần', 'bàn giao', 'tháng tới'],
   },
+];
+
+export const BILINGUAL_WRITING_PROMPTS: BilingualPrompt[] = [
+  ...BASE_BILINGUAL_WRITING_PROMPTS,
+  ...WRITING_BANK_PART1,
+  ...WRITING_BANK_PART2,
 ];

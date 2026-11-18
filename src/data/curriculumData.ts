@@ -1,4 +1,6 @@
 import { LearningStage, LessonModule, ReadingPassage, RoleplayScenario, WordEntry } from '../types/learning';
+import { ROLEPLAY_BANK_PART1 } from './roleplayBankPart1';
+import { ROLEPLAY_BANK_PART2 } from './roleplayBankPart2';
 
 export const LEARNING_STAGES: LearningStage[] = [
   {
@@ -855,7 +857,7 @@ export const READING_PASSAGES: ReadingPassage[] = [
   },
 ];
 
-export const ROLEPLAY_SCENARIOS: RoleplayScenario[] = [
+const BASE_ROLEPLAY_SCENARIOS: RoleplayScenario[] = [
   {
     id: 'rp-cafe',
     title: 'Gọi đồ uống tại Quán Cà Phê',
@@ -1077,4 +1079,10 @@ export const ROLEPLAY_SCENARIOS: RoleplayScenario[] = [
       },
     ],
   },
+];
+
+export const ROLEPLAY_SCENARIOS: RoleplayScenario[] = [
+  ...BASE_ROLEPLAY_SCENARIOS,
+  ...ROLEPLAY_BANK_PART1,
+  ...ROLEPLAY_BANK_PART2,
 ];

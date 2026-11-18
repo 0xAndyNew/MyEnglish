@@ -1,4 +1,6 @@
 import { CefrLevel } from '../types/learning';
+import { PRACTICAL_CATEGORIES } from './practicalCategories';
+import { SENTENCE_BANK_EXTRA } from './sentenceBankExtra';
 
 export interface SentenceExercise {
   id: string;
@@ -11,6 +13,7 @@ export interface SentenceExercise {
 
 export const SENTENCE_TOPICS = [
   'Tất cả',
+  ...PRACTICAL_CATEGORIES,
   'Từ loại & Mạo từ',
   'Câu đơn & Hiện tại đơn',
   'Hiện tại tiếp diễn',
@@ -21,7 +24,7 @@ export const SENTENCE_TOPICS = [
   'Giao tiếp & Công việc',
 ] as const;
 
-export const SENTENCE_EXERCISES: SentenceExercise[] = [
+const BASE_SENTENCE_EXERCISES: SentenceExercise[] = [
   // ======================== A1 (30 câu: se-1 .. se-30) ========================
   { id: 'se-1', level: 'A1', topic: 'Từ loại & Mạo từ', vi: 'Tôi có một quyển sách mới.', en: 'I have a new book', hint: 'Mạo từ "a" + Tính từ (new) + Danh từ (book).' },
   { id: 'se-2', level: 'A1', topic: 'Từ loại & Mạo từ', vi: 'Cô ấy ăn một quả táo mỗi sáng.', en: 'She eats an apple every morning', hint: 'Dùng "an" trước nguyên âm "apple"; động từ chia "eats".' },
@@ -190,4 +193,9 @@ export const SENTENCE_EXERCISES: SentenceExercise[] = [
   { id: 'se-158', level: 'B2', topic: 'Giao tiếp & Công việc', vi: 'Việc lắng nghe tích cực giúp giải quyết xung đột hiệu quả hơn.', en: 'Active listening helps resolve conflicts much more effectively', hint: 'resolve conflicts = giải quyết xung đột.' },
   { id: 'se-159', level: 'B2', topic: 'Giao tiếp & Công việc', vi: 'Chúng tôi mong muốn xây dựng mối quan hệ hợp tác bền vững.', en: 'We look forward to building a sustainable long term partnership', hint: 'look forward to + V-ing.' },
   { id: 'se-160', level: 'B2', topic: 'Giao tiếp & Công việc', vi: 'Rất mong nhận được phản hồi từ quý đối tác trong tuần này.', en: 'We look forward to hearing from your partner team this week', hint: 'hearing from = nhận tin từ.' },
+];
+
+export const SENTENCE_EXERCISES: SentenceExercise[] = [
+  ...BASE_SENTENCE_EXERCISES,
+  ...SENTENCE_BANK_EXTRA,
 ];

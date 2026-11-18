@@ -8,32 +8,49 @@ import {
   KeyRound,
   Loader2,
   Mic,
+  Music,
   PlusCircle,
   RefreshCw,
   RotateCcw,
   Shield,
   Sparkles,
   Trash2,
+  Upload,
   Users,
+  Video,
   X,
 } from 'lucide-react';
+import {
+  AUDIENCE_METADATA,
+  AudienceId,
+  createDefaultProfile,
+  getAudienceMeta,
+} from '../types/audience';
 import { CefrLevel } from '../types/learning';
+import { KIDS_UNITS } from '../data/kids/kidsCurriculumData';
+import { extractYouTubeVideoId } from '../utils/kidsSongPlayer';
 import { callGeminiText } from '../utils/geminiClient';
+import { blobToBase64 } from '../utils/audioRecorder';
 import { setServerSttProvider } from '../utils/speechEngine';
 import {
   adminCreateCustomLesson,
   adminDeleteCustomLesson,
+  adminDeleteKidsSongMedia,
   adminDeleteUser,
   adminResetUserPassword,
   adminResetUserProgress,
+  adminSaveKidsSongMedia,
   adminUpdateSttSettings,
+  adminUpdateUserProfile,
   adminWarmupSttModel,
   AdminUserSummary,
   CustomLessonKind,
   CustomLessonRecord,
   fetchAdminOverview,
   fetchCustomLessons,
+  fetchKidsSongsMedia,
   isDevAccount,
+  KidsSongMediaEntry,
   LocalSttStatus,
   saveAdminApiKey,
   SttProviderMode,
@@ -79,10 +96,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [savingStt, setSavingStt] = useState(false);
   const [warmingStt, setWarmingStt] = useState(false);
 
+  // Kids Song Media Manager (Vocal MP3 / Audio URL / YouTube Kids)
+  const [kidsSongsMedia, setKidsSongsMedia] = useState<Record<string, KidsSongMediaEntry>>({});
+  const [selectedSongUnitId, setSelectedSongUnitId] = useState<string>(KIDS_UNITS[0]?.id || 'colors');
+  const [songAudioUrlDraft, setSongAudioUrlDraft] = useState('');
+  const [songYoutubeDraft, setSongYoutubeDraft] = useState('');
+  const [songFileDraft, setSongFileDraft] = useState<{
+    base64: string;
+    fileName: string;
+    mimeType: string;
+    sizeKb: number;
+  } | null>(null);
+  const [savingSongMedia, setSavingSongMedia] = useState(false);
+
   // Tab 2: Custom Lessons Manager
   const [customLessons, setCustomLessons] = useState<CustomLessonRecord[]>([]);
   const [lessonKind, setLessonKind] = useState<CustomLessonKind>('sentence');
   const [lessonLevel, setLessonLevel] = useState<CefrLevel>('A2');
+  const [lessonAudiences, setLessonAudiences] = useState<AudienceId[]>([]);
   const [savingLesson, setSavingLesson] = useState(false);
   const [aiTopic, setAiTopic] = useState('');
   const [aiFilling, setAiFilling] = useState(false);
@@ -105,7 +136,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const loadAllAdminData = async () => {
     setLoadingList(true);
     try {
-      const [overview, lessons] = await Promise.all([fetchAdminOverview(), fetchCustomLessons()]);
+      const [overview, lessons, songsMedia] = await Promise.all([
+        fetchAdminOverview(),
+        fetchCustomLessons(),
+        fetchKidsSongsMedia(),
+      ]);
       setUsers(overview.users);
       setMaskedKey(overview.maskedApiKey);
       onApiKeyStatusChange(overview.hasApiKey);
@@ -118,6 +153,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setServerSttProvider(overview.sttProvider || 'auto');
       setCustomLessons(lessons);
       onCustomLessonsChange?.(lessons);
+      setKidsSongsMedia(songsMedia);
+      const currentSong = songsMedia[selectedSongUnitId];
+      setSongAudioUrlDraft(currentSong?.audioUrl || '');
+      setSongYoutubeDraft(currentSong?.youtubeId || '');
     } catch (err: any) {
       setStatusMsg(`❌ ${err?.message || 'Không tải được dữ liệu SQLite Admin.'}`);
     } finally {
@@ -126,12 +165,82 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   };
 
   useEffect(() => {
+    const entry = kidsSongsMedia[selectedSongUnitId];
+    setSongAudioUrlDraft(entry?.audioUrl || '');
+    setSongYoutubeDraft(entry?.youtubeId || '');
+    setSongFileDraft(null);
+  }, [selectedSongUnitId]);
+
+  useEffect(() => {
     if (isOpen) {
       loadAllAdminData();
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleSelectSongFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 8.5 * 1024 * 1024) {
+      setStatusMsg('❌ File nhạc bài hát quá lớn (vui lòng chọn file MP3/WAV <= 8.5 MB).');
+      return;
+    }
+    try {
+      const base64 = await blobToBase64(file);
+      setSongFileDraft({
+        base64,
+        fileName: file.name,
+        mimeType: file.type || 'audio/mpeg',
+        sizeKb: Math.max(1, Math.round(file.size / 1024)),
+      });
+      setStatusMsg(`🎵 Đã chọn file "${file.name}" (${Math.round(file.size / 1024)} KB). Bấm "Lưu bài hát này" để tải lên.`);
+    } catch {
+      setStatusMsg('❌ Không đọc được file âm thanh đã chọn.');
+    }
+  };
+
+  const handleSaveSongMedia = async () => {
+    setSavingSongMedia(true);
+    try {
+      const res = await adminSaveKidsSongMedia({
+        unitId: selectedSongUnitId,
+        audioBase64: songFileDraft?.base64,
+        fileName: songFileDraft?.fileName,
+        mimeType: songFileDraft?.mimeType,
+        audioUrl: songFileDraft ? undefined : songAudioUrlDraft.trim(),
+        youtubeId: songYoutubeDraft.trim(),
+      });
+      setKidsSongsMedia(res.media);
+      setSongAudioUrlDraft(res.entry?.audioUrl || '');
+      setSongYoutubeDraft(res.entry?.youtubeId || '');
+      setSongFileDraft(null);
+      setStatusMsg(`✅ Đã lưu nhạc bài hát thật cho chủ đề "${selectedSongUnitId}".`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Lưu nhạc bài hát thất bại.'}`);
+    } finally {
+      setSavingSongMedia(false);
+    }
+  };
+
+  const handleDeleteSongMedia = async (unitId: string) => {
+    setSavingSongMedia(true);
+    try {
+      const res = await adminDeleteKidsSongMedia(unitId);
+      setKidsSongsMedia(res.media);
+      if (unitId === selectedSongUnitId) {
+        setSongAudioUrlDraft('');
+        setSongYoutubeDraft('');
+        setSongFileDraft(null);
+      }
+      setStatusMsg(`ℹ️ Đã xóa nhạc ngoài của "${unitId}" (sử dụng lại nhạc đệm giai điệu gốc).`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Không thể xóa nhạc bài hát.'}`);
+    } finally {
+      setSavingSongMedia(false);
+    }
+  };
 
   const clearLessonForm = () => {
     setTitleInput('');
@@ -239,6 +348,23 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     } catch (err: any) {
       setStatusMsg(`❌ ${err?.message || 'Xóa tài khoản thất bại.'}`);
     }
+  };
+
+  const handleChangeUserAudience = async (email: string, nextAud: AudienceId) => {
+    try {
+      await adminUpdateUserProfile(email, createDefaultProfile(nextAud));
+      await loadAllAdminData();
+      const meta = getAudienceMeta(nextAud);
+      setStatusMsg(`✅ Đã cập nhật nhóm đối tượng của "${email}" thành: ${meta.emoji} ${meta.label}`);
+    } catch (err: any) {
+      setStatusMsg(`❌ ${err?.message || 'Đổi nhóm đối tượng thất bại.'}`);
+    }
+  };
+
+  const toggleLessonAudience = (aud: AudienceId) => {
+    setLessonAudiences((prev) =>
+      prev.includes(aud) ? prev.filter((a) => a !== aud) : [...prev, aud]
+    );
   };
 
   const handleAiAutoFillLesson = async () => {
@@ -397,8 +523,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         };
       }
 
-      await adminCreateCustomLesson(lessonKind, payload);
+      await adminCreateCustomLesson(lessonKind, payload, lessonAudiences);
       clearLessonForm();
+      setLessonAudiences([]);
       await loadAllAdminData();
       setStatusMsg('✅ Đã lưu bài học mới vào SQLite! Bài học đã hiển thị ngay ở giao diện học.');
     } catch (err: any) {
@@ -618,6 +745,170 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               </div>
             </div>
 
+            {/* Kids Songs Real Vocal / YouTube Media Manager */}
+            <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-900/50 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-extrabold uppercase text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <Music className="w-4 h-4" /> Nhạc Bài Hát Thiếu Nhi (12 Chủ Đề — Vocal MP3 / YouTube)
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/80 dark:bg-slate-900 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                  Đã gắn giọng hát: {Object.keys(kidsSongsMedia).length}/{KIDS_UNITS.length} bài
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Mặc định ứng dụng đã tích hợp sẵn 12 bản nhạc đệm giai điệu gốc (Twinkle Twinkle, Old MacDonald, ABC Song...). Admin có thể tải lên file MP3/WAV có ca sĩ hát hoặc gắn link YouTube Kids cho từng bài.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                {KIDS_UNITS.map((u) => {
+                  const media = kidsSongsMedia[u.id];
+                  const hasCustom = Boolean(media?.audioUrl || media?.youtubeId);
+                  const selected = selectedSongUnitId === u.id;
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => setSelectedSongUnitId(u.id)}
+                      className={`px-2.5 py-2 rounded-xl text-left text-xs font-bold border transition flex items-center justify-between gap-1 ${
+                        selected
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-amber-200/80 dark:border-slate-700 hover:bg-amber-100/60'
+                      }`}
+                    >
+                      <span className="truncate">
+                        {u.emoji} {u.title}
+                      </span>
+                      {hasCustom && (
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            selected ? 'bg-white' : 'bg-emerald-500'
+                          }`}
+                          title="Đã gắn nhạc giọng hát / YouTube"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {(() => {
+                const activeSongUnit = KIDS_UNITS.find((u) => u.id === selectedSongUnitId) || KIDS_UNITS[0];
+                const currentEntry = kidsSongsMedia[activeSongUnit.id];
+                const parsedYtId = extractYouTubeVideoId(songYoutubeDraft);
+                return (
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-slate-700 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          {activeSongUnit.emoji} {activeSongUnit.songChantTitle}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Giai điệu gốc: <strong>{activeSongUnit.originalTuneName || 'Nhạc thiếu nhi'}</strong>
+                        </div>
+                      </div>
+                      {currentEntry?.audioUrl || currentEntry?.youtubeId ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSongMedia(activeSongUnit.id)}
+                          disabled={savingSongMedia}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold inline-flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Xóa nhạc ngoài
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                          Đang dùng nhạc đệm Karaoke tích hợp sẵn
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                          1. Tải file MP3/WAV ca sĩ hát (tối đa 8.5 MB)
+                        </label>
+                        <label className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-dashed border-amber-400 bg-amber-50/50 dark:bg-amber-950/20 text-xs font-bold text-amber-800 dark:text-amber-200 cursor-pointer hover:bg-amber-100/60">
+                          <Upload className="w-4 h-4" />
+                          <span>
+                            {songFileDraft
+                              ? `${songFileDraft.fileName} (${songFileDraft.sizeKb} KB)`
+                              : currentEntry?.isUploaded
+                              ? 'Thay thế file MP3/WAV hiện có'
+                              : 'Chọn file MP3 / WAV / M4A từ máy'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/mp4,.mp3,.wav,.m4a,.ogg"
+                            onChange={handleSelectSongFile}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                          2. Hoặc nhập Link file Audio trực tiếp (.mp3/.wav)
+                        </label>
+                        <input
+                          type="text"
+                          value={songAudioUrlDraft}
+                          onChange={(e) => {
+                            setSongAudioUrlDraft(e.target.value);
+                            if (songFileDraft) setSongFileDraft(null);
+                          }}
+                          placeholder="https://.../song.mp3"
+                          className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                        <Video className="w-3.5 h-3.5 text-rose-500" /> 3. Link Video YouTube bài hát gốc (tùy chọn)
+                      </label>
+                      <input
+                        type="text"
+                        value={songYoutubeDraft}
+                        onChange={(e) => setSongYoutubeDraft(e.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=... hoặc YouTube Video ID"
+                        className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-xs outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      {songYoutubeDraft.trim() && (
+                        <div className="text-[11px] font-semibold">
+                          {parsedYtId ? (
+                            <span className="text-emerald-600">✓ Video ID hợp lệ: {parsedYtId}</span>
+                          ) : (
+                            <span className="text-rose-600">✗ Link/ID YouTube chưa đúng định dạng</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveSongMedia}
+                        disabled={savingSongMedia}
+                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {savingSongMedia ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Music className="w-3.5 h-3.5" />}
+                        Lưu bài hát này
+                      </button>
+                      {songFileDraft && (
+                        <button
+                          type="button"
+                          onClick={() => setSongFileDraft(null)}
+                          className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300"
+                        >
+                          Bỏ file đang chọn
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* SQLite Users Table */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -636,19 +927,29 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                 {users.map((acc) => {
                   const isAdmin = acc.role === 'admin' || isDevAccount(acc.email);
+                  const audMeta = acc.audience ? getAudienceMeta(acc.audience) : null;
                   return (
                     <div
                       key={acc.email}
                       className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3"
                     >
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <strong className="text-xs sm:text-sm text-slate-900 dark:text-white">
                             {acc.displayName}
                           </strong>
                           {isAdmin && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700">
                               ADMIN DEV
+                            </span>
+                          )}
+                          {audMeta ? (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${audMeta.badgeColor}`}>
+                              {audMeta.emoji} {audMeta.shortLabel}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                              Chưa chọn đối tượng
                             </span>
                           )}
                         </div>
@@ -658,6 +959,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5">
+                        <select
+                          value={acc.audience || ''}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleChangeUserAudience(acc.email, e.target.value as AudienceId);
+                            }
+                          }}
+                          className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-bold"
+                          title="Đổi nhóm đối tượng cho học viên"
+                        >
+                          <option value="" disabled>
+                            Đổi đối tượng...
+                          </option>
+                          {AUDIENCE_METADATA.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.emoji} {m.shortLabel}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           onClick={() => handleResetProgress(acc.email)}
                           className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold inline-flex items-center gap-1"
@@ -725,6 +1045,41 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Audience Target Filter for Custom Lesson */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] font-bold text-slate-500 mr-1">
+                  Hiển thị cho đối tượng:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setLessonAudiences([])}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    lessonAudiences.length === 0
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  Tất cả nhóm
+                </button>
+                {AUDIENCE_METADATA.map((aud) => {
+                  const active = lessonAudiences.includes(aud.id);
+                  return (
+                    <button
+                      type="button"
+                      key={aud.id}
+                      onClick={() => toggleLessonAudience(aud.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {aud.emoji} {aud.shortLabel}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Optional AI Quick Fill */}

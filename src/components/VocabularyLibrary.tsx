@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, Volume2, BookOpen, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CORE_VOCABULARY, CoreVocabItem, VOCAB_TOPICS } from '../data/coreVocabulary';
+import { LearnerProfile } from '../types/audience';
 import { AccentMode, CefrLevel, WordEntry } from '../types/learning';
+import { filterAndSortByProfile, getAllowedCategoriesForProfile } from '../utils/audienceFilter';
 import { analyzeWordFull } from '../utils/wordAnalyzer';
 import { speakText } from '../utils/speechEngine';
 import { WordAnatomyCard } from './WordAnatomyCard';
@@ -11,6 +13,7 @@ interface VocabularyLibraryProps {
   savedWords: WordEntry[];
   onSaveWord: (word: WordEntry) => void;
   onPronunciationScore: (score: number) => void;
+  learnerProfile?: LearnerProfile | null;
 }
 
 const LEVELS: ('ALL' | CefrLevel)[] = ['ALL', 'A1', 'A2', 'B1', 'B2', 'C1'];
@@ -21,6 +24,7 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
   savedWords,
   onSaveWord,
   onPronunciationScore,
+  learnerProfile,
 }) => {
   const [query, setQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState<'ALL' | CefrLevel>('ALL');
@@ -30,9 +34,46 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
   const [selectedWord, setSelectedWord] = useState<WordEntry | null>(null);
   const [loadingWord, setLoadingWord] = useState(false);
 
+  const profileVocab = useMemo(
+    () => filterAndSortByProfile(CORE_VOCABULARY, learnerProfile),
+    [learnerProfile]
+  );
+
+  const availableTopics = useMemo(() => {
+    if (!learnerProfile) return VOCAB_TOPICS;
+    const presentTopics = new Set(profileVocab.map((item) => item.topic));
+    const baseTopics = VOCAB_TOPICS.filter((t) => presentTopics.has(t));
+    // Giữ thứ tự hợp lý; với người đi làm/học sinh vẫn đảm bảo không bị lọc rỗng danh mục đơn giản
+    return learnerProfile.audience === 'kids'
+      ? baseTopics
+      : getAllowedCategoriesForProfile(baseTopics, learnerProfile);
+  }, [learnerProfile, profileVocab]);
+
+  const availableLevels = useMemo(
+    () =>
+      learnerProfile?.audience === 'kids'
+        ? (['ALL', 'A1'] as ('ALL' | CefrLevel)[])
+        : LEVELS,
+    [learnerProfile]
+  );
+
+  useEffect(() => {
+    if (topicFilter !== 'ALL' && !availableTopics.includes(topicFilter)) {
+      setTopicFilter('ALL');
+      setPage(1);
+    }
+  }, [availableTopics, topicFilter]);
+
+  useEffect(() => {
+    if (!availableLevels.includes(levelFilter)) {
+      setLevelFilter('ALL');
+      setPage(1);
+    }
+  }, [availableLevels, levelFilter]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return CORE_VOCABULARY.filter((item) => {
+    return profileVocab.filter((item) => {
       if (levelFilter !== 'ALL' && item.level !== levelFilter) return false;
       if (topicFilter !== 'ALL' && item.topic !== topicFilter) return false;
       if (q && !item.word.toLowerCase().includes(q) && !item.meaningVi.toLowerCase().includes(q)) {
@@ -40,7 +81,7 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
       }
       return true;
     });
-  }, [query, levelFilter, topicFilter]);
+  }, [profileVocab, query, levelFilter, topicFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -68,7 +109,10 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-indigo-600" />
-            <span>Kho Từ Vựng Cốt Lõi ({CORE_VOCABULARY.length} từ thông dụng A1 → C1)</span>
+            <span>
+              Kho Từ Vựng Cốt Lõi ({profileVocab.length} từ thông dụng{' '}
+              {learnerProfile?.audience === 'kids' ? 'A1' : 'A1 → C1'})
+            </span>
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Lọc theo cấp độ, chủ đề hoặc tìm nhanh — bấm vào bất kỳ từ nào để xem giải phẫu mặt chữ, IPA, mẹo nhớ và luyện nói!
@@ -100,8 +144,8 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
             }}
             className="px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
           >
-            <option value="ALL">Tất cả chủ đề ({VOCAB_TOPICS.length})</option>
-            {VOCAB_TOPICS.map((t) => (
+            <option value="ALL">Tất cả chủ đề ({availableTopics.length})</option>
+            {availableTopics.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -111,7 +155,7 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
-            {LEVELS.map((lv) => (
+            {availableLevels.map((lv) => (
               <button
                 key={lv}
                 onClick={() => {

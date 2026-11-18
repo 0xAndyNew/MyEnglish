@@ -17,7 +17,9 @@ import {
 import { CORE_VOCABULARY } from '../data/coreVocabulary';
 import { COMPREHENSIVE_GRAMMAR_EXAM, GRAMMAR_LESSONS } from '../data/grammarData';
 import { EXAMPLE_BREAKDOWNS } from '../data/grammarExamplesMeta';
+import { AudienceId, getAudienceMeta, LearnerProfile } from '../types/audience';
 import { AccentMode, CefrLevel } from '../types/learning';
+import { filterAndSortByProfile } from '../utils/audienceFilter';
 import { callGeminiText } from '../utils/geminiClient';
 import { speakText } from '../utils/speechEngine';
 
@@ -32,6 +34,7 @@ interface WritingGrammarLabProps {
   devUnlockAll?: boolean;
   savedCompletedGrammarIds?: string[];
   onCompleteGrammarId?: (id: string) => void;
+  learnerProfile?: LearnerProfile | null;
 }
 
 interface SentenceExercise {
@@ -122,44 +125,79 @@ interface WritingPrompt {
   task: string;
   template: string;
   usefulPhrases: string[];
+  audiences?: AudienceId[];
 }
 
 const WRITING_PROMPTS: WritingPrompt[] = [
   {
     id: 'wp-diary',
     level: 'A1',
-    title: '📔 Viết Nhật Ký Hàng Ngày (3–5 câu về hôm nay)',
-    task: 'Viết 3–5 câu đơn giản kể lại hôm nay bạn làm gì, cảm thấy thế nào và kế hoạch ngày mai.',
+    title: '📔 Viết Nhật Ký Một Ngày Ở Trường (3–5 câu)',
+    task: 'Viết 3–5 câu đơn giản kể lại hôm nay bạn học gì ở trường, cảm thấy thế nào và kế hoạch ngày mai.',
     template:
-      'Today is a good day. In the morning, I drank coffee and studied English for thirty minutes. At work, I finished my tasks on schedule. In the evening, I feel happy and relaxed.',
-    usefulPhrases: ['Today is...', 'In the morning, I...', 'I feel...', 'Tomorrow I will...'],
+      'Today was a busy school day. In the morning, I studied English and Math with my classmates. After school, I played badminton and did my homework. I feel happy and ready for tomorrow.',
+    usefulPhrases: ['Today was...', 'In the morning, I...', 'After school...', 'I feel...'],
+    audiences: ['teen'],
+  },
+  {
+    id: 'wp-school-hobby',
+    level: 'A2',
+    title: '🎒 Viết Đoạn Văn Về Sở Thích / Hoạt Động Ngoại Khóa',
+    task: 'Viết 4–6 câu giới thiệu sở thích hoặc câu lạc bộ bạn yêu thích nhất và lý do.',
+    template:
+      'My favorite hobby is reading science books and playing football with friends. I usually join the school club on Saturday mornings because it helps me stay healthy and make new friends.',
+    usefulPhrases: ['My favorite hobby is...', 'I usually...', 'because it helps me...', 'In the future...'],
+    audiences: ['teen'],
+  },
+  {
+    id: 'wp-academic-opinion',
+    level: 'B1',
+    title: '🎓 Viết Đoạn Văn Học Thuật Ngắn (Topic Sentence + Example)',
+    task: 'Viết đoạn văn 5–7 câu trình bày một lợi ích của việc học nhóm hoặc tự nghiên cứu ở bậc Đại học.',
+    template:
+      'Collaborative learning plays an essential role in university education. Firstly, discussing complex theories with peers helps students deepen their understanding. For instance, preparing a group presentation encourages critical thinking and clear communication.',
+    usefulPhrases: ['plays an essential role...', 'Firstly,...', 'For instance,...', 'In conclusion,...'],
+    audiences: ['university', 'exam'],
+  },
+  {
+    id: 'wp-exam-argument',
+    level: 'B2',
+    title: '🏆 Luyện Đoạn Lập Luận Chuẩn Thi Chứng Chỉ',
+    task: 'Viết đoạn thân bài 6–8 câu nêu quan điểm có dẫn chứng về việc học trực tuyến (Online Learning).',
+    template:
+      'Although online learning requires strong self-discipline, its flexibility brings substantial benefits to modern learners. Students can revisit recorded lectures at their own pace, which significantly improves comprehension.',
+    usefulPhrases: ['Although...', 'substantial benefits', 'at their own pace', 'Consequently,...'],
+    audiences: ['exam', 'university'],
   },
   {
     id: 'wp-intro',
     level: 'A1',
-    title: 'Viết đoạn tự giới thiệu bản thân (3–5 câu)',
-    task: 'Hãy viết 3–5 câu giới thiệu tên, công việc/sở thích và lý do bạn học tiếng Anh.',
+    title: '💼 Tự Giới Thiệu Bản Thân Nơi Công Sở (3–5 câu)',
+    task: 'Hãy viết 3–5 câu giới thiệu tên, vị trí công việc và lý do bạn học tiếng Anh.',
     template:
-      'Hello! My name is [Tên]. I am from Vietnam and I work as a [Nghề nghiệp]. In my free time, I like [Sở thích]. I am learning English because [Lý do].',
+      'Hello! My name is [Tên]. I am from Vietnam and I work as a [Nghề nghiệp]. In my free time, I like [Sở thích]. I am learning English to communicate better at work.',
     usefulPhrases: ['My name is...', 'I work as a...', 'In my free time...', 'I want to improve...'],
+    audiences: ['worker'],
   },
   {
     id: 'wp-dialogue',
     level: 'A2',
-    title: 'Viết đoạn hội thoại A-B tại Quán Cà Phê / Cửa Hàng',
+    title: '☕ Viết Đoạn Hội Thoại Tại Quán Cà Phê / Gặp Khách Hàng',
     task: 'Hãy tự viết một đoạn hội thoại ngắn 4 lượt giữa Nhân viên (A) và Bạn (B) khi gọi đồ uống hoặc hỏi giá.',
     template:
       'A: Good morning! How can I help you today?\nB: Hi! Can I have a cup of iced coffee, please?\nA: Sure! Anything else?\nB: No, thank you. How much is it?',
     usefulPhrases: ['How can I help you?', 'Can I have... please?', 'How much is it?', 'Thank you very much!'],
+    audiences: ['worker'],
   },
   {
     id: 'wp-email',
     level: 'B1',
-    title: 'Viết Email / Tin nhắn công việc ngắn',
+    title: '✉️ Viết Email / Tin Nhắn Công Việc Ngắn',
     task: 'Viết một tin nhắn/email ngắn gửi đồng nghiệp để hẹn lịch họp hoặc báo cáo tiến độ dự án.',
     template:
       'Hi [Tên],\nI hope you are doing well. I am writing to share an update about our project. We have finished the first stage on schedule. Could we have a short meeting tomorrow morning to discuss the next steps?\nBest regards,',
     usefulPhrases: ['I am writing to...', 'on schedule', 'Could we have a meeting...', 'Best regards,'],
+    audiences: ['worker'],
   },
 ];
 
@@ -254,8 +292,17 @@ export const WritingGrammarLab: React.FC<WritingGrammarLabProps> = ({
   devUnlockAll = false,
   savedCompletedGrammarIds,
   onCompleteGrammarId,
+  learnerProfile,
 }) => {
   const [subTab, setSubTab] = useState<'grammar' | 'studio'>('grammar');
+
+  const visiblePrompts = useMemo(() => {
+    if (!learnerProfile) return WRITING_PROMPTS;
+    const matched = WRITING_PROMPTS.filter(
+      (p) => !p.audiences || p.audiences.includes(learnerProfile.audience)
+    );
+    return matched.length > 0 ? matched : WRITING_PROMPTS;
+  }, [learnerProfile]);
 
   // Step-by-step Grammar Lessons state
   const [selectedGrammarIdx, setSelectedGrammarIdx] = useState<number>(0); // 0..12 = lessons, 13 = Final Exam
@@ -272,10 +319,11 @@ export const WritingGrammarLab: React.FC<WritingGrammarLabProps> = ({
   const [drillChecked, setDrillChecked] = useState<'none' | 'correct' | 'wrong'>('none');
 
   const posBuckets = useMemo(() => {
-    const nouns = CORE_VOCABULARY.filter((w) => w.pos === 'n');
-    const verbs = CORE_VOCABULARY.filter((w) => w.pos === 'v');
-    const adjs = CORE_VOCABULARY.filter((w) => w.pos === 'adj');
-    const coreAdvs = CORE_VOCABULARY.filter((w) => w.pos === 'adv');
+    const profileVocab = filterAndSortByProfile(CORE_VOCABULARY, learnerProfile);
+    const nouns = profileVocab.filter((w) => w.pos === 'n');
+    const verbs = profileVocab.filter((w) => w.pos === 'v');
+    const adjs = profileVocab.filter((w) => w.pos === 'adj');
+    const coreAdvs = profileVocab.filter((w) => w.pos === 'adv');
     const extraAdvs = [
       { word: 'quickly', pos: 'adv', level: 'A1' as CefrLevel, topic: 'Mô tả', meaningVi: 'một cách nhanh chóng' },
       { word: 'carefully', pos: 'adv', level: 'A2' as CefrLevel, topic: 'Mô tả', meaningVi: 'một cách cẩn thận' },
@@ -383,7 +431,7 @@ export const WritingGrammarLab: React.FC<WritingGrammarLabProps> = ({
     }
   };
 
-  const currentPrompt = WRITING_PROMPTS[promptIdx];
+  const currentPrompt = visiblePrompts[promptIdx % Math.max(1, visiblePrompts.length)] || WRITING_PROMPTS[0];
 
   const handleCheckWriting = () => {
     const res = analyzeWritingOffline(essay);
@@ -420,10 +468,19 @@ Bài viết của học viên:
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <PenTool className="w-6 h-6 text-indigo-600" />
-            <span>Ngữ Pháp Từng Bước & Viết Văn</span>
+            <span>
+              Ngữ Pháp Từng Bước &amp; Viết Văn
+              {learnerProfile ? ` (${getAudienceMeta(learnerProfile.audience).shortLabel})` : ''}
+            </span>
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Học từng bài ngữ pháp + làm Quiz ngay cho từng bài, sau đó vượt qua <strong>Bài Thi Tổng Hợp ≥ 80%</strong> để sang <strong>Lab Ghép Câu</strong>.
+            {learnerProfile?.audience === 'teen'
+              ? 'Hệ thống 14 chuyên đề ngữ pháp trọng tâm THCS/THPT & luyện viết đoạn văn học đường.'
+              : learnerProfile?.audience === 'university'
+              ? 'Ngữ pháp học thuật (câu phức, mệnh đề quan hệ, bị động) phục vụ viết Essay & nghiên cứu.'
+              : learnerProfile?.audience === 'exam'
+              ? 'Ôn chắc nền tảng ngữ pháp, tránh bẫy chia thì & cấu trúc câu ăn điểm thi chứng chỉ.'
+              : 'Học từng bài ngữ pháp + làm Quiz ngay cho từng bài, phục vụ giao tiếp & viết Email công việc.'}
           </p>
         </div>
 
@@ -1090,7 +1147,7 @@ Bài viết của học viên:
           <div className="lg:col-span-5 space-y-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2.5">
               <div className="text-xs font-bold uppercase text-slate-500">Chọn đề bài luyện viết</div>
-              {WRITING_PROMPTS.map((p, i) => (
+              {visiblePrompts.map((p, i) => (
                 <button
                   key={p.id}
                   onClick={() => {
@@ -1099,7 +1156,7 @@ Bài viết của học viên:
                     setAiReview(null);
                   }}
                   className={`w-full text-left p-3 rounded-xl border transition ${
-                    promptIdx === i
+                    (promptIdx % visiblePrompts.length) === i
                       ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30'
                       : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}

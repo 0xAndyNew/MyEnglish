@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Volume2, Turtle, Mic, Square, Sparkles, CheckCircle2, Headphones } from 'lucide-react';
+import { Volume2, Turtle, Mic, Square, Sparkles, CheckCircle2, Headphones, RotateCw } from 'lucide-react';
 import { AccentMode } from '../types/learning';
 import {
   isSpeechRecognitionSupported,
@@ -384,12 +384,34 @@ function renderHighlightedWord(word: string, letter: string, isVowel: boolean) {
   );
 }
 
-interface AlphabetFoundationProps {
+const KIDS_WORD_EMOJI: Record<string, string> = {
+  apple: '🍎', make: '🛠️', car: '🚗', water: '💧', book: '📖', baby: '👶', table: '🪑', job: '💼',
+  cat: '🐱', city: '🏙️', coffee: '☕', nice: '✨', day: '☀️', door: '🚪', friend: '🤝', read: '📚',
+  egg: '🥚', English: '🇬🇧', see: '👀', food: '🍔', family: '👨‍👩‍👧‍👦', leaf: '🍃', good: '👍', go: '🏃',
+  orange: '🍊', bag: '🎒', hello: '👋', house: '🏠', happy: '😊', hour: '⏰', ice: '🧊', sit: '🪑',
+  time: '⏱️', fish: '🐟', juice: '🧃', jacket: '🧥', enjoy: '🎉', key: '🔑', kitchen: '🍳', know: '💡',
+  love: '❤️', learn: '🎓', school: '🏫', man: '👨', morning: '🌅', music: '🎵', name: '🏷️', new: '✨',
+  sunny: '☀️', pen: '🖊️', open: '📂', hot: '🔥', home: '🏡', paper: '📄', cup: '🥤', quick: '⚡',
+  question: '❓', quiet: '🤫', queen: '👑', red: '🔴', rain: '🌧️', sun: '☀️', bus: '🚌', tea: '🍵',
+  use: '🛠️', blue: '🔵', umbrella: '☂️', very: '🌟', visit: '✈️', voice: '🗣️', work: '💼', window: '🪟',
+  write: '✏️', box: '📦', taxi: '🚕', six: '6️⃣', exam: '📝', yes: '👍', year: '📅', fly: '🦋',
+  zoo: '🦁', zero: '0️⃣', amazing: '🤩', size: '📏',
+};
+
+const KIDS_PRAISES = [
+  '🎉 Tuyệt vời quá bé ơi! Bé chọn đúng chữ',
+  '🌟 Siêu sao nhí xuất sắc! Chuẩn chữ',
+  '🦁 Bé giỏi lắm luôn! Đúng ngay chữ',
+  '🎈 Hoan hô bé yêu! Tìm trúng chữ',
+];
+
+export interface AlphabetFoundationProps {
   accent: AccentMode;
   isStepCompleted?: boolean;
   onCompleteStep1A?: () => void;
   savedPassedLetters?: string[];
   onPassLetter?: (letter: string) => void;
+  kidsMode?: boolean;
 }
 
 export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
@@ -398,8 +420,10 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
   onCompleteStep1A,
   savedPassedLetters,
   onPassLetter,
+  kidsMode = false,
 }) => {
   const [selected, setSelected] = useState<AlphabetItem>(ALPHABET_DATA[0]);
+  const [kidsCardFlipped, setKidsCardFlipped] = useState(false);
   const [listeningWord, setListeningWord] = useState<string | null>(null);
   const [micInterim, setMicInterim] = useState('');
   const [micError, setMicError] = useState<string | null>(null);
@@ -409,6 +433,7 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
     heard: string;
     audioUrl?: string;
   } | null>(null);
+  const [kidsPraise, setKidsPraise] = useState<{ ok: boolean; text: string } | null>(null);
   const stopMicRef = useRef<((abort?: boolean) => void) | null>(null);
 
   useEffect(() => {
@@ -458,6 +483,7 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
     setMicInterim('');
     setMicError(null);
     setSelected(item);
+    setKidsCardFlipped(false);
     setMicResult(null);
     speakText(item.letter.toLowerCase(), accent, 0.85);
   };
@@ -501,19 +527,47 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Kid-Friendly Bright Banner */}
+      {kidsMode && (
+        <div className="lg:col-span-12 rounded-3xl bg-gradient-to-r from-amber-400 via-orange-400 to-pink-500 p-5 sm:p-6 text-white shadow-lg flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight">
+              🎨 Vườn Chữ Cái Vui Nhộn Cho Bé
+            </h3>
+            <p className="text-xs sm:text-sm font-semibold text-white/95">
+              Chạm vào từng ô chữ đầy màu sắc để nghe đọc to rõ, xem từ ví dụ dễ thương và gom đủ 26 ngôi sao nhé! 🌈
+            </p>
+          </div>
+          <div className="px-4 py-2 rounded-2xl bg-white text-orange-600 font-black text-xs sm:text-sm shadow-sm">
+            ⭐ Đã gom: {passedLetters.length}/26 chữ cái
+          </div>
+        </div>
+      )}
+
       {/* Step 1A Unlock Banner */}
       {onCompleteStep1A && (
         <div className="lg:col-span-12 p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs sm:text-sm text-indigo-900 dark:text-indigo-200">
-            <strong>🎯 Nhiệm vụ mở khóa Bước 1B (44 Âm IPA):</strong>{' '}
-            Hoàn thành bài kiểm tra Nghe âm → Chọn đúng Chữ cái cho cả 26 chữ ({isStepCompleted ? 26 : passedLetters.length}/26 chữ cái).
+            {kidsMode ? (
+              <>
+                <strong>🌟 Nhiệm vụ mở khóa K2 (Từ Vựng Qua Tranh):</strong>{' '}
+                Bé hãy chơi Nghe âm → Chạm đúng Chữ cái cho cả 26 chữ ({isStepCompleted ? 26 : passedLetters.length}/26 ngôi sao).
+              </>
+            ) : (
+              <>
+                <strong>🎯 Nhiệm vụ mở khóa Bước 1B (44 Âm IPA):</strong>{' '}
+                Hoàn thành bài kiểm tra Nghe âm → Chọn đúng Chữ cái cho cả 26 chữ ({isStepCompleted ? 26 : passedLetters.length}/26 chữ cái).
+              </>
+            )}
           </div>
           {canUnlockNext ? (
             <button
               onClick={onCompleteStep1A}
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-sm transition"
             >
-              🎉 Hoàn thành 26/26 chữ cái! Mở khóa Bước 1B →
+              {kidsMode
+                ? '🎉 Giỏi quá! Mở khóa K2: Từ Vựng Qua Tranh →'
+                : '🎉 Hoàn thành 26/26 chữ cái! Mở khóa Bước 1B →'}
             </button>
           ) : (
             <span className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 text-xs font-bold text-slate-500 border border-slate-200 dark:border-slate-700">
@@ -524,22 +578,31 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
       )}
 
       {/* Left: 26 Letters Grid */}
-      <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3">
+      <div
+        className={`lg:col-span-7 bg-white dark:bg-slate-900 border ${
+          kidsMode
+            ? 'rounded-3xl border-2 border-amber-200 dark:border-slate-800 p-5 space-y-4'
+            : 'rounded-2xl border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3'
+        }`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-            Bảng 26 Chữ Cái Tiếng Anh (Bấm từng chữ để nghe)
+          <h3 className={`${kidsMode ? 'text-lg font-black' : 'text-base font-extrabold'} text-slate-900 dark:text-white`}>
+            {kidsMode
+              ? '🌈 Bảng 26 Chữ Cái Kỳ Diệu (Chạm để nghe)'
+              : 'Bảng 26 Chữ Cái Tiếng Anh (Bấm từng chữ để nghe)'}
           </h3>
           <div className="flex items-center gap-3 text-[11px] font-semibold">
             <span className="inline-flex items-center gap-1 text-orange-600">
-              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> 5 Nguyên âm (A, E, I, O, U)
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />{' '}
+              {kidsMode ? '5 Chữ Cam (A, E, I, O, U)' : '5 Nguyên âm (A, E, I, O, U)'}
             </span>
             <span className="inline-flex items-center gap-1 text-sky-600">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> 21 Phụ âm
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> {kidsMode ? '21 Chữ Xanh' : '21 Phụ âm'}
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-5 sm:grid-cols-7 gap-2">
+        <div className={kidsMode ? 'grid grid-cols-4 sm:grid-cols-6 gap-2.5' : 'grid grid-cols-5 sm:grid-cols-7 gap-2'}>
           {ALPHABET_DATA.map((item) => {
             const active = item.letter === selected.letter;
             const passed = passedLetters.includes(item.letter);
@@ -547,9 +610,13 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
               <button
                 key={item.letter}
                 onClick={() => handleSelect(item)}
-                className={`relative p-2.5 rounded-xl border flex flex-col items-center justify-center transition ${
+                className={`relative flex flex-col items-center justify-center transition ${
+                  kidsMode ? 'p-3.5 sm:p-4 rounded-2xl border-2' : 'p-2.5 rounded-xl border'
+                } ${
                   active
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.04]'
+                    ? kidsMode
+                      ? 'bg-gradient-to-br from-pink-500 to-orange-500 text-white border-transparent shadow-lg scale-[1.06]'
+                      : 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.04]'
                     : item.isVowel
                     ? 'bg-orange-50 hover:bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-900/50'
                     : 'bg-sky-50/70 hover:bg-sky-100 text-slate-800 border-sky-200/80 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
@@ -557,123 +624,291 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
               >
                 {passed && (
                   <CheckCircle2
-                    className={`w-3.5 h-3.5 absolute top-1 right-1 ${active ? 'text-emerald-300' : 'text-emerald-500'}`}
+                    className={`w-3.5 h-3.5 absolute top-1.5 right-1.5 ${active ? 'text-emerald-200' : 'text-emerald-500'}`}
                   />
                 )}
-                <span className="text-xl font-black leading-none">{item.letter}</span>
-                <span className={`text-[10px] font-mono mt-1 ${active ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  {item.ipa}
+                <span className={kidsMode ? 'text-2xl sm:text-3xl font-black leading-none' : 'text-xl font-black leading-none'}>
+                  {kidsMode ? `${item.letter}${item.letter.toLowerCase()}` : item.letter}
                 </span>
+                {!kidsMode && (
+                  <span className={`text-[10px] font-mono mt-1 ${active ? 'text-indigo-100' : 'text-slate-500'}`}>
+                    {item.ipa}
+                  </span>
+                )}
+                {kidsMode && (
+                  <span className={`text-[11px] font-bold mt-1 ${active ? 'text-white/95' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {item.vietHint}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Right: Selected Letter Detail */}
-      <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      {/* Right: Selected Letter Detail (3D Flippable Card in Kids Mode) */}
+      <div className="lg:col-span-5 space-y-3">
+        {kidsMode ? (
+          <div
+            onClick={() => setKidsCardFlipped((v) => !v)}
+            className="perspective-1200 cursor-pointer select-none"
+          >
             <div
-              className={`w-16 h-16 rounded-2xl flex items-center justify-center text-4xl font-black text-white shadow-md ${
-                selected.isVowel ? 'bg-orange-500' : 'bg-indigo-600'
+              className={`relative w-full min-h-[430px] transition-transform duration-500 transform-style-3d ${
+                kidsCardFlipped ? 'rotate-y-180' : ''
               }`}
             >
-              {selected.letter}
-            </div>
-            <div>
-              <div className="text-xs font-bold uppercase text-slate-400">
-                {selected.isVowel ? 'Nguyên âm (Vowel)' : 'Phụ âm (Consonant)'}
-              </div>
-              <div className="font-mono text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                {selected.ipa}
-              </div>
-              <div className="text-xs text-slate-600 dark:text-slate-300">
-                Đọc tên chữ cái: <strong>"{selected.vietHint}"</strong>
-              </div>
-            </div>
-          </div>
+              {/* Front of 3D Alphabet Card */}
+              <div className={`absolute inset-0 backface-hidden rounded-3xl border-4 border-white dark:border-slate-700 bg-gradient-to-br from-amber-50 via-white to-sky-50 dark:from-slate-900 dark:to-slate-800 kids-card-shadow p-6 flex flex-col justify-between text-center ${kidsCardFlipped ? 'pointer-events-none' : ''}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-black ${
+                      selected.isVowel
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-sky-100 text-sky-700'
+                    }`}
+                  >
+                    {selected.isVowel ? '🌟 Chữ Nguyên Âm' : '🎈 Chữ Phụ Âm'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
+                    <RotateCw className="w-3 h-3 text-pink-500" /> Chạm lật 3D
+                  </span>
+                </div>
 
-          <button
-            onClick={() => speakText(selected.letter.toLowerCase(), accent, 0.8)}
-            className="p-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-            title="Nghe tên chữ cái"
-          >
-            <Volume2 className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-300 mb-1">
-            <Sparkles className="w-3.5 h-3.5" /> Cách đọc khi ghép vào từ
-          </div>
-          <p className="text-sm text-slate-700 dark:text-slate-300">{selected.inWordSound}</p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs text-slate-400 uppercase font-bold">
-              Từ ví dụ minh họa ({selected.examples.length} từ)
-            </span>
-            <span className="text-[11px] font-medium text-slate-400">Nghe • Chậm • Đọc thử</span>
-          </div>
-
-          <div className="space-y-2">
-            {selected.examples.map((ex) => {
-              const isMicActive = listeningWord === ex.word;
-              return (
-                <div
-                  key={ex.word}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="text-base font-extrabold text-slate-900 dark:text-white">
-                        {renderHighlightedWord(ex.word, selected.letter, selected.isVowel)}
-                      </span>
-                      <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400">{ex.ipa}</span>
-                      {ex.note && (
-                        <span className="px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 text-[10px] font-bold">
-                          {ex.note}
+                <div className="my-auto space-y-4 py-2">
+                  <div className="flex items-center justify-center gap-4">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speakText(selected.letter.toLowerCase(), accent, 0.8);
+                      }}
+                      className={`w-28 h-28 rounded-3xl flex items-center justify-center font-black text-5xl text-white shadow-xl border-4 border-white hover:scale-105 active:scale-95 transition ${
+                        selected.isVowel
+                          ? 'bg-gradient-to-br from-orange-400 to-rose-500'
+                          : 'bg-gradient-to-br from-sky-400 to-indigo-600'
+                      }`}
+                      title="Bấm nghe tên chữ cái"
+                    >
+                      {selected.letter}
+                      {selected.letter.toLowerCase()}
+                    </button>
+                    {selected.examples[0] && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          speakText(selected.examples[0].word, accent, 0.85);
+                        }}
+                        className="w-24 h-28 rounded-3xl bg-white dark:bg-slate-800 border-2 border-amber-200 dark:border-slate-700 shadow-lg flex flex-col items-center justify-center gap-1 hover:scale-105 transition"
+                        title="Nghe từ minh họa"
+                      >
+                        <span className="text-4xl">
+                          {KIDS_WORD_EMOJI[selected.examples[0].word] || '🌟'}
                         </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{ex.meaning}</div>
+                        <span className="text-xs font-black text-slate-800 dark:text-white">
+                          {selected.examples[0].word}
+                        </span>
+                      </button>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => speakText(ex.word, accent, 1.0)}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400"
-                      title={`Nghe từ ${ex.word}`}
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => speakText(ex.word, accent, 0.55)}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400"
-                      title={`Nghe chậm ${ex.word}`}
-                    >
-                      <Turtle className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMic(ex.word)}
-                      className={`p-2 rounded-lg text-white transition ${
-                        isMicActive ? 'bg-rose-600 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
-                      }`}
-                      title={isMicActive ? 'Dừng & chấm điểm' : `Đọc thử từ ${ex.word}`}
-                    >
-                      {isMicActive ? <Square className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                    </button>
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 text-amber-900 font-black text-sm shadow-sm">
+                    🗣️ Bé đọc là: “{selected.vietHint}”
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex items-center justify-between gap-2 pt-3 border-t border-amber-200/60">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speakText(selected.letter.toLowerCase(), accent, 0.8);
+                    }}
+                    className="px-4 py-2 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-900 font-black text-xs sm:text-sm inline-flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Volume2 className="w-4 h-4" /> Nghe chữ {selected.letter}
+                  </button>
+                  <span className="text-xs font-extrabold text-pink-600 dark:text-pink-400">
+                    👆 Chạm thẻ để xem {selected.examples.length} từ mẫu!
+                  </span>
+                </div>
+              </div>
+
+              {/* Back of 3D Alphabet Card */}
+              <div className={`absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 border-white dark:border-slate-700 bg-white dark:bg-slate-900 kids-card-shadow p-5 flex flex-col justify-between gap-3 ${!kidsCardFlipped ? 'pointer-events-none' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase text-pink-600 dark:text-pink-400">
+                    🌟 {selected.examples.length} Từ vựng có chữ {selected.letter}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-extrabold text-slate-600 dark:text-slate-300">
+                    <RotateCw className="w-3 h-3" /> Lật lại
+                  </span>
+                </div>
+
+                <div className="space-y-2 my-auto">
+                  {selected.examples.map((ex) => {
+                    const isMicActive = listeningWord === ex.word;
+                    const wordEmoji = KIDS_WORD_EMOJI[ex.word] || '🌟';
+                    return (
+                      <div
+                        key={ex.word}
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0 flex items-center gap-2.5">
+                          <span className="text-2xl shrink-0">{wordEmoji}</span>
+                          <div className="min-w-0">
+                            <div className="text-base font-black text-slate-900 dark:text-white">
+                              {renderHighlightedWord(ex.word, selected.letter, selected.isVowel)}
+                            </div>
+                            <div className="text-xs font-semibold text-slate-500 dark:text-slate-300">
+                              {ex.meaning}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => speakText(ex.word, accent, 1.0)}
+                            className="p-2 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400"
+                            title={`Nghe từ ${ex.word}`}
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => speakText(ex.word, accent, 0.55)}
+                            className="p-2 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400"
+                            title={`Nghe chậm ${ex.word}`}
+                          >
+                            <Turtle className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMic(ex.word)}
+                            className={`p-2 rounded-xl text-white transition ${
+                              isMicActive ? 'bg-rose-600 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
+                            }`}
+                            title={isMicActive ? 'Dừng & chấm điểm' : `Đọc thử từ ${ex.word}`}
+                          >
+                            {isMicActive ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 border rounded-2xl border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`flex items-center justify-center font-black text-white shadow-md w-16 h-16 rounded-2xl text-4xl ${
+                    selected.isVowel ? 'bg-orange-500' : 'bg-indigo-600'
+                  }`}
+                >
+                  {selected.letter}
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase text-slate-400">
+                    {selected.isVowel ? 'Nguyên âm (Vowel)' : 'Phụ âm (Consonant)'}
+                  </div>
+                  <div className="font-mono text-xl font-bold text-indigo-600 dark:text-indigo-400">
+                    {selected.ipa}
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">
+                    Đọc tên chữ cái: <strong>"{selected.vietHint}"</strong>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => speakText(selected.letter.toLowerCase(), accent, 0.8)}
+                className="p-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                title="Nghe tên chữ cái"
+              >
+                <Volume2 className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-sky-700 dark:text-sky-300 mb-1">
+                <Sparkles className="w-3.5 h-3.5" /> Cách đọc khi ghép vào từ
+              </div>
+              <p className="text-sm text-slate-700 dark:text-slate-300">{selected.inWordSound}</p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs text-slate-400 uppercase font-bold">
+                  Từ ví dụ minh họa ({selected.examples.length} từ)
+                </span>
+                <span className="text-[11px] font-medium text-slate-400">Nghe • Chậm • Đọc thử</span>
+              </div>
+
+              <div className="space-y-2">
+                {selected.examples.map((ex) => {
+                  const isMicActive = listeningWord === ex.word;
+                  return (
+                    <div
+                      key={ex.word}
+                      className="px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <span className="text-base font-extrabold text-slate-900 dark:text-white">
+                            {renderHighlightedWord(ex.word, selected.letter, selected.isVowel)}
+                          </span>
+                          <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400">{ex.ipa}</span>
+                          {ex.note && (
+                            <span className="px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 text-[10px] font-bold">
+                              {ex.note}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{ex.meaning}</div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => speakText(ex.word, accent, 1.0)}
+                          className="p-2 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400"
+                          title={`Nghe từ ${ex.word}`}
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => speakText(ex.word, accent, 0.55)}
+                          className="p-2 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-indigo-400"
+                          title={`Nghe chậm ${ex.word}`}
+                        >
+                          <Turtle className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMic(ex.word)}
+                          className={`p-2 rounded-lg text-white transition ${
+                            isMicActive ? 'bg-rose-600 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
+                          title={isMicActive ? 'Dừng & chấm điểm' : `Đọc thử từ ${ex.word}`}
+                        >
+                          {isMicActive ? <Square className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {listeningWord && micInterim && (
           <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
@@ -688,6 +923,7 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
         {micResult && (
           <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-xs flex flex-wrap items-center justify-between gap-2">
             <span>
+              {kidsMode && micResult.score >= 70 ? '🌟 Giỏi quá bé ơi! ' : ''}
               Điểm đọc từ <strong>{micResult.word}</strong>: <strong>{micResult.score}%</strong> (Nghe: "{micResult.heard}")
             </span>
             {micResult.audioUrl && (
@@ -704,37 +940,68 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
       </div>
 
       {/* Practice: Listen & Pick Letter Quiz (Must pass all 26 letters) */}
-      <div className="lg:col-span-12 bg-white dark:bg-slate-900 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 p-5 space-y-4">
+      <div
+        className={`lg:col-span-12 bg-white dark:bg-slate-900 border ${
+          kidsMode
+            ? 'rounded-3xl border-2 border-emerald-300 dark:border-emerald-800 p-5 sm:p-6 space-y-4'
+            : 'rounded-2xl border-emerald-200 dark:border-emerald-900/60 p-5 space-y-4'
+        }`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm sm:text-base font-extrabold text-emerald-700 dark:text-emerald-300">
             <Headphones className="w-5 h-5" />
-            <span>Thực hành: Nghe âm → Chọn đúng Chữ cái (Hoàn thành đủ 26/26 chữ cái)</span>
+            <span>
+              {kidsMode
+                ? '🎮 Trò Chơi Săn Chữ Cái: Nghe & Chạm Đúng Chữ Nhé!'
+                : 'Thực hành: Nghe âm → Chọn đúng Chữ cái (Hoàn thành đủ 26/26 chữ cái)'}
+            </span>
           </div>
           <span className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold">
-            Đã thuộc: {passedLetters.length}/26 chữ cái
+            {kidsMode ? `⭐ Đã gom: ${passedLetters.length}/26 ngôi sao` : `Đã thuộc: ${passedLetters.length}/26 chữ cái`}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => speakText(quizTarget.letter.toLowerCase(), accent, 0.8)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-sm"
+            className={`inline-flex items-center gap-1.5 text-white font-bold shadow-sm ${
+              kidsMode
+                ? 'px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-sm sm:text-base font-black'
+                : 'px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm'
+            }`}
           >
-            <Volume2 className="w-4 h-4" /> Nghe chữ cái cần tìm
+            <Volume2 className="w-4 h-4" /> {kidsMode ? 'Nghe Chữ Bí Mật 🔊' : 'Nghe chữ cái cần tìm'}
           </button>
 
           {quizChoice && (
             <button
               onClick={() => {
                 setQuizChoice(null);
+                setKidsPraise(null);
                 setQuizSeed((s) => s + 1);
               }}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
+              className={`${
+                kidsMode
+                  ? 'px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black'
+                  : 'px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold'
+              }`}
             >
-              Chữ tiếp theo →
+              {kidsMode ? 'Chữ Tiếp Theo 🚀' : 'Chữ tiếp theo →'}
             </button>
           )}
         </div>
+
+        {kidsMode && kidsPraise && (
+          <div
+            className={`p-3.5 rounded-2xl border-2 text-sm sm:text-base font-black ${
+              kidsPraise.ok
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 text-emerald-800 dark:text-emerald-200'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-800 dark:text-amber-200'
+            }`}
+          >
+            {kidsPraise.text}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quizOptions.map((opt) => {
@@ -757,14 +1024,38 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
                       : [...passedLetters, opt.letter];
                     setLocalPassedLetters(nextPassed);
                     onPassLetter?.(opt.letter);
-                    if (nextPassed.length === ALPHABET_DATA.length) {
+                    if (kidsMode) {
+                      if (nextPassed.length === ALPHABET_DATA.length) {
+                        setKidsPraise({
+                          ok: true,
+                          text: '👑 Hoan hô! Bé đã chinh phục trọn vẹn 26/26 ngôi sao chữ cái rồi!!',
+                        });
+                        confetti({ particleCount: 80, spread: 75 });
+                      } else {
+                        const praisePrefix = KIDS_PRAISES[quizSeed % KIDS_PRAISES.length];
+                        setKidsPraise({
+                          ok: true,
+                          text: `${praisePrefix} ${opt.letter}! (+1 ⭐)`,
+                        });
+                        confetti({ particleCount: 28, spread: 55, origin: { y: 0.72 } });
+                      }
+                    } else if (nextPassed.length === ALPHABET_DATA.length) {
                       confetti({ particleCount: 70, spread: 70 });
                     }
+                  } else if (kidsMode) {
+                    setKidsPraise({
+                      ok: false,
+                      text: `🎈 Suýt trúng rồi! Ô vừa chọn là chữ ${opt.letter}, đáp án đúng là ${quizTarget.letter} đó bé!`,
+                    });
                   }
                 }}
-                className={`py-3.5 rounded-xl border-2 font-black text-2xl transition ${cls}`}
+                className={`${
+                  kidsMode
+                    ? 'py-5 rounded-2xl border-4 font-black text-3xl sm:text-4xl'
+                    : 'py-3.5 rounded-xl border-2 font-black text-2xl'
+                } transition ${cls}`}
               >
-                {opt.letter}
+                {kidsMode ? `${opt.letter}${opt.letter.toLowerCase()}` : opt.letter}
               </button>
             );
           })}

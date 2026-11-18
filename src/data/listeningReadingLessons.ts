@@ -1,9 +1,26 @@
 import { CefrLevel } from '../types/learning';
+import { LISTENING_BANK_PART1 } from './listeningBankPart1';
+import { LISTENING_BANK_PART2 } from './listeningBankPart2';
+import { PRACTICAL_CATEGORIES, PracticalCategory } from './practicalCategories';
+
+export type ListeningCategory =
+  | 'Hội thoại đời sống'
+  | 'Bài đọc cơ bản'
+  | 'Giao tiếp công việc'
+  | PracticalCategory;
+
+export const LISTENING_CATEGORIES: ('Tất cả' | ListeningCategory)[] = [
+  'Tất cả',
+  ...PRACTICAL_CATEGORIES,
+  'Hội thoại đời sống',
+  'Bài đọc cơ bản',
+  'Giao tiếp công việc',
+];
 
 export interface ListeningReadingLesson {
   id: string;
   level: CefrLevel;
-  category: 'Hội thoại đời sống' | 'Bài đọc cơ bản' | 'Giao tiếp công việc';
+  category: ListeningCategory;
   title: string;
   sourceStyle: string;
   transcript: string;
@@ -16,7 +33,7 @@ export interface ListeningReadingLesson {
   };
 }
 
-export const LISTENING_READING_LESSONS: ListeningReadingLesson[] = [
+const BASE_LISTENING_READING_LESSONS: ListeningReadingLesson[] = [
   {
     id: 'lr-1',
     level: 'A1',
@@ -857,4 +874,10 @@ export const LISTENING_READING_LESSONS: ListeningReadingLesson[] = [
       correctIdx: 1,
     },
   },
+];
+
+export const LISTENING_READING_LESSONS: ListeningReadingLesson[] = [
+  ...BASE_LISTENING_READING_LESSONS,
+  ...LISTENING_BANK_PART1,
+  ...LISTENING_BANK_PART2,
 ];

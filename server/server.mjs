@@ -9,6 +9,7 @@ import {
   deleteCustomLesson,
   DEV_EMAIL,
   getAppSetting,
+  getLearnerProfile,
   getUserBySessionToken,
   hashPassword,
   listAllUsersAdmin,
@@ -16,6 +17,7 @@ import {
   loadFullProgress,
   resetProgressInDb,
   saveFullProgress,
+  saveLearnerProfile,
   setAppSetting,
   verifyPassword,
 } from './db.mjs';
@@ -32,7 +34,94 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '../dist');
+const SONG_AUDIO_DIR = path.resolve(__dirname, '../data/song-audio');
 const PORT = Number(process.env.PORT || 3001);
+
+const SONG_MIME_BY_EXT = {
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.webm': 'audio/webm',
+};
+
+const SONG_EXT_BY_MIME = {
+  'audio/mpeg': '.mp3',
+  'audio/mp3': '.mp3',
+  'audio/wav': '.wav',
+  'audio/wave': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/ogg': '.ogg',
+  'audio/mp4': '.m4a',
+  'audio/x-m4a': '.m4a',
+  'audio/m4a': '.m4a',
+  'audio/webm': '.webm',
+};
+
+function sanitizeUnitId(raw) {
+  return String(raw || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+}
+
+function readKidsSongsMediaMap() {
+  try {
+    const raw = getAppSetting('kids_songs_media');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeKidsSongsMediaMap(map) {
+  setAppSetting('kids_songs_media', JSON.stringify(map || {}));
+}
+
+function removeUploadedSongFiles(unitId) {
+  for (const ext of Object.keys(SONG_MIME_BY_EXT)) {
+    const fp = path.join(SONG_AUDIO_DIR, `${unitId}${ext}`);
+    if (fs.existsSync(fp)) {
+      try {
+        fs.unlinkSync(fp);
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+function findUploadedSongFile(unitId) {
+  for (const [ext, mime] of Object.entries(SONG_MIME_BY_EXT)) {
+    const fp = path.join(SONG_AUDIO_DIR, `${unitId}${ext}`);
+    if (fs.existsSync(fp) && fs.statSync(fp).isFile()) {
+      return { filePath: fp, ext, mime };
+    }
+  }
+  return null;
+}
+
+function extractYouTubeIdServer(raw) {
+  const clean = String(raw || '').trim();
+  if (!clean) return '';
+  if (/^[A-Za-z0-9_-]{11}$/.test(clean)) return clean;
+  try {
+    const url = new URL(clean);
+    if (url.hostname.includes('youtu.be')) {
+      const seg = url.pathname.replace(/^\/+/, '').split('/')[0] || '';
+      return /^[A-Za-z0-9_-]{11}$/.test(seg) ? seg : '';
+    }
+    const v = url.searchParams.get('v') || '';
+    if (/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+    const parts = url.pathname.split('/').filter(Boolean);
+    const idx = parts.findIndex((p) => p === 'embed' || p === 'shorts' || p === 'v');
+    if (idx >= 0 && parts[idx + 1] && /^[A-Za-z0-9_-]{11}$/.test(parts[idx + 1])) {
+      return parts[idx + 1];
+    }
+  } catch {
+    // ignore
+  }
+  return '';
+}
 
 const GEMINI_MODELS = [
   'gemini-3.8-flash',
@@ -56,8 +145,8 @@ function readJsonBody(req) {
     let total = 0;
     req.on('data', (chunk) => {
       total += chunk.length;
-      if (total > 12 * 1024 * 1024) {
-        reject(new Error('Dữ liệu gửi lên quá lớn.'));
+      if (total > 14 * 1024 * 1024) {
+        reject(new Error('Dữ liệu gửi lên quá lớn (tối đa ~9MB file gốc).'));
         req.destroy();
         return;
       }
@@ -174,9 +263,14 @@ const MIME_MAP = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.webm': 'audio/webm',
 };
 
-function serveStatic(reqPath, res) {
+function serveStatic(req, reqPath, res) {
   if (!fs.existsSync(DIST_DIR)) {
     sendJson(res, 404, { error: 'Frontend chưa build (dist/ không tồn tại). Hãy chạy npm run dev hoặc npm run build.' });
     return;
@@ -187,7 +281,43 @@ function serveStatic(reqPath, res) {
     ? filePath
     : path.join(DIST_DIR, 'index.html');
   const ext = path.extname(target);
-  res.writeHead(200, { 'Content-Type': MIME_MAP[ext] || 'application/octet-stream' });
+  const mime = MIME_MAP[ext] || 'application/octet-stream';
+  const stat = fs.statSync(target);
+  const total = stat.size;
+  const rangeHeader = String(req.headers.range || '');
+
+  if (rangeHeader && (ext === '.mp3' || ext === '.wav' || ext === '.ogg' || ext === '.m4a' || ext === '.webm')) {
+    const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+    if (!match) {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      return res.end();
+    }
+    const start = match[1] ? Number(match[1]) : 0;
+    const end = match[2] ? Math.min(Number(match[2]), total - 1) : total - 1;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= total) {
+      res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+      return res.end();
+    }
+    const chunkSize = end - start + 1;
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type': mime,
+      'Cache-Control': 'public, max-age=86400',
+    });
+    if (req.method === 'HEAD') return res.end();
+    fs.createReadStream(target, { start, end }).pipe(res);
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': mime,
+    'Content-Length': total,
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=86400',
+  });
+  if (req.method === 'HEAD') return res.end();
   fs.createReadStream(target).pipe(res);
 }
 
@@ -197,13 +327,65 @@ const server = http.createServer(async (req, res) => {
   const method = req.method || 'GET';
 
   if (!pathname.startsWith('/api/')) {
-    serveStatic(pathname, res);
+    serveStatic(req, pathname, res);
     return;
   }
 
   try {
     if (method === 'GET' && pathname === '/api/health') {
       return sendJson(res, 200, { ok: true, database: 'sqlite', path: 'data/myenglish.db' });
+    }
+
+    // KIDS SONGS MEDIA METADATA & STREAMING (Public read so kids audio works seamlessly)
+    if (method === 'GET' && pathname === '/api/kids/songs-media') {
+      return sendJson(res, 200, { media: readKidsSongsMediaMap() });
+    }
+
+    const songAudioMatch = pathname.match(/^\/api\/kids\/song-audio\/([^/]+)$/);
+    if ((method === 'GET' || method === 'HEAD') && songAudioMatch) {
+      const unitId = sanitizeUnitId(decodeURIComponent(songAudioMatch[1]));
+      const fileInfo = unitId ? findUploadedSongFile(unitId) : null;
+      if (!fileInfo) {
+        return sendJson(res, 404, { error: 'Không tìm thấy file nhạc cho chủ đề này.' });
+      }
+      const stat = fs.statSync(fileInfo.filePath);
+      const total = stat.size;
+      const rangeHeader = String(req.headers.range || '');
+
+      if (rangeHeader) {
+        const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+        if (!match) {
+          res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+          return res.end();
+        }
+        const start = match[1] ? Number(match[1]) : 0;
+        const end = match[2] ? Math.min(Number(match[2]), total - 1) : total - 1;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= total) {
+          res.writeHead(416, { 'Content-Range': `bytes */${total}` });
+          return res.end();
+        }
+        const chunkSize = end - start + 1;
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${total}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': fileInfo.mime,
+          'Cache-Control': 'public, max-age=3600',
+        });
+        if (method === 'HEAD') return res.end();
+        fs.createReadStream(fileInfo.filePath, { start, end }).pipe(res);
+        return;
+      }
+
+      res.writeHead(200, {
+        'Accept-Ranges': 'bytes',
+        'Content-Length': total,
+        'Content-Type': fileInfo.mime,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      if (method === 'HEAD') return res.end();
+      fs.createReadStream(fileInfo.filePath).pipe(res);
+      return;
     }
 
     // AUTH: REGISTER
@@ -232,10 +414,15 @@ const server = http.createServer(async (req, res) => {
       db.prepare('INSERT INTO users (email, display_name, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)')
         .run(email, displayName, hashPassword(password), 'user', now);
 
+      const profile =
+        body.profile && typeof body.profile === 'object'
+          ? saveLearnerProfile(email, body.profile)
+          : null;
+
       const progress = loadFullProgress(email);
       const token = createSession(email);
       return sendJson(res, 201, {
-        user: { email, displayName, role: 'user', createdAt: now },
+        user: { email, displayName, role: 'user', createdAt: now, profile },
         token,
         progress,
       });
@@ -256,6 +443,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const progress = loadFullProgress(email);
+      const profile = getLearnerProfile(email);
       const token = createSession(email);
       return sendJson(res, 200, {
         user: {
@@ -263,6 +451,7 @@ const server = http.createServer(async (req, res) => {
           displayName: row.display_name,
           role: row.role,
           createdAt: row.created_at,
+          profile,
         },
         token,
         progress,
@@ -287,9 +476,34 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'GET' && pathname === '/api/auth/me') {
       const progress = loadFullProgress(currentUser.email);
+      const profile = getLearnerProfile(currentUser.email);
       const hasApiKey = Boolean(getAppSetting('gemini_api_key'));
       const { sttProvider, sttModel } = getSttSettings();
-      return sendJson(res, 200, { user: currentUser, progress, hasApiKey, sttProvider, sttModel });
+      return sendJson(res, 200, {
+        user: { ...currentUser, profile },
+        progress,
+        hasApiKey,
+        sttProvider,
+        sttModel,
+      });
+    }
+
+    if (method === 'GET' && pathname === '/api/profile') {
+      const profile = getLearnerProfile(currentUser.email);
+      return sendJson(res, 200, { profile });
+    }
+
+    if (method === 'PUT' && pathname === '/api/profile') {
+      const existing = getLearnerProfile(currentUser.email);
+      if (existing && currentUser.role !== 'admin') {
+        return sendJson(res, 403, {
+          error: 'Hồ sơ đối tượng đã được cố định theo thông tin đăng ký tài khoản. Chỉ Quản trị viên mới có quyền thay đổi.',
+        });
+      }
+      const body = await readJsonBody(req);
+      const payload = body.profile && typeof body.profile === 'object' ? body.profile : body;
+      const profile = saveLearnerProfile(currentUser.email, payload);
+      return sendJson(res, 200, { ok: true, profile });
     }
 
     if (method === 'GET' && pathname === '/api/speech/status') {
@@ -371,7 +585,15 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'GET' && pathname === '/api/custom-lessons') {
       const lessons = listCustomLessons();
-      return sendJson(res, 200, { lessons });
+      if (currentUser.role === 'admin') {
+        return sendJson(res, 200, { lessons });
+      }
+      const userProfile = getLearnerProfile(currentUser.email);
+      const userAud = userProfile?.audience;
+      const filtered = userAud
+        ? lessons.filter((l) => !Array.isArray(l.audiences) || l.audiences.length === 0 || l.audiences.includes(userAud))
+        : lessons;
+      return sendJson(res, 200, { lessons: filtered });
     }
 
     // AI PROXY (Key stays safely in SQLite on server!)
@@ -485,6 +707,19 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true });
       }
 
+      const updateProfileMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/profile$/);
+      if (method === 'PUT' && updateProfileMatch) {
+        const targetEmail = decodeURIComponent(updateProfileMatch[1]).toLowerCase();
+        const exists = db.prepare('SELECT email FROM users WHERE email = ?').get(targetEmail);
+        if (!exists) {
+          return sendJson(res, 404, { error: 'Không tìm thấy tài khoản.' });
+        }
+        const body = await readJsonBody(req);
+        const payload = body.profile && typeof body.profile === 'object' ? body.profile : body;
+        const profile = saveLearnerProfile(targetEmail, payload);
+        return sendJson(res, 200, { ok: true, profile });
+      }
+
       if (method === 'POST' && pathname === '/api/admin/lessons') {
         const body = await readJsonBody(req);
         const kind = String(body.kind || '');
@@ -495,7 +730,8 @@ const server = http.createServer(async (req, res) => {
         if (!body.payload || typeof body.payload !== 'object') {
           return sendJson(res, 400, { error: 'Thiếu nội dung bài học.' });
         }
-        const created = addCustomLesson(kind, body.payload);
+        const audiences = Array.isArray(body.audiences) ? body.audiences : [];
+        const created = addCustomLesson(kind, body.payload, audiences);
         return sendJson(res, 201, { lesson: created });
       }
 
@@ -504,6 +740,96 @@ const server = http.createServer(async (req, res) => {
         const lessonId = decodeURIComponent(delLessonMatch[1]);
         deleteCustomLesson(lessonId);
         return sendJson(res, 200, { ok: true });
+      }
+
+      if (method === 'POST' && pathname === '/api/admin/kids-song-media') {
+        const body = await readJsonBody(req);
+        const unitId = sanitizeUnitId(body.unitId);
+        if (!unitId) {
+          return sendJson(res, 400, { error: 'Thiếu mã chủ đề bài hát (unitId).' });
+        }
+
+        const map = readKidsSongsMediaMap();
+        const nextEntry = { ...(map[unitId] || {}) };
+        const rawBase64 = String(body.audioBase64 || '').trim();
+
+        if (rawBase64) {
+          const cleanB64 = rawBase64.replace(/^data:[^;]+;base64,/, '');
+          const buf = Buffer.from(cleanB64, 'base64');
+          if (!buf.length) {
+            return sendJson(res, 400, { error: 'File âm thanh trống hoặc không hợp lệ.' });
+          }
+          if (buf.length > 9 * 1024 * 1024) {
+            return sendJson(res, 400, { error: 'File nhạc quá lớn (tối đa 9MB).' });
+          }
+          const rawExt = path.extname(String(body.fileName || '')).toLowerCase();
+          const mimeKey = String(body.mimeType || '').split(';')[0].trim().toLowerCase();
+          const ext = SONG_MIME_BY_EXT[rawExt] ? rawExt : SONG_EXT_BY_MIME[mimeKey] || '.mp3';
+
+          fs.mkdirSync(SONG_AUDIO_DIR, { recursive: true });
+          removeUploadedSongFiles(unitId);
+          fs.writeFileSync(path.join(SONG_AUDIO_DIR, `${unitId}${ext}`), buf);
+
+          nextEntry.audioUrl = `/api/kids/song-audio/${unitId}?v=${Date.now()}`;
+          nextEntry.isUploaded = true;
+          nextEntry.mimeType = SONG_MIME_BY_EXT[ext] || 'audio/mpeg';
+        } else if (body.audioUrl !== undefined) {
+          const cleanUrl = String(body.audioUrl || '').trim();
+          if (!cleanUrl) {
+            delete nextEntry.audioUrl;
+            delete nextEntry.isUploaded;
+            delete nextEntry.mimeType;
+            removeUploadedSongFiles(unitId);
+          } else if (
+            !/^https?:\/\//i.test(cleanUrl) &&
+            !cleanUrl.startsWith('/api/kids/song-audio/')
+          ) {
+            return sendJson(res, 400, { error: 'Link nhạc phải bắt đầu bằng http:// hoặc https://.' });
+          } else {
+            nextEntry.audioUrl = cleanUrl;
+            if (!cleanUrl.startsWith('/api/kids/song-audio/')) {
+              delete nextEntry.isUploaded;
+              delete nextEntry.mimeType;
+              removeUploadedSongFiles(unitId);
+            }
+          }
+        }
+
+        if (body.youtubeId !== undefined) {
+          const rawYt = String(body.youtubeId || '').trim();
+          if (!rawYt) {
+            delete nextEntry.youtubeId;
+          } else {
+            const yt = extractYouTubeIdServer(rawYt);
+            if (!yt) {
+              return sendJson(res, 400, { error: 'Link hoặc ID YouTube không hợp lệ.' });
+            }
+            nextEntry.youtubeId = yt;
+          }
+        }
+
+        if (!nextEntry.audioUrl && !nextEntry.youtubeId) {
+          delete map[unitId];
+        } else {
+          nextEntry.updatedAt = new Date().toISOString();
+          map[unitId] = nextEntry;
+        }
+
+        writeKidsSongsMediaMap(map);
+        return sendJson(res, 200, { ok: true, unitId, entry: map[unitId] || null, media: map });
+      }
+
+      const delSongMediaMatch = pathname.match(/^\/api\/admin\/kids-song-media\/([^/]+)$/);
+      if (method === 'DELETE' && delSongMediaMatch) {
+        const unitId = sanitizeUnitId(decodeURIComponent(delSongMediaMatch[1]));
+        if (!unitId) {
+          return sendJson(res, 400, { error: 'Mã chủ đề không hợp lệ.' });
+        }
+        removeUploadedSongFiles(unitId);
+        const map = readKidsSongsMediaMap();
+        delete map[unitId];
+        writeKidsSongsMediaMap(map);
+        return sendJson(res, 200, { ok: true, unitId, media: map });
       }
     }
 
