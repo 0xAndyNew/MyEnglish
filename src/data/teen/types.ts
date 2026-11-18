@@ -66,12 +66,22 @@ export interface SchoolExamQuestion {
 
 export interface SchoolExamSet {
   id: SchoolExamId;
+  setKey?: string;
   title: string;
   subtitle: string;
   badge: string;
   durationMinutes: number;
   targetDescription: string;
   questions: SchoolExamQuestion[];
+}
+
+export interface SchoolReviewSet {
+  id: string;
+  grade: SchoolGrade;
+  reviewNumber: 1 | 2 | 3 | 4;
+  title: string;
+  unitRange: string;
+  exercises: Exercise[];
 }
 
 export const SCHOOL_GRADES: SchoolGradeMeta[] = [

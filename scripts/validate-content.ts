@@ -1,4 +1,4 @@
-import { SCHOOL_UNITS, SCHOOL_EXAMS } from '../src/data/teen/schoolCurriculumData';
+import { SCHOOL_UNITS, SCHOOL_EXAMS, SCHOOL_EXAM_SETS, SCHOOL_REVIEWS } from '../src/data/teen/schoolCurriculumData';
 import { KIDS_UNITS, KIDS_SENTENCE_CHUNKS, KIDS_YLE_CHALLENGES } from '../src/data/kids/kidsCurriculumData';
 import {
   AWL_WORDS,
@@ -159,18 +159,28 @@ if (teenExDist.length > 0) checkMcqDistribution('Teen exercises', teenExDist);
 
 const examQIds: string[] = [];
 const examDist: number[] = [];
-for (const examKey of Object.keys(SCHOOL_EXAMS) as Array<keyof typeof SCHOOL_EXAMS>) {
-  const exam = SCHOOL_EXAMS[examKey];
-  for (const q of exam.questions) {
-    examQIds.push(q.id);
-    if (q.correctIndex < 0 || q.correctIndex >= q.options.length) {
-      error(`SCHOOL_EXAMS [${q.id}]: correctIndex out of range`);
+for (const examKey of Object.keys(SCHOOL_EXAM_SETS) as Array<keyof typeof SCHOOL_EXAM_SETS>) {
+  for (const exam of SCHOOL_EXAM_SETS[examKey]) {
+    for (const q of exam.questions) {
+      examQIds.push(q.id);
+      if (q.correctIndex < 0 || q.correctIndex >= q.options.length) {
+        error(`SCHOOL_EXAM_SETS [${q.id}]: correctIndex out of range`);
+      }
+      if (q.options.length === 4) examDist.push(q.correctIndex);
     }
-    if (q.options.length === 4) examDist.push(q.correctIndex);
   }
 }
-checkUniqueIds('SCHOOL_EXAMS questions', examQIds);
-checkMcqDistribution('SCHOOL_EXAMS', examDist);
+checkUniqueIds('SCHOOL_EXAM_SETS questions', examQIds);
+checkMcqDistribution('SCHOOL_EXAM_SETS', examDist);
+
+checkUniqueIds('SCHOOL_REVIEWS', SCHOOL_REVIEWS.map((r) => r.id));
+const reviewExDist: number[] = [];
+let reviewExCount = 0;
+for (const rev of SCHOOL_REVIEWS) {
+  validateExerciseList(`Review ${rev.id}`, rev.exercises, reviewExDist);
+  reviewExCount += rev.exercises.length;
+}
+if (reviewExDist.length > 0) checkMcqDistribution('SCHOOL_REVIEWS exercises', reviewExDist);
 
 // 2. KIDS
 checkUniqueIds('KIDS_UNITS', KIDS_UNITS.map((u) => u.id));
@@ -217,7 +227,7 @@ for (const key of EXAM_ORDER) {
 checkUniqueIds('GRAMMAR_LESSONS', GRAMMAR_LESSONS.map((g) => g.id));
 
 console.log('\n=== Inventory Summary ===');
-console.log(`• Teen: ${SCHOOL_UNITS.length} units, ${teenQuizIds.length} practiceQuiz, ${teenExerciseCount} exercises, ${examQIds.length} school exam Qs`);
+console.log(`• Teen: ${SCHOOL_UNITS.length} units, ${teenQuizIds.length} practiceQuiz, ${teenExerciseCount} exercises, ${SCHOOL_REVIEWS.length} reviews (${reviewExCount} ex), ${examQIds.length} school exam Qs (${SCHOOL_EXAM_SETS.entrance10.length}+${SCHOOL_EXAM_SETS.thpt.length} sets)`);
 console.log(`• Kids: ${KIDS_UNITS.length} units (${KIDS_UNITS.reduce((a, u) => a + u.words.length, 0)} words), ${KIDS_SENTENCE_CHUNKS.length} chunks, ${KIDS_YLE_CHALLENGES.length} YLE Qs`);
 console.log(`• University: ${AWL_WORDS.length} AWL words, ${ACADEMIC_ABSTRACTS.length} abstracts, ${ACADEMIC_WRITING_PROMPTS.length} writing prompts, ${GRADUATION_QUICK_QUIZ.length} grad quiz`);
 console.log(`• Workplace: ${WORKPLACE_MEETING_PHRASES.length} meetings, ${WORKPLACE_EMAIL_TEMPLATES.length} emails, ${WORKPLACE_STAR_QUESTIONS.length} STAR, ${WORKPLACE_CASE_SITUATIONS.length} cases`);

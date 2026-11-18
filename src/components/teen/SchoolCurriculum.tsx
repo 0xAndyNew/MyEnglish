@@ -25,8 +25,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import {
+  getReviewsByGrade,
   getUnitsByGrade,
   SCHOOL_EXAMS,
+  SCHOOL_EXAM_SETS,
   SCHOOL_GRADES,
   SCHOOL_UNITS,
   SchoolExamId,
@@ -45,6 +47,7 @@ export interface SchoolCurriculumProps {
   onAddXp: (amount: number) => void;
   onSaveWord?: (word: WordEntry) => void;
   initialMode?: 'units' | 'exams';
+  allowAllOptions?: boolean;
 }
 
 interface SectionBreakdown {
@@ -156,6 +159,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
   onAddXp,
   onSaveWord,
   initialMode,
+  allowAllOptions = false,
 }) => {
   // Top-level mode ('units' vs 'exams')
   const [mode, setMode] = useState<'units' | 'exams'>(() => initialMode || 'units');
@@ -165,9 +169,11 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
     getDefaultGradeFromProfile(profile)
   );
   const gradeUnits = useMemo(() => getUnitsByGrade(selectedGrade), [selectedGrade]);
+  const gradeReviews = useMemo(() => getReviewsByGrade(selectedGrade), [selectedGrade]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>(
     () => getUnitsByGrade(getDefaultGradeFromProfile(profile))[0]?.id || SCHOOL_UNITS[0].id
   );
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [unitSectionFilter, setUnitSectionFilter] = useState<'all' | 'vocab' | 'grammar' | 'quiz' | 'exercises'>(
     'all'
   );
@@ -183,7 +189,9 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
   const [selectedExamId, setSelectedExamId] = useState<SchoolExamId>(() =>
     getDefaultExamFromProfile(profile)
   );
-  const activeExam = SCHOOL_EXAMS[selectedExamId];
+  const [selectedExamSetIdx, setSelectedExamSetIdx] = useState<number>(0);
+  const availableExamSets = SCHOOL_EXAM_SETS[selectedExamId] || [SCHOOL_EXAMS[selectedExamId]];
+  const activeExam = availableExamSets[selectedExamSetIdx] || availableExamSets[0];
   const [examAnswers, setExamAnswers] = useState<Record<string, number>>({});
   const [examSubmitted, setExamSubmitted] = useState(false);
   const [examRewarded, setExamRewarded] = useState(false);
@@ -261,6 +269,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
 
   const handleSelectGrade = (grade: SchoolGrade) => {
     setSelectedGrade(grade);
+    setSelectedReviewId(null);
     const firstUnit = getUnitsByGrade(grade)[0];
     if (firstUnit) {
       setSelectedUnitId(firstUnit.id);
@@ -270,6 +279,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
   };
 
   const handleSelectUnit = (unitId: string) => {
+    setSelectedReviewId(null);
     setSelectedUnitId(unitId);
     setQuizAnswers({});
     setQuizSubmitted(false);
@@ -327,11 +337,25 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
   // Exam Handlers
   const handleSwitchExam = (examId: SchoolExamId) => {
     setSelectedExamId(examId);
+    setSelectedExamSetIdx(0);
+    const nextSet = SCHOOL_EXAM_SETS[examId]?.[0] || SCHOOL_EXAMS[examId];
     setExamAnswers({});
     setExamSubmitted(false);
     setExamRewarded(false);
     setReviewFilter('all');
-    setSecondsLeft(SCHOOL_EXAMS[examId].durationMinutes * 60);
+    setSecondsLeft(nextSet.durationMinutes * 60);
+    setTimerRunning(true);
+  };
+
+  const handleSelectExamSet = (idx: number) => {
+    const sets = SCHOOL_EXAM_SETS[selectedExamId] || [SCHOOL_EXAMS[selectedExamId]];
+    const target = sets[idx] || sets[0];
+    setSelectedExamSetIdx(idx);
+    setExamAnswers({});
+    setExamSubmitted(false);
+    setExamRewarded(false);
+    setReviewFilter('all');
+    setSecondsLeft(target.durationMinutes * 60);
     setTimerRunning(true);
   };
 
@@ -529,22 +553,24 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
       {/* ==================== MODE 1: UNITS (LỚP 6–12) ==================== */}
       {mode === 'units' && (
         <div className="space-y-6">
-          {/* Grade Picker (THCS 6-9 & THPT 10-12) */}
+          {/* Grade Picker (Admin sees all 6-12; student sees ONLY their registered grade) */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-                  1. Chọn Khối Lớp (THCS &amp; THPT)
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Mỗi khối lớp gồm 5 Unit tiêu biểu bám sát SGK Global Success
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-300 w-fit">
-                <CheckCheck className="w-3.5 h-3.5" />
-                Đã hoàn thành {completedUnitIds.length} / {SCHOOL_UNITS.length} Unit Quiz
-              </span>
-            </div>
+            {allowAllOptions ? (
+              <>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                      1. Chọn Khối Lớp (THCS &amp; THPT)
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Mỗi khối lớp gồm 5 Unit tiêu biểu bám sát SGK Global Success
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-300 w-fit">
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Đã hoàn thành {completedUnitIds.length} / {SCHOOL_UNITS.length} Unit Quiz
+                  </span>
+                </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {/* THCS Block */}
@@ -650,6 +676,22 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                 Trình độ {activeGradeMeta.cefrRange}
               </span>
             </div>
+              </>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase text-sky-600 dark:text-sky-400">
+                    Chương trình theo hồ sơ đăng ký: {activeGradeMeta.label}
+                  </div>
+                  <div className="text-sm font-black text-sky-900 dark:text-sky-100 mt-0.5">
+                    {activeGradeMeta.bookTitle} — {activeGradeMeta.focusVi}
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 font-extrabold text-sky-700 dark:text-sky-300">
+                  Trình độ {activeGradeMeta.cefrRange}
+                </span>
+              </div>
+            )}
 
             {/* Unit Selector Tabs */}
             <div>
@@ -727,10 +769,77 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                   );
                 })}
               </div>
+
+              {gradeReviews.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <div className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300 mb-2">
+                    Ôn tập định kỳ {activeGradeMeta.label} (30 câu tổng hợp/bài):
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {gradeReviews.map((rev) => {
+                      const isRevActive = selectedReviewId === rev.id;
+                      return (
+                        <button
+                          type="button"
+                          key={rev.id}
+                          onClick={() => setSelectedReviewId(isRevActive ? null : rev.id)}
+                          className={`p-2.5 rounded-xl border text-left transition ${
+                            isRevActive
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                              : 'bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 hover:border-indigo-400'
+                          }`}
+                        >
+                          <div className="text-xs font-extrabold">{rev.title}</div>
+                          <div className={`text-[11px] ${isRevActive ? 'text-indigo-100' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                            {rev.unitRange} • {rev.exercises.length} câu
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Active Unit Detail Panel */}
+          {selectedReviewId ? (
+            (() => {
+              const activeReview = gradeReviews.find((r) => r.id === selectedReviewId);
+              if (!activeReview) return null;
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-4">
+                    <div>
+                      <div className="text-xs font-extrabold uppercase text-indigo-600 dark:text-indigo-400">
+                        {activeGradeMeta.label} • {activeReview.unitRange}
+                      </div>
+                      <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                        {activeReview.title}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReviewId(null)}
+                      className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50"
+                    >
+                      ← Quay lại Unit
+                    </button>
+                  </div>
+                  <ExerciseRunner
+                    key={activeReview.id}
+                    exercises={activeReview.exercises}
+                    accent={accent}
+                    title={`${activeReview.title} (${activeReview.unitRange})`}
+                    subtitle="30 bài tập tổng hợp nhiều dạng ôn kiến thức cụm Unit."
+                    onComplete={(correct, total) => {
+                      if (correct >= Math.ceil(total * 0.6)) onAddXp(40);
+                    }}
+                  />
+                </div>
+              );
+            })()
+          ) : (
+          /* Active Unit Detail Panel */
           <div className="space-y-6">
             {/* Unit Overview + Objectives + Section Filter */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4">
@@ -1173,15 +1282,19 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                 />
               )}
           </div>
+          )}
         </div>
       )}
 
       {/* ==================== MODE 2: EXAMS (THI VÀO 10 & THPT) ==================== */}
       {mode === 'exams' && (
         <div className="space-y-6">
-          {/* Exam Selector */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(['entrance10', 'thpt'] as const).map((examId) => {
+          {/* Exam Selector (Admin sees both; student sees ONLY the exam matching their grade/goal) */}
+          <div className={`grid grid-cols-1 ${allowAllOptions ? 'md:grid-cols-2' : ''} gap-4`}>
+            {(allowAllOptions
+              ? (['entrance10', 'thpt'] as const)
+              : [getDefaultExamFromProfile(profile)]
+            ).map((examId) => {
               const exam = SCHOOL_EXAMS[examId];
               const isSelected = selectedExamId === examId;
               return (
@@ -1220,6 +1333,37 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
               );
             })}
           </div>
+
+          {/* Exam Set Picker (10 đề) */}
+          {availableExamSets.length > 1 && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2.5">
+              <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                Chọn bộ đề luyện tập ({availableExamSets.length} đề có sẵn):
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {availableExamSets.map((set, idx) => {
+                  const isCurrent = idx === selectedExamSetIdx;
+                  return (
+                    <button
+                      type="button"
+                      key={set.setKey || idx}
+                      onClick={() => handleSelectExamSet(idx)}
+                      className={`px-3 py-2 rounded-xl border text-left transition ${
+                        isCurrent
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-400'
+                      }`}
+                    >
+                      <div className="text-xs font-extrabold">Đề số {idx + 1}</div>
+                      <div className={`text-[10px] truncate ${isCurrent ? 'text-indigo-100' : 'text-slate-500'}`}>
+                        {set.questions.length} câu • {set.durationMinutes}p
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Sticky Timer & Exam Toolbar */}
           <div className="sticky top-16 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
