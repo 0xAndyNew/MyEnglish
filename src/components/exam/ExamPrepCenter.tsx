@@ -436,6 +436,15 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   const [speakingClockLabel, setSpeakingClockLabel] = useState<string>('');
 
   // Tab 4: Timed Mock Test state
+  const [mockTestIdx, setMockTestIdx] = useState(0);
+  const [mockBestScores, setMockBestScores] = useState<Record<string, { correct: number; total: number }>>(() => {
+    try {
+      const raw = localStorage.getItem('myenglish_exam_mock_scores_v1');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
   const [mockPhase, setMockPhase] = useState<'ready' | 'running' | 'submitted'>('ready');
   const [mockCurrentIdx, setMockCurrentIdx] = useState(0);
   const [mockAnswers, setMockAnswers] = useState<Record<string, number>>({});
@@ -486,6 +495,8 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   }, []);
 
   const examData = EXAM_PREP_DATA[selectedExam];
+  const availableMockTests = examData.mockTests && examData.mockTests.length > 0 ? examData.mockTests : [examData.mockTest];
+  const activeMockTest = availableMockTests[mockTestIdx] || availableMockTests[0];
   const examMeta = getExamMeta(selectedExam);
 
   // Reset per-exam volatile sub-views when switching exam
@@ -508,11 +519,12 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     setSpeakingClockSec(null);
 
     // Reset mock test safely
+    setMockTestIdx(0);
     setMockPhase('ready');
     setMockCurrentIdx(0);
     setMockAnswers({});
     setMockFlagged({});
-    setMockSecondsLeft(EXAM_PREP_DATA[selectedExam].mockTest.durationMinutes * 60);
+    setMockSecondsLeft((EXAM_PREP_DATA[selectedExam].mockTests?.[0] || EXAM_PREP_DATA[selectedExam].mockTest).durationMinutes * 60);
     setMockDurationUsedSec(0);
     setMockReviewFilter('all');
 
@@ -539,7 +551,7 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   // Mock test countdown effect
   useEffect(() => {
     if (mockPhase !== 'running') return;
-    const totalSec = examData.mockTest.durationMinutes * 60;
+    const totalSec = activeMockTest.durationMinutes * 60;
     const timer = setInterval(() => {
       setMockSecondsLeft((prev) => {
         if (prev <= 1) {
@@ -552,7 +564,7 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [mockPhase, examData.mockTest.durationMinutes]);
+  }, [mockPhase, activeMockTest.durationMinutes]);
 
   const stopAllAudio = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -661,7 +673,7 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   };
 
   // Mock Test handlers
-  const mockQuestions = examData.mockTest.questions;
+  const mockQuestions = activeMockTest.questions;
   const safeMockIdx = Math.min(mockCurrentIdx, Math.max(0, mockQuestions.length - 1));
   const currentMockQ: ExamMcqQuestion | undefined = mockQuestions[safeMockIdx];
 
@@ -670,7 +682,7 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     setMockAnswers({});
     setMockFlagged({});
     setMockCurrentIdx(0);
-    setMockSecondsLeft(examData.mockTest.durationMinutes * 60);
+    setMockSecondsLeft(activeMockTest.durationMinutes * 60);
     setMockDurationUsedSec(0);
     setMockReviewFilter('all');
     setMockPhase('running');
@@ -678,13 +690,27 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
 
   const handleSubmitMockTest = () => {
     stopAllAudio();
-    const totalSec = examData.mockTest.durationMinutes * 60;
+    const totalSec = activeMockTest.durationMinutes * 60;
     setMockDurationUsedSec(Math.max(1, totalSec - mockSecondsLeft));
     setMockPhase('submitted');
     const correct = mockQuestions.reduce(
       (acc, q) => (mockAnswers[q.id] === q.correctIdx ? acc + 1 : acc),
       0
     );
+    const scoreKey = `${selectedExam}-${mockTestIdx}`;
+    setMockBestScores((prev) => {
+      const existing = prev[scoreKey];
+      const next =
+        !existing || correct > existing.correct
+          ? { ...prev, [scoreKey]: { correct, total: mockQuestions.length } }
+          : prev;
+      try {
+        localStorage.setItem('myenglish_exam_mock_scores_v1', JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
     const accuracy = mockQuestions.length > 0 ? correct / mockQuestions.length : 0;
     onAddXp(accuracy >= 0.75 ? 50 : 35);
   };
@@ -2080,14 +2106,48 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
           {mockPhase === 'ready' && (
             <div className="max-w-2xl mx-auto py-6 text-center space-y-4">
+              {availableMockTests.length > 1 && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-left pb-2">
+                  {availableMockTests.map((mt, idx) => {
+                    const isPicked = idx === mockTestIdx;
+                    const best = mockBestScores[`${selectedExam}-${idx}`];
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => {
+                          setMockTestIdx(idx);
+                          setMockSecondsLeft(mt.durationMinutes * 60);
+                        }}
+                        className={`p-2.5 rounded-xl border transition ${
+                          isPicked
+                            ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-400'
+                        }`}
+                      >
+                        <div className="text-xs font-extrabold">Đề #{idx + 1}</div>
+                        <div className={`text-[10px] ${isPicked ? 'text-rose-100' : 'text-slate-500'}`}>
+                          {mt.questions.length} câu • {mt.durationMinutes}p
+                        </div>
+                        {best && (
+                          <div className={`text-[10px] font-bold mt-0.5 ${isPicked ? 'text-white' : 'text-emerald-600'}`}>
+                            ✓ {best.correct}/{best.total}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="w-14 h-14 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
                 <Timer className="w-7 h-7" />
               </div>
               <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                {examData.mockTest.title}
+                {activeMockTest.title}
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                {examData.mockTest.description}
+                {activeMockTest.description}
               </p>
 
               <div className="grid grid-cols-3 gap-3 text-left max-w-md mx-auto pt-2">
@@ -2100,7 +2160,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <div className="text-[11px] text-slate-400 font-bold">Thời gian</div>
                   <div className="text-base font-black text-rose-600">
-                    {examData.mockTest.durationMinutes} phút
+                    {activeMockTest.durationMinutes} phút
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
@@ -2137,7 +2197,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                     {formatClock(mockSecondsLeft)}
                   </span>
                   <div className="text-xs">
-                    <div className="font-extrabold">{examData.mockTest.title}</div>
+                    <div className="font-extrabold">{activeMockTest.title}</div>
                     <div className="text-slate-400">
                       Đã làm {Object.keys(mockAnswers).length}/{mockQuestions.length} câu
                     </div>

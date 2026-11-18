@@ -234,20 +234,24 @@ checkMcqDistribution('WORKPLACE_VOCAB_DRILLS', wpDrillDist);
 let examPrepMcqCount = 0;
 for (const key of EXAM_ORDER) {
   const p = EXAM_PREP_DATA[key];
+  const allMocks = p.mockTests && p.mockTests.length > 0 ? p.mockTests : [p.mockTest];
   const ids = [
     ...p.diagnosticQuestions.map((q) => q.id),
     ...p.skillPractice.reading.flatMap((r) => [r.id, ...r.questions.map((q) => q.id)]),
     ...p.skillPractice.listening.flatMap((l) => [l.id, ...l.questions.map((q) => q.id)]),
     ...p.skillPractice.writing.map((w) => w.id),
     ...p.skillPractice.speaking.map((s) => s.id),
-    ...p.mockTest.questions.map((q) => q.id),
+    ...allMocks.flatMap((m) => m.questions.map((q) => q.id)),
   ];
   checkUniqueIds(`EXAM_PREP[${key}]`, ids);
-  examPrepMcqCount +=
-    p.diagnosticQuestions.length +
-    p.skillPractice.reading.reduce((acc, r) => acc + r.questions.length, 0) +
-    p.skillPractice.listening.reduce((acc, l) => acc + l.questions.length, 0) +
-    p.mockTest.questions.length;
+  const dist = [
+    ...p.diagnosticQuestions.map((q) => q.correctIdx),
+    ...p.skillPractice.reading.flatMap((r) => r.questions.map((q) => q.correctIdx)),
+    ...p.skillPractice.listening.flatMap((l) => l.questions.map((q) => q.correctIdx)),
+    ...allMocks.flatMap((m) => m.questions.map((q) => q.correctIdx)),
+  ];
+  checkMcqDistribution(`EXAM_PREP[${key}]`, dist);
+  examPrepMcqCount += dist.length;
 }
 
 // 6. GRAMMAR
