@@ -494,16 +494,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'PUT' && pathname === '/api/profile') {
-      const existing = getLearnerProfile(currentUser.email);
       const body = await readJsonBody(req);
       const payload = body.profile && typeof body.profile === 'object' ? body.profile : body;
-      const samePreschoolAudience =
-        existing?.audience === 'preschool' && payload?.audience === 'preschool';
-      if (existing && currentUser.role !== 'admin' && !samePreschoolAudience) {
-        return sendJson(res, 403, {
-          error: 'Hồ sơ đối tượng đã được cố định theo thông tin đăng ký tài khoản. Chỉ Quản trị viên mới có quyền thay đổi.',
-        });
-      }
       const profile = saveLearnerProfile(currentUser.email, payload);
       return sendJson(res, 200, { ok: true, profile });
     }

@@ -33,10 +33,12 @@ export const LearnerProfilePanel: React.FC<LearnerProfilePanelProps> = ({
 }) => {
   const [draft, setDraft] = useState<LearnerProfile>(() => profile || createDefaultProfile('worker'));
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       setDraft(profile || createDefaultProfile('worker'));
+      setSaveError(null);
     }
   }, [isOpen, profile]);
 
@@ -84,9 +86,12 @@ export const LearnerProfilePanel: React.FC<LearnerProfilePanelProps> = ({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSaveProfile({ ...draft, updatedAt: new Date().toISOString() });
       onClose();
+    } catch (err: any) {
+      setSaveError(err?.message || 'Không thể lưu thay đổi. Vui lòng thử lại.');
     } finally {
       setSaving(false);
     }
@@ -674,23 +679,30 @@ export const LearnerProfilePanel: React.FC<LearnerProfilePanelProps> = ({
           </div>
         </div>
 
-        <div className="sticky bottom-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold"
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleSave}
-            className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${saving ? 'animate-spin' : ''}`} />
-            {saving ? 'Đang cập nhật...' : 'Áp dụng lộ trình này'}
-          </button>
+        <div className="sticky bottom-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-6 py-4 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+          {saveError && (
+            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs font-bold text-rose-700 dark:text-rose-300">
+              ⚠️ {saveError}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleSave}
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${saving ? 'animate-spin' : ''}`} />
+              {saving ? 'Đang cập nhật...' : 'Áp dụng lộ trình này'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
