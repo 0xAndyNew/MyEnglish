@@ -7,6 +7,7 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        kid: ['"Baloo 2"', 'Nunito', 'system-ui', 'sans-serif'],
       },
     },
   },

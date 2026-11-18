@@ -168,4 +168,10 @@ export interface UserProgress {
   pronunciationScores: number[];
   accent: AccentMode;
   geminiApiKey?: string;
+  preschool?: {
+    completedLessonIds: string[];
+    stickers: string[];
+    stars: number;
+    lastLessonAt?: string;
+  };
 }

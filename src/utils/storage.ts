@@ -99,6 +99,7 @@ export function getDefaultProgress(): UserProgress {
     pronunciationScores: [],
     accent: 'en-US',
     geminiApiKey: '',
+    preschool: { completedLessonIds: [], stickers: [], stars: 0 },
   };
 }
 

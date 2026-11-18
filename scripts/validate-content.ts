@@ -18,7 +18,15 @@ import {
 } from '../src/data/worker/workplaceScenariosData';
 import { EXAM_PREP_DATA, EXAM_ORDER } from '../src/data/exam/examPrepData';
 import { GRAMMAR_LESSONS } from '../src/data/grammarData';
+import {
+  ALL_PRESCHOOL_UNITS,
+  PHONICS_LETTERS,
+  PRESCHOOL_LEVELS,
+  buildUnitLessons,
+} from '../src/data/preschool';
 import { Exercise } from '../src/types/exercise';
+import fs from 'node:fs';
+import path from 'node:path';
 
 let errorCount = 0;
 let warningCount = 0;
@@ -257,7 +265,50 @@ for (const key of EXAM_ORDER) {
 // 6. GRAMMAR
 checkUniqueIds('GRAMMAR_LESSONS', GRAMMAR_LESSONS.map((g) => g.id));
 
+// 7. PRESCHOOL (1-6)
+checkUniqueIds('ALL_PRESCHOOL_UNITS', ALL_PRESCHOOL_UNITS.map((u) => u.id));
+const preschoolWordIds = ALL_PRESCHOOL_UNITS.flatMap((u) => u.words.map((w) => w.id));
+checkUniqueIds('PRESCHOOL_WORDS', preschoolWordIds);
+checkUniqueIds('PHONICS_LETTERS', PHONICS_LETTERS.map((p) => p.letter));
+if (PHONICS_LETTERS.length !== 26) {
+  error(`PHONICS_LETTERS expected 26 items, got ${PHONICS_LETTERS.length}`);
+}
+
+let preschoolLessonCount = 0;
+let missingImagesCount = 0;
+const wordSlugsSeen = new Set<string>();
+const imgRoot = path.join(process.cwd(), 'public', 'preschool', 'img');
+
+for (const u of ALL_PRESCHOOL_UNITS) {
+  const lvMeta = PRESCHOOL_LEVELS[u.levelId];
+  if (u.words.length < lvMeta.wordsPerUnit) {
+    error(`Preschool unit [${u.id}]: expected >= ${lvMeta.wordsPerUnit} words, got ${u.words.length}`);
+  }
+  const lessons = buildUnitLessons(u);
+  preschoolLessonCount += lessons.length;
+  for (const les of lessons) {
+    if (les.activities.length < 5) {
+      error(`Preschool lesson [${les.id}]: expected >= 5 activities, got ${les.activities.length}`);
+    }
+  }
+  for (const w of u.words) {
+    if (!wordSlugsSeen.has(w.image)) {
+      wordSlugsSeen.add(w.image);
+      if (!fs.existsSync(path.join(imgRoot, 'words', `${w.image}.webp`))) {
+        missingImagesCount++;
+      }
+    }
+  }
+  if (!fs.existsSync(path.join(imgRoot, 'units', `${u.id}.webp`))) {
+    missingImagesCount++;
+  }
+}
+if (missingImagesCount > 0) {
+  warn(`Preschool illustrations missing: ${missingImagesCount} WebP files under public/preschool/img/ (emoji fallback active)`);
+}
+
 console.log('\n=== Inventory Summary ===');
+console.log(`• Preschool: ${ALL_PRESCHOOL_UNITS.length} units, ${preschoolLessonCount} lessons, ${preschoolWordIds.length} word entries (${wordSlugsSeen.size} unique slugs), ${PHONICS_LETTERS.length} phonics sounds`);
 console.log(`• Teen: ${SCHOOL_UNITS.length} units, ${teenQuizIds.length} practiceQuiz, ${teenExerciseCount} exercises, ${SCHOOL_REVIEWS.length} reviews (${reviewExCount} ex), ${examQIds.length} school exam Qs (${SCHOOL_EXAM_SETS.entrance10.length}+${SCHOOL_EXAM_SETS.thpt.length} sets)`);
 console.log(`• Kids: ${KIDS_UNITS.length} units (${KIDS_UNITS.reduce((a, u) => a + u.words.length, 0)} words, ${kidsExCount} ex), ${KIDS_SENTENCE_CHUNKS.length} chunks, ${KIDS_YLE_CHALLENGES.length} YLE Qs, ${KIDS_YLE_MOCK_TESTS.length} YLE mocks (${kidsMockQIds.length} Qs)`);
 console.log(`• University: ${AWL_WORDS.length} AWL words, ${AWL_DRILLS.length} AWL drills, ${ACADEMIC_ABSTRACTS.length} abstracts (${ACADEMIC_ABSTRACTS.reduce((a, x) => a + x.questions.length, 0)} Qs), ${ACADEMIC_WRITING_PROMPTS.length} writing prompts, ${PRESENTATION_PHRASES.length + SEMINAR_PHRASES.length} pres/sem phrases, ${GRADUATION_QUICK_QUIZ.length} grad quiz`);

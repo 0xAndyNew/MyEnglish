@@ -28,6 +28,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [selectedAudience, setSelectedAudience] = useState<AudienceId>('worker');
+  const [preschoolAgeBand, setPreschoolAgeBand] = useState<'1-2' | '3-4' | '5-6'>('3-4');
   const [kidsAgeBand, setKidsAgeBand] = useState<'6-7' | '8-10'>('6-7');
   const [teenGrade, setTeenGrade] = useState<6 | 7 | 8 | 9 | 10 | 11 | 12>(9);
   const [uniYear, setUniYear] = useState<1 | 2 | 3 | 4>(2);
@@ -39,7 +40,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
   const buildDraftProfile = (): LearnerProfile => {
     const base = createDefaultProfile(selectedAudience);
-    if (selectedAudience === 'kids') {
+    if (selectedAudience === 'preschool') {
+      const levelId = preschoolAgeBand === '1-2' ? 'tiny' : preschoolAgeBand === '5-6' ? 'star' : 'explorer';
+      base.preschool = {
+        ...(base.preschool || { studyDays: [2, 4], startDate: new Date().toISOString().slice(0, 10) }),
+        ageBand: preschoolAgeBand,
+        levelId,
+        parentConfirmed: true,
+      };
+    } else if (selectedAudience === 'kids') {
       base.kids = { ...(base.kids || { ageBand: kidsAgeBand, goal: 'intro' }), ageBand: kidsAgeBand, parentConfirmed: true };
     } else if (selectedAudience === 'teen') {
       base.teen = { grade: teenGrade, goal: teenGrade >= 10 ? 'thpt' : teenGrade === 9 ? 'entrance10' : 'school' };
@@ -179,6 +188,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
                 {/* Quick sub-detail matching selected audience */}
                 <div className="mt-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                  {selectedAudience === 'preschool' && (
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-bold text-slate-600 dark:text-slate-300">Độ tuổi của bé:</span>
+                      <select
+                        value={preschoolAgeBand}
+                        onChange={(e) => setPreschoolAgeBand(e.target.value as '1-2' | '3-4' | '5-6')}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 font-bold"
+                      >
+                        <option value="1-2">1–2 tuổi (Tiny Tots)</option>
+                        <option value="3-4">3–4 tuổi (Little Explorers)</option>
+                        <option value="5-6">5–6 tuổi (Bright Stars)</option>
+                      </select>
+                    </div>
+                  )}
                   {selectedAudience === 'kids' && (
                     <div className="flex items-center justify-between gap-2 text-xs">
                       <span className="font-bold text-slate-600 dark:text-slate-300">Độ tuổi của bé:</span>

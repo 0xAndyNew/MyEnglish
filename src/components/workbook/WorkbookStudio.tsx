@@ -144,6 +144,12 @@ export const WorkbookStudio: React.FC<WorkbookStudioProps> = ({
               ? '5 Đề Thi Thử Bấm Giờ & 20 Câu Chẩn Đoán Trình Độ'
               : 'Chiến Thuật, Bài Đọc Hiểu & Đề Viết / Nói Mẫu Band Cao',
         };
+      case 'preschool':
+      default:
+        return {
+          title: 'Giáo Trình Mầm Non (1–6 Tuổi)',
+          subtitle: 'Học qua tranh ảnh, bài hát & truyện tương tác trực tiếp trong lớp học của bé',
+        };
     }
   }, [audience, teenGrade, teenScope, kidsScope, uniScope, workerIndustry, examType, examScope]);
 

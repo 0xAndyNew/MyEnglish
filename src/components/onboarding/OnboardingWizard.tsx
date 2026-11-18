@@ -68,13 +68,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     const base = createDefaultProfile(audience);
     setProfile((prev) => ({
       ...base,
+      preschool: prev.preschool || base.preschool,
       kids: prev.kids || base.kids,
       teen: prev.teen || base.teen,
       university: prev.university || base.university,
       worker: prev.worker || base.worker,
       exam: prev.exam || base.exam,
-      startLevel: audience === 'kids' ? 'A0' : prev.startLevel,
-      dailyMinutes: audience === 'kids' ? 10 : prev.dailyMinutes,
+      startLevel: audience === 'kids' || audience === 'preschool' ? 'A0' : prev.startLevel,
+      dailyMinutes: audience === 'kids' || audience === 'preschool' ? 10 : prev.dailyMinutes,
     }));
   };
 
@@ -92,6 +93,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const audienceMeta = getAudienceMeta(profile.audience);
 
   const canProceedStep2 = (() => {
+    if (profile.audience === 'preschool') {
+      return Boolean(profile.preschool?.parentConfirmed) && (profile.preschool?.studyDays?.length || 0) >= 1;
+    }
     if (profile.audience === 'kids') {
       return Boolean(profile.kids?.parentConfirmed);
     }
@@ -233,6 +237,158 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   </p>
                 </div>
               </div>
+
+              {profile.audience === 'preschool' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                      1. Độ tuổi & Lớp của bé
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {[
+                        { ageBand: '1-2' as const, levelId: 'tiny' as const, label: '🐣 1–2 tuổi', sub: 'Tiny Tots (5–7 phút)' },
+                        { ageBand: '3-4' as const, levelId: 'explorer' as const, label: '🐥 3–4 tuổi', sub: 'Little Explorers (10–12 phút)' },
+                        { ageBand: '5-6' as const, levelId: 'star' as const, label: '⭐ 5–6 tuổi', sub: 'Bright Stars (12–15 phút)' },
+                      ].map((opt) => {
+                        const active = (profile.preschool?.ageBand || '3-4') === opt.ageBand;
+                        return (
+                          <button
+                            type="button"
+                            key={opt.ageBand}
+                            onClick={() =>
+                              setProfile((p) => ({
+                                ...p,
+                                preschool: {
+                                  ...(p.preschool || {
+                                    ageBand: opt.ageBand,
+                                    levelId: opt.levelId,
+                                    studyDays: [2, 4],
+                                    startDate: new Date().toISOString().slice(0, 10),
+                                    parentConfirmed: true,
+                                  }),
+                                  ageBand: opt.ageBand,
+                                  levelId: opt.levelId,
+                                },
+                              }))
+                            }
+                            className={`p-3 rounded-xl border text-left transition ${
+                              active
+                                ? 'border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200'
+                                : 'border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            <div className="text-xs font-extrabold">{opt.label}</div>
+                            <div className="text-[11px] opacity-80 mt-0.5">{opt.sub}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                      2. Tên gọi ở nhà của bé (để Gấu Bo chào bé)
+                    </label>
+                    <input
+                      type="text"
+                      value={profile.preschool?.childName || ''}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          preschool: {
+                            ...(p.preschool || {
+                              ageBand: '3-4',
+                              levelId: 'explorer',
+                              studyDays: [2, 4],
+                              startDate: new Date().toISOString().slice(0, 10),
+                              parentConfirmed: true,
+                            }),
+                            childName: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Ví dụ: Bin, Bông, Sóc..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                      3. Lịch học hàng tuần (chọn 2–3 ngày/tuần giống lịch trung tâm)
+                    </label>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {[
+                        { d: 1, label: 'T2' },
+                        { d: 2, label: 'T3' },
+                        { d: 3, label: 'T4' },
+                        { d: 4, label: 'T5' },
+                        { d: 5, label: 'T6' },
+                        { d: 6, label: 'T7' },
+                        { d: 0, label: 'CN' },
+                      ].map((day) => {
+                        const days = profile.preschool?.studyDays || [2, 4];
+                        const active = days.includes(day.d);
+                        return (
+                          <button
+                            type="button"
+                            key={day.d}
+                            onClick={() => {
+                              const nextDays = active
+                                ? days.filter((x) => x !== day.d)
+                                : [...days, day.d].sort((a, b) => a - b);
+                              setProfile((p) => ({
+                                ...p,
+                                preschool: {
+                                  ...(p.preschool || {
+                                    ageBand: '3-4',
+                                    levelId: 'explorer',
+                                    studyDays: [2, 4],
+                                    startDate: new Date().toISOString().slice(0, 10),
+                                    parentConfirmed: true,
+                                  }),
+                                  studyDays: nextDays.length ? nextDays : [day.d],
+                                },
+                              }));
+                            }}
+                            className={`py-2 rounded-xl border text-xs font-extrabold transition ${
+                              active
+                                ? 'border-emerald-500 bg-emerald-500 text-white'
+                                : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(profile.preschool?.parentConfirmed)}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          preschool: {
+                            ...(p.preschool || {
+                              ageBand: '3-4',
+                              levelId: 'explorer',
+                              studyDays: [2, 4],
+                              startDate: new Date().toISOString().slice(0, 10),
+                            }),
+                            parentConfirmed: e.target.checked,
+                          },
+                        }))
+                      }
+                      className="mt-0.5 rounded text-amber-600"
+                    />
+                    <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                      Tôi là phụ huynh / người lớn đồng hành cùng bé (trẻ 1–2 tuổi cần bố mẹ ngồi chơi cùng, mỗi buổi 5–7 phút).
+                    </span>
+                  </label>
+                </div>
+              )}
 
               {profile.audience === 'kids' && (
                 <div className="space-y-4">
@@ -1034,7 +1190,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             {step > 1 ? (
               <button
                 type="button"
-                onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
+                onClick={() =>
+                  setStep((s) => {
+                    if (s === 4 && profile.audience === 'preschool') return 2;
+                    return (s - 1) as 1 | 2 | 3 | 4;
+                  })
+                }
                 className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-1.5 hover:bg-white dark:hover:bg-slate-800"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -1056,7 +1217,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <button
                 type="button"
                 disabled={step === 2 && !canProceedStep2}
-                onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3 | 4)}
+                onClick={() =>
+                  setStep((s) => {
+                    if (s === 2 && profile.audience === 'preschool') return 4;
+                    return (s + 1) as 1 | 2 | 3 | 4;
+                  })
+                }
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm"
               >
                 Tiếp tục

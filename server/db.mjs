@@ -94,9 +94,10 @@ function ensureColumnExists(tableName, columnName, columnDef) {
 
 ensureColumnExists('user_progress', 'track_unlocks', "TEXT NOT NULL DEFAULT '{}'");
 ensureColumnExists('user_progress', 'srs_cards', "TEXT NOT NULL DEFAULT '{}'");
+ensureColumnExists('user_progress', 'preschool_progress', "TEXT NOT NULL DEFAULT '{}'");
 ensureColumnExists('custom_lessons', 'audiences', "TEXT NOT NULL DEFAULT '[]'");
 
-export const VALID_AUDIENCES = new Set(['kids', 'teen', 'university', 'worker', 'exam']);
+export const VALID_AUDIENCES = new Set(['preschool', 'kids', 'teen', 'university', 'worker', 'exam']);
 const VALID_LEVELS = new Set(['A0', 'A1', 'A2', 'B1', 'B2', 'C1']);
 const VALID_DAILY_MINUTES = new Set([10, 20, 30, 60]);
 
@@ -144,6 +145,7 @@ export function getDefaultProgressObj() {
     srsCards: {},
     pronunciationScores: [],
     accent: 'en-US',
+    preschool: { completedLessonIds: [], stickers: [], stars: 0 },
   };
 }
 
@@ -214,6 +216,14 @@ export function loadFullProgress(emailRaw) {
 
   Object.assign(srsCards, parseJsonSafe(row.srs_cards, {}));
 
+  const rawPreschool = parseJsonSafe(row.preschool_progress, {});
+  const preschool = {
+    completedLessonIds: Array.isArray(rawPreschool?.completedLessonIds) ? rawPreschool.completedLessonIds : [],
+    stickers: Array.isArray(rawPreschool?.stickers) ? rawPreschool.stickers : [],
+    stars: Number(rawPreschool?.stars || 0),
+    ...(rawPreschool?.lastLessonAt ? { lastLessonAt: String(rawPreschool.lastLessonAt) } : {}),
+  };
+
   return {
     xp: row.xp || 0,
     streakDays,
@@ -230,6 +240,7 @@ export function loadFullProgress(emailRaw) {
     srsCards,
     pronunciationScores: parseJsonSafe(row.pronunciation_scores, []),
     accent: row.accent === 'en-GB' ? 'en-GB' : 'en-US',
+    preschool,
   };
 }
 
@@ -256,6 +267,7 @@ export function saveFullProgress(emailRaw, progress) {
         mastered_phonemes = ?,
         pronunciation_scores = ?,
         srs_cards = ?,
+        preschool_progress = ?,
         updated_at = ?
       WHERE email = ?`
     ).run(
@@ -273,6 +285,7 @@ export function saveFullProgress(emailRaw, progress) {
       JSON.stringify(progress.masteredPhonemes || []),
       JSON.stringify(progress.pronunciationScores || []),
       JSON.stringify(progress.srsCards || {}),
+      JSON.stringify(progress.preschool || { completedLessonIds: [], stickers: [], stars: 0 }),
       now,
       email
     );
@@ -371,6 +384,7 @@ export function saveLearnerProfile(emailRaw, profileInput = {}) {
   const dailyMinutes = VALID_DAILY_MINUTES.has(dailyMinutesNum) ? dailyMinutesNum : 20;
 
   const details = {};
+  if (profileInput.preschool && typeof profileInput.preschool === 'object') details.preschool = profileInput.preschool;
   if (profileInput.kids && typeof profileInput.kids === 'object') details.kids = profileInput.kids;
   if (profileInput.teen && typeof profileInput.teen === 'object') details.teen = profileInput.teen;
   if (profileInput.university && typeof profileInput.university === 'object') details.university = profileInput.university;

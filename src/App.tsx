@@ -46,6 +46,7 @@ import { VocabularyLibrary } from './components/VocabularyLibrary';
 import { MemoryGamesSRS } from './components/MemoryGamesSRS';
 import { WordAnatomyCard } from './components/WordAnatomyCard';
 const KidsPlayground = lazy(() => import('./components/kids/KidsPlayground').then((m) => ({ default: m.KidsPlayground })));
+const PreschoolApp = lazy(() => import('./components/preschool/PreschoolApp').then((m) => ({ default: m.PreschoolApp })));
 const SchoolCurriculum = lazy(() => import('./components/teen/SchoolCurriculum').then((m) => ({ default: m.SchoolCurriculum })));
 const AcademicSkills = lazy(() => import('./components/university/AcademicSkills').then((m) => ({ default: m.AcademicSkills })));
 const WorkplaceCareerHub = lazy(() => import('./components/worker/WorkplaceCareerHub').then((m) => ({ default: m.WorkplaceCareerHub })));
@@ -141,6 +142,7 @@ export function App() {
       const base = createDefaultProfile(adminPreviewAudience);
       return {
         ...base,
+        preschool: learnerProfile?.preschool || base.preschool,
         kids: learnerProfile?.kids || base.kids,
         teen: learnerProfile?.teen || base.teen,
         university: learnerProfile?.university || base.university,
@@ -204,6 +206,7 @@ export function App() {
   const handleSaveLearnerProfile = async (nextProfile: LearnerProfile) => {
     const mergedProfile: LearnerProfile = {
       ...nextProfile,
+      preschool: nextProfile.preschool || learnerProfile?.preschool,
       kids: nextProfile.kids || learnerProfile?.kids,
       teen: nextProfile.teen || learnerProfile?.teen,
       university: nextProfile.university || learnerProfile?.university,
@@ -215,6 +218,7 @@ export function App() {
     const hydratedSaved: LearnerProfile = {
       ...mergedProfile,
       ...saved,
+      preschool: saved.preschool || mergedProfile.preschool,
       kids: saved.kids || mergedProfile.kids,
       teen: saved.teen || mergedProfile.teen,
       university: saved.university || mergedProfile.university,
@@ -257,12 +261,13 @@ export function App() {
       ...(learnerProfile || {}),
       audience: aud,
       startLevel:
-        aud === 'kids'
+        aud === 'kids' || aud === 'preschool'
           ? 'A0'
           : learnerProfile?.startLevel && learnerProfile.startLevel !== 'A0'
           ? learnerProfile.startLevel
           : base.startLevel,
       dailyMinutes: learnerProfile?.dailyMinutes || base.dailyMinutes,
+      preschool: learnerProfile?.preschool || base.preschool,
       kids: learnerProfile?.kids || base.kids,
       teen: learnerProfile?.teen || base.teen,
       university: learnerProfile?.university || base.university,
@@ -439,6 +444,9 @@ export function App() {
   };
 
   const audienceSubTag = (() => {
+    if (effectiveProfile.audience === 'preschool') {
+      return `${effectiveProfile.preschool?.ageBand || '3-4'} tuổi`;
+    }
     if (effectiveProfile.audience === 'kids') {
       return effectiveProfile.kids?.goal === 'yle'
         ? `YLE ${(effectiveProfile.kids.yleLevel || 'starters').toUpperCase()}`
@@ -474,6 +482,50 @@ export function App() {
           onClose={() => setShowWorkbookStudio(false)}
         />
       </Suspense>
+    );
+  }
+
+  if (effectiveProfile.audience === 'preschool') {
+    return (
+      <>
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFF8EC] gap-3 font-kid text-amber-800">
+              <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+              <p className="text-lg font-bold">Đang mở lớp học của bé...</p>
+            </div>
+          }
+        >
+          <PreschoolApp
+            profile={effectiveProfile}
+            progress={progress.preschool || { completedLessonIds: [], stickers: [], stars: 0 }}
+            accent={progress.accent}
+            displayName={currentUser.displayName}
+            isAdmin={isAdminUser}
+            isPreview={Boolean(adminPreviewAudience)}
+            onProgressChange={(nextPreschool, gainedXp = 0) =>
+              setProgress((prev) => ({
+                ...prev,
+                xp: prev.xp + gainedXp,
+                preschool: nextPreschool,
+              }))
+            }
+            onSaveProfile={handleSaveLearnerProfile}
+            onOpenProfileModal={() => setShowProfileModal(true)}
+            onExitPreview={() => setAdminPreviewAudience(null)}
+            onLogout={handleLogout}
+          />
+        </Suspense>
+
+        <LearnerProfilePanel
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          profile={effectiveProfile}
+          onSaveProfile={handleSaveLearnerProfile}
+          xp={progress.xp}
+          savedWordsCount={progress.savedWords.length}
+        />
+      </>
     );
   }
 

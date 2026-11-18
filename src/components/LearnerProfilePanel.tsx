@@ -49,12 +49,13 @@ export const LearnerProfilePanel: React.FC<LearnerProfilePanelProps> = ({
     const base = createDefaultProfile(aud);
     setDraft((prev) => ({
       ...base,
+      preschool: prev.preschool || base.preschool,
       kids: prev.kids || base.kids,
       teen: prev.teen || base.teen,
       university: prev.university || base.university,
       worker: prev.worker || base.worker,
       exam: prev.exam || base.exam,
-      startLevel: aud === 'kids' ? 'A0' : prev.startLevel,
+      startLevel: aud === 'kids' || aud === 'preschool' ? 'A0' : prev.startLevel,
       dailyMinutes: prev.dailyMinutes,
     }));
   };
@@ -164,6 +165,62 @@ export const LearnerProfilePanel: React.FC<LearnerProfilePanelProps> = ({
             <div className="text-xs font-extrabold text-slate-800 dark:text-white">
               Tùy chỉnh chi tiết ({currentMeta.emoji} {currentMeta.shortLabel})
             </div>
+
+            {draft.audience === 'preschool' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">Tên gọi ở nhà của bé</label>
+                  <input
+                    type="text"
+                    value={draft.preschool?.childName || ''}
+                    onChange={(e) =>
+                      setDraft((p) => ({
+                        ...p,
+                        preschool: {
+                          ...(p.preschool || {
+                            ageBand: '3-4',
+                            levelId: 'explorer',
+                            studyDays: [2, 4],
+                            startDate: new Date().toISOString().slice(0, 10),
+                          }),
+                          childName: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Ví dụ: Bin, Bông..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">Độ tuổi & Lớp</label>
+                  <select
+                    value={draft.preschool?.ageBand || '3-4'}
+                    onChange={(e) => {
+                      const ageBand = e.target.value as '1-2' | '3-4' | '5-6';
+                      const levelId = ageBand === '1-2' ? 'tiny' : ageBand === '5-6' ? 'star' : 'explorer';
+                      setDraft((p) => ({
+                        ...p,
+                        preschool: {
+                          ...(p.preschool || {
+                            ageBand,
+                            levelId,
+                            studyDays: [2, 4],
+                            startDate: new Date().toISOString().slice(0, 10),
+                          }),
+                          ageBand,
+                          levelId,
+                        },
+                      }));
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold"
+                  >
+                    <option value="1-2">1–2 tuổi (Tiny Tots)</option>
+                    <option value="3-4">3–4 tuổi (Little Explorers)</option>
+                    <option value="5-6">5–6 tuổi (Bright Stars)</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             {draft.audience === 'kids' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

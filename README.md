@@ -8,6 +8,17 @@
 
 ---
 
+## Lộ trình Mầm non (1–6 tuổi) — Học như Trung tâm Ngoại ngữ
+
+Nhóm đối tượng **Mầm non (`preschool`)** có giao diện Kid Mode toàn màn hình (chữ to, nút ≥ 80px, chạm là phát âm, không cần biết đọc) và giáo trình 3 cấp độ giống trung tâm:
+
+- **Tiny Tots (1–2 tuổi)**: 2 Term · 8 Unit · 32 buổi (5–7 phút/buổi, bố mẹ cùng chơi).
+- **Little Explorers (3–4 tuổi)**: 3 Term · 12 Unit · 48 buổi (10–12 phút/buổi, từ vựng + mẫu câu + tô hình).
+- **Bright Stars (5–6 tuổi)**: 3 Term · 12 Unit · 48 buổi (12–15 phút/buổi, 26 âm Jolly Phonics + ghép âm CVC + hỏi đáp + tô chữ).
+- **Chức năng trung tâm**: Lịch học theo **Term – Tuần – Buổi học** (2 buổi/tuần mặc định, chèn Tuần ôn tập cuối mỗi Term), góc **Bài hát Karaoke**, **Truyện tranh tương tác**, **Album Sticker**, **Nhắc nghỉ mắt** và **Cổng Phụ Huynh** (giữ 2 giây + phép tính).
+
+---
+
 ## Lộ trình 7 Bước Tích Hợp
 
 | Bước | Tên bước | Nội dung chính |

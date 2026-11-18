@@ -35,6 +35,29 @@ export function isLevelAtLeast(level: CefrLevel | undefined, target: CefrLevel):
 }
 
 export const AUDIENCE_TRACKS: Record<AudienceId, AudienceTrackConfig> = {
+  preschool: {
+    title: 'Lớp Tiếng Anh Mầm Non (1–6 Tuổi)',
+    subtitle: 'Học như ở trung tâm: Term – Unit – Buổi học, bé chạm & nghe, bố mẹ đồng hành',
+    theme: 'kids',
+    skillDistribution: [
+      { skill: 'Nghe & nhận biết', percent: 35, color: 'bg-amber-500' },
+      { skill: 'Bài hát & vận động', percent: 20, color: 'bg-pink-500' },
+      { skill: 'Trò chơi chạm-là-học', percent: 20, color: 'bg-emerald-500' },
+      { skill: 'Truyện tranh', percent: 10, color: 'bg-sky-500' },
+      { skill: 'Nói theo & Phonics', percent: 10, color: 'bg-violet-500' },
+      { skill: 'Tô màu & tô chữ', percent: 5, color: 'bg-orange-500' },
+    ],
+    steps: [
+      {
+        idx: 0,
+        code: 'P1',
+        label: 'P1: Lớp học của bé',
+        description: 'Bản đồ phiêu lưu, buổi học hôm nay, bài hát, truyện, sticker & lịch học.',
+        page: 'preschool',
+      },
+    ],
+  },
+
   kids: {
     title: 'Lộ Trình Tiếng Anh Vui Nhộn Cho Bé (6–10 Tuổi)',
     subtitle: 'Học qua hình ảnh, âm thanh, truyện kể & trò chơi — không công thức ngữ pháp khô khan',
@@ -368,6 +391,7 @@ export const PAGE_VISIBILITY: Record<PageKey, (profile?: LearnerProfile | null) 
     return aud === 'teen' || aud === 'university' || aud === 'worker';
   },
   kids: (p) => (p?.audience || 'worker') === 'kids',
+  preschool: (p) => (p?.audience || 'worker') === 'preschool',
   school: (p) => (p?.audience || 'worker') === 'teen',
   academic: (p) => (p?.audience || 'worker') === 'university',
   workplace: (p) => (p?.audience || 'worker') === 'worker',
@@ -403,6 +427,8 @@ export function resolveTrack(profile?: LearnerProfile | null): TrackStep[] {
 }
 
 export function canViewPage(page: PageKey, profile?: LearnerProfile | null): boolean {
+  // Preschool learners live entirely inside the full-screen Kid Mode.
+  if (profile?.audience === 'preschool') return page === 'preschool' || page === 'profile';
   const checker = PAGE_VISIBILITY[page];
   return checker ? checker(profile) : false;
 }

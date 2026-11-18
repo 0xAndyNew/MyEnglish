@@ -1,6 +1,6 @@
 import { CefrLevel } from './learning';
 
-export type AudienceId = 'kids' | 'teen' | 'university' | 'worker' | 'exam';
+export type AudienceId = 'preschool' | 'kids' | 'teen' | 'university' | 'worker' | 'exam';
 export type ExamType = 'ielts' | 'toeic' | 'vstep' | 'cambridge' | 'toefl';
 
 export type PageKey =
@@ -15,6 +15,7 @@ export type PageKey =
   | 'writing'
   | 'ocr'
   | 'kids'
+  | 'preschool'
   | 'school'
   | 'academic'
   | 'workplace'
@@ -26,6 +27,16 @@ export interface LearnerProfile {
   audience: AudienceId;
   startLevel: CefrLevel;
   dailyMinutes: 10 | 20 | 30 | 60;
+  preschool?: {
+    ageBand: '1-2' | '3-4' | '5-6';
+    levelId: 'tiny' | 'explorer' | 'star';
+    childName?: string;
+    /** 0 = Sunday ... 6 = Saturday */
+    studyDays: number[];
+    /** ISO date (YYYY-MM-DD) when the course started — used for the weekly schedule */
+    startDate: string;
+    parentConfirmed?: boolean;
+  };
   kids?: {
     ageBand: '6-7' | '8-10';
     goal: 'intro' | 'primary' | 'yle';
@@ -67,6 +78,16 @@ export interface AudienceMetadataItem {
 }
 
 export const AUDIENCE_METADATA: AudienceMetadataItem[] = [
+  {
+    id: 'preschool',
+    label: 'Mầm non (1–6 tuổi)',
+    shortLabel: 'Mầm non',
+    emoji: '🐣',
+    ageRange: '1–6 tuổi (Nhà trẻ – Mẫu giáo)',
+    description: 'Học như ở trung tâm: lịch Term – Unit – Buổi học, tranh to, giọng đọc, bài hát, truyện & trò chơi chạm-là-học.',
+    badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-950/50 dark:text-yellow-300 dark:border-yellow-800',
+    accentGradient: 'from-yellow-400 to-amber-500',
+  },
   {
     id: 'kids',
     label: 'Trẻ em (6–10 tuổi)',
@@ -178,7 +199,7 @@ export const EXAM_METADATA: ExamMetadataItem[] = [
 ];
 
 export function getAudienceMeta(audience: AudienceId): AudienceMetadataItem {
-  return AUDIENCE_METADATA.find((item) => item.id === audience) || AUDIENCE_METADATA[3];
+  return AUDIENCE_METADATA.find((item) => item.id === audience) || AUDIENCE_METADATA.find((item) => item.id === 'worker')!;
 }
 
 export function getExamMeta(examType: ExamType): ExamMetadataItem {
@@ -188,6 +209,20 @@ export function getExamMeta(examType: ExamType): ExamMetadataItem {
 export function createDefaultProfile(audience: AudienceId = 'worker'): LearnerProfile {
   const now = new Date().toISOString();
   switch (audience) {
+    case 'preschool':
+      return {
+        audience: 'preschool',
+        startLevel: 'A0',
+        dailyMinutes: 10,
+        preschool: {
+          ageBand: '3-4',
+          levelId: 'explorer',
+          studyDays: [2, 4],
+          startDate: now.slice(0, 10),
+          parentConfirmed: true,
+        },
+        updatedAt: now,
+      };
     case 'kids':
       return {
         audience: 'kids',
