@@ -173,5 +173,32 @@ export interface UserProgress {
     stickers: string[];
     stars: number;
     lastLessonAt?: string;
+    lew?: {
+      children: {
+        id: string;
+        name: string;
+        ageLevelId: 'level1' | 'level2' | 'level3' | 'level4' | 'level5';
+        avatar: 'benny' | 'toto' | 'bunny' | 'kitty';
+      }[];
+      activeChildId: string;
+      completedKeys: Record<string, string[]>;
+      stickersByChild: Record<string, string[]>;
+      observations: {
+        id: string;
+        childId: string;
+        topicId: string;
+        levelId: 'level1' | 'level2' | 'level3' | 'level4' | 'level5';
+        observations: (
+          | 'recognized'
+          | 'understood'
+          | 'spoke'
+          | 'real_life'
+          | 'needs_review'
+          | 'not_observed'
+        )[];
+        parentNote?: string;
+        createdAt: string;
+      }[];
+    };
   };
 }

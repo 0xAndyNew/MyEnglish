@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { AccentMode } from '../../types/learning';
 import { LearnerProfile } from '../../types/audience';
+import { resolveFlashcardImage } from '../../utils/flashcardMedia';
 import {
   isSpeechRecognitionSupported,
   playLoudAudioUrl,
@@ -51,6 +52,7 @@ import {
   YleLevel,
 } from '../../data/kids/kidsCurriculumData';
 import { ExerciseRunner } from '../practice/ExerciseRunner';
+import { PaginationBar, usePagination } from '../common/PaginationBar';
 import { KidsFlashcard3D } from './KidsFlashcard3D';
 
 export type KidsTab = 'vocab' | 'stories' | 'sentences' | 'games' | 'yle';
@@ -179,6 +181,18 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
     () => KIDS_UNITS.find((u) => u.id === selectedUnitId) || KIDS_UNITS[0],
     [selectedUnitId]
   );
+  const activeUnitIndex = useMemo(
+    () => Math.max(0, KIDS_UNITS.findIndex((u) => u.id === activeUnit.id)),
+    [activeUnit.id]
+  );
+  const vocabUnitsRef = useRef<HTMLDivElement | null>(null);
+  const vocabWordsRef = useRef<HTMLDivElement | null>(null);
+  const storiesUnitsRef = useRef<HTMLDivElement | null>(null);
+  const chunksSectionRef = useRef<HTMLDivElement | null>(null);
+
+  const vocabUnitPagination = usePagination(KIDS_UNITS, 8, { activeIndex: activeUnitIndex });
+  const storiesUnitPagination = usePagination(KIDS_UNITS, 8, { activeIndex: activeUnitIndex });
+  const vocabWordPagination = usePagination(activeUnit.words, 8, { resetKey: activeUnit.id });
 
   // Vocab completion state
   const [starredWordIds, setStarredWordIds] = useState<string[]>([]);
@@ -760,6 +774,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
     if (chunkCategory === 'Tất cả') return KIDS_SENTENCE_CHUNKS;
     return KIDS_SENTENCE_CHUNKS.filter((c) => c.category === chunkCategory);
   }, [chunkCategory]);
+  const chunkPagination = usePagination(filteredChunks, 6, { resetKey: chunkCategory });
 
   const ageBandText = profile?.kids?.ageBand === '8-10' ? '8–10 tuổi' : '6–7 tuổi';
 
@@ -899,22 +914,24 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
       {/* ==================== TAB 1: VOCAB ==================== */}
       {activeTab === 'vocab' && (
         <div className="space-y-5">
-          {/* 12 Units Selector */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-amber-200/80 dark:border-slate-800 p-4 sm:p-5 space-y-3">
+          {/* Units Selector (8 units per page) */}
+          <div ref={vocabUnitsRef} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-amber-200/80 dark:border-slate-800 p-4 sm:p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <Palette className="w-5 h-5 text-pink-500" />
-                <span>Chọn 1 Trong 12 Chủ Đề Vui Nhộn</span>
+                <span>Chọn 1 Trong {KIDS_UNITS.length} Chủ Đề Vui Nhộn</span>
               </h3>
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                Tổng cộng {ALL_KIDS_WORDS.length} từ vựng hình ảnh
+                Tổng cộng {KIDS_UNITS.length} chủ đề • {ALL_KIDS_WORDS.length} từ vựng hình ảnh
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-              {KIDS_UNITS.map((unit, idx) => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              {vocabUnitPagination.pageItems.map((unit, idx) => {
+                const unitNumber = vocabUnitPagination.startIdx + idx + 1;
                 const isSelected = unit.id === activeUnit.id;
                 const doneCount = unit.words.filter((w) => starredWordIds.includes(w.id)).length;
+                const unitThumb = unit.words[0] ? resolveFlashcardImage(unit.words[0].word, unit.words[0].meaningVi, unit.id) : '/preschool/img/words/star.webp';
                 return (
                   <button
                     key={unit.id}
@@ -927,7 +944,11 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl">{unit.emoji}</span>
+                      <img
+                        src={unitThumb}
+                        alt={unit.title}
+                        className="w-10 h-10 rounded-xl bg-white p-1 border border-slate-100 object-contain shrink-0"
+                      />
                       <span
                         className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                           isSelected
@@ -940,7 +961,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                     </div>
                     <div>
                       <div className="text-xs font-black leading-tight">
-                        Unit {idx + 1}: {unit.title}
+                        Unit {unitNumber}: {unit.title}
                       </div>
                       <div
                         className={`text-[11px] font-semibold mt-0.5 ${
@@ -954,13 +975,29 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                 );
               })}
             </div>
+
+            <PaginationBar
+              page={vocabUnitPagination.page}
+              totalPages={vocabUnitPagination.totalPages}
+              totalItems={vocabUnitPagination.totalItems}
+              startIdx={vocabUnitPagination.startIdx}
+              endIdx={vocabUnitPagination.endIdx}
+              onPageChange={vocabUnitPagination.setPage}
+              variant="kid"
+              itemLabel="chủ đề"
+              scrollTargetRef={vocabUnitsRef}
+            />
           </div>
 
           {/* Active Unit Banner */}
           <div className={`rounded-3xl bg-gradient-to-r ${activeUnit.color} p-5 text-white shadow-md flex flex-wrap items-center justify-between gap-3`}>
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white/25 flex items-center justify-center text-4xl">
-                {activeUnit.emoji}
+              <div className="w-14 h-14 rounded-2xl bg-white p-1.5 shadow-sm flex items-center justify-center shrink-0">
+                <img
+                  src={activeUnit.words[0] ? resolveFlashcardImage(activeUnit.words[0].word, activeUnit.words[0].meaningVi, activeUnit.id) : '/preschool/img/words/star.webp'}
+                  alt={activeUnit.title}
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div>
                 <div className="text-xs font-extrabold uppercase tracking-wide text-white/90">
@@ -1055,9 +1092,10 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
               onAddXp={onAddXp}
             />
           ) : (
-            /* Giant Kid-Friendly Vocab Cards Grid */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeUnit.words.map((item) => {
+            /* Giant Kid-Friendly Vocab Cards Grid (8 words/page) */
+            <div ref={vocabWordsRef} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {vocabWordPagination.pageItems.map((item) => {
               const isStarred = starredWordIds.includes(item.id);
               const isMicActive = listeningKey === item.id;
               return (
@@ -1069,10 +1107,14 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                     <button
                       type="button"
                       onClick={() => speakText(item.word, accent, speechRate)}
-                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white dark:bg-slate-900 shadow-md border-2 border-white/80 dark:border-slate-700 flex items-center justify-center text-5xl sm:text-6xl shrink-0 hover:scale-105 active:scale-95 transition"
+                      className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white shadow-md border-2 border-white/80 p-2 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition"
                       title="Bấm vào hình để nghe"
                     >
-                      {item.emoji}
+                      <img
+                        src={resolveFlashcardImage(item.word, item.meaningVi, activeUnit.id)}
+                        alt={item.word}
+                        className="w-full h-full object-contain"
+                      />
                     </button>
 
                     <div className="min-w-0 flex-1 space-y-1">
@@ -1167,6 +1209,19 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                 </div>
               );
             })}
+              </div>
+
+              <PaginationBar
+                page={vocabWordPagination.page}
+                totalPages={vocabWordPagination.totalPages}
+                totalItems={vocabWordPagination.totalItems}
+                startIdx={vocabWordPagination.startIdx}
+                endIdx={vocabWordPagination.endIdx}
+                onPageChange={vocabWordPagination.setPage}
+                variant="kid"
+                itemLabel="từ vựng"
+                scrollTargetRef={vocabWordsRef}
+              />
             </div>
           )}
 
@@ -1190,13 +1245,13 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
       {/* ==================== TAB 2: STORIES & SONGS ==================== */}
       {activeTab === 'stories' && (
         <div className="space-y-5">
-          {/* Quick Unit Pill Bar */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-amber-200/80 dark:border-slate-800 p-4">
-            <div className="text-xs font-extrabold uppercase text-slate-500 dark:text-slate-400 mb-2.5">
+          {/* Quick Unit Pill Bar (8 per page) */}
+          <div ref={storiesUnitsRef} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-amber-200/80 dark:border-slate-800 p-4 space-y-3">
+            <div className="text-xs font-extrabold uppercase text-slate-500 dark:text-slate-400">
               Chọn chủ đề truyện &amp; bài hát cho bé:
             </div>
             <div className="flex flex-wrap gap-2">
-              {KIDS_UNITS.map((u) => {
+              {storiesUnitPagination.pageItems.map((u) => {
                 const active = u.id === activeUnit.id;
                 return (
                   <button
@@ -1215,6 +1270,18 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                 );
               })}
             </div>
+
+            <PaginationBar
+              page={storiesUnitPagination.page}
+              totalPages={storiesUnitPagination.totalPages}
+              totalItems={storiesUnitPagination.totalItems}
+              startIdx={storiesUnitPagination.startIdx}
+              endIdx={storiesUnitPagination.endIdx}
+              onPageChange={storiesUnitPagination.setPage}
+              variant="kid"
+              itemLabel="chủ đề"
+              scrollTargetRef={storiesUnitsRef}
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -1620,7 +1687,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
 
       {/* ==================== TAB 3: FIRST SENTENCE CHUNKS ==================== */}
       {activeTab === 'sentences' && (
-        <div className="space-y-5">
+        <div ref={chunksSectionRef} className="space-y-5">
           {/* Category Filter */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-sky-200/80 dark:border-slate-800 p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-base font-black text-slate-900 dark:text-white">
@@ -1647,7 +1714,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredChunks.map((chunk: KidsSentenceChunk) => {
+            {chunkPagination.pageItems.map((chunk: KidsSentenceChunk) => {
               const activeSwapIdx = selectedSwaps[chunk.id];
               const activeSwap =
                 chunk.swaps && activeSwapIdx !== undefined ? chunk.swaps[activeSwapIdx] : null;
@@ -1772,6 +1839,18 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
               );
             })}
           </div>
+
+          <PaginationBar
+            page={chunkPagination.page}
+            totalPages={chunkPagination.totalPages}
+            totalItems={chunkPagination.totalItems}
+            startIdx={chunkPagination.startIdx}
+            endIdx={chunkPagination.endIdx}
+            onPageChange={chunkPagination.setPage}
+            variant="kid"
+            itemLabel="mẫu câu"
+            scrollTargetRef={chunksSectionRef}
+          />
         </div>
       )}
 
@@ -1893,7 +1972,17 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                       onClick={() => handleSelectListenOption(opt)}
                       className={`p-5 rounded-3xl border-4 transition flex flex-col items-center justify-center gap-2 min-h-[150px] ${cardStyle}`}
                     >
-                      <span className="text-5xl sm:text-6xl leading-none">{opt.emoji}</span>
+                      <span className="w-24 h-24 rounded-2xl bg-white p-2 border border-slate-100 shadow-2xs flex items-center justify-center">
+                        <img
+                          src={resolveFlashcardImage(
+                            opt.word,
+                            opt.meaningVi,
+                            gameUnitFilter === 'all' ? undefined : gameUnitFilter
+                          )}
+                          alt={opt.word}
+                          className="w-full h-full object-contain"
+                        />
+                      </span>
                       {(!hideWordsInGame || listenPickedId) && (
                         <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
                           {opt.word}
@@ -1965,7 +2054,17 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                             : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-teal-400'
                         }`}
                       >
-                        <span className="text-4xl">{card.emoji}</span>
+                        <div className="w-16 h-16 rounded-xl bg-white p-1.5 border border-slate-100 flex items-center justify-center shrink-0">
+                          <img
+                            src={resolveFlashcardImage(
+                              card.word,
+                              card.meaningVi,
+                              gameUnitFilter === 'all' ? undefined : gameUnitFilter
+                            )}
+                            alt={card.word}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                         <span className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                           {card.meaningVi}
                         </span>

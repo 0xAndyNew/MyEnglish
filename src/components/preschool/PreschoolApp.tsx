@@ -1,31 +1,34 @@
 import React, { useMemo, useState } from 'react';
-import { getUnitsByLevel } from '../../data/preschool';
-import { PRESCHOOL_LEVELS } from '../../data/preschool/levels';
-import { buildSchedule } from '../../data/preschool/schedule';
-import type { PreschoolLesson, PreschoolProgress, PreschoolUnit } from '../../data/preschool/types';
+import {
+  LEW_AGE_LEVELS,
+  ageBandToLewLevel,
+} from '../../data/preschool/lewLevels';
+import { LEW_TOPICS } from '../../data/preschool/lewTopics';
+import type {
+  LewAgeLevelId,
+  LewAvatarId,
+  LewChildProfile,
+  LewObservationCode,
+  LewStoreState,
+  LewTopic,
+} from '../../data/preschool/lewTypes';
 import type { LearnerProfile } from '../../types/audience';
-import type { AccentMode } from '../../types/learning';
-import { LessonPlayer } from './lesson/LessonPlayer';
-import { HomeMap } from './screens/HomeMap';
-import { ParentZone } from './screens/ParentZone';
-import { SongsCorner } from './screens/SongsCorner';
-import { StickerBook } from './screens/StickerBook';
-import { StoryCorner } from './screens/StoryCorner';
-import { BreakReminder } from './shell/BreakReminder';
-import { KidDock, type KidScreenId } from './shell/KidDock';
-import { KidTopBar } from './shell/KidTopBar';
-import { ParentGate } from './shell/ParentGate';
-import { useBreakTimer } from './ui/useBreakTimer';
+import type { AccentMode, UserProgress } from '../../types/learning';
+import { ChildHome } from './ChildHome';
+import { LessonFlow, type LessonStepId } from './LessonFlow';
+import { LewParentZone } from './LewParentZone';
 import { useKidAudio } from './ui/useKidAudio';
+
+type PreschoolProgressShape = NonNullable<UserProgress['preschool']>;
 
 interface PreschoolAppProps {
   profile: LearnerProfile;
-  progress: PreschoolProgress;
+  progress: PreschoolProgressShape;
   accent?: AccentMode;
   displayName: string;
   isAdmin?: boolean;
   isPreview?: boolean;
-  onProgressChange: (next: PreschoolProgress, gainedXp?: number) => void;
+  onProgressChange: (next: PreschoolProgressShape, gainedXp?: number) => void;
   onSaveProfile: (next: LearnerProfile) => Promise<void> | void;
   onOpenProfileModal: () => void;
   onExitPreview?: () => void;
@@ -37,188 +40,212 @@ export const PreschoolApp: React.FC<PreschoolAppProps> = ({
   progress: rawProgress,
   accent = 'en-US',
   displayName,
-  isAdmin = false,
   isPreview = false,
   onProgressChange,
-  onSaveProfile,
   onOpenProfileModal,
   onExitPreview,
   onLogout,
 }) => {
-  const progress: PreschoolProgress = useMemo(
-    () => ({
-      completedLessonIds: Array.isArray(rawProgress?.completedLessonIds) ? rawProgress.completedLessonIds : [],
-      stickers: Array.isArray(rawProgress?.stickers) ? rawProgress.stickers : [],
-      stars: Number(rawProgress?.stars || 0),
-      lastLessonAt: rawProgress?.lastLessonAt,
-    }),
-    [rawProgress]
-  );
-  const levelId = profile.preschool?.levelId || 'explorer';
-  const levelMeta = PRESCHOOL_LEVELS[levelId];
-  const childName = profile.preschool?.childName?.trim() || displayName || 'Bé yêu';
-  const units = useMemo(() => getUnitsByLevel(levelId), [levelId]);
-  const schedule = useMemo(() => buildSchedule(profile, units, progress), [profile, units, progress]);
-
   const audio = useKidAudio(accent);
 
-  const [screen, setScreen] = useState<KidScreenId>('home');
-  const [activeSession, setActiveSession] = useState<{
-    unit: PreschoolUnit;
-    lesson: PreschoolLesson;
+  const store: LewStoreState = useMemo(() => {
+    const defaultChildId = 'child-1';
+    const defaultChild: LewChildProfile = {
+      id: defaultChildId,
+      name: profile.preschool?.childName?.trim() || displayName || 'Bin',
+      ageLevelId: ageBandToLewLevel(profile.preschool?.ageBand),
+      avatar: 'benny',
+    };
+
+    const rawLew = rawProgress?.lew;
+    const children =
+      Array.isArray(rawLew?.children) && rawLew.children.length > 0
+        ? rawLew.children
+        : [defaultChild];
+    const activeChildId =
+      rawLew?.activeChildId && children.some((c) => c.id === rawLew.activeChildId)
+        ? rawLew.activeChildId
+        : children[0].id;
+
+    return {
+      children,
+      activeChildId,
+      completedKeys: rawLew?.completedKeys || {},
+      stickersByChild: rawLew?.stickersByChild || {},
+      observations: Array.isArray(rawLew?.observations) ? rawLew.observations : [],
+    };
+  }, [rawProgress, profile.preschool?.childName, profile.preschool?.ageBand, displayName]);
+
+  const activeChild =
+    store.children.find((c) => c.id === store.activeChildId) || store.children[0];
+  const levelMeta = LEW_AGE_LEVELS[activeChild.ageLevelId];
+  const childCompleted = store.completedKeys[activeChild.id] || [];
+  const childStickers = store.stickersByChild[activeChild.id] || [];
+
+  const recommendedTopic = useMemo(() => {
+    const nextUnfinished = LEW_TOPICS.find((t) => !childStickers.includes(t.id));
+    return nextUnfinished || LEW_TOPICS[0];
+  }, [childStickers]);
+
+  const [activeLesson, setActiveLesson] = useState<{
+    topic: LewTopic;
+    initialStep?: LessonStepId;
   } | null>(null);
+  const [parentZoneOpen, setParentZoneOpen] = useState(false);
 
-  const [gateOpen, setGateOpen] = useState(false);
-  const [parentMode, setParentMode] = useState(false);
-
-  const { breakDue, dismissBreak } = useBreakTimer(
-    levelMeta.breakAfterMinutes,
-    parentMode || gateOpen
-  );
-
-  const currentScheduleEntry = schedule.find((s) => s.status === 'today') || schedule[0];
-  const termUnitLabel = currentScheduleEntry?.unitTitle
-    ? `Term ${currentScheduleEntry.term} · ${currentScheduleEntry.unitTitle}`
-    : `${levelMeta.emoji} ${levelMeta.name}`;
-
-  const handleLessonComplete = (earnedSticker: boolean) => {
-    if (!activeSession) return;
-    const { unit, lesson } = activeSession;
-    const alreadyDone = progress.completedLessonIds.includes(lesson.id);
-    const completedLessonIds = alreadyDone
-      ? progress.completedLessonIds
-      : [...progress.completedLessonIds, lesson.id];
-    const stickers =
-      earnedSticker && !progress.stickers.includes(unit.id)
-        ? [...progress.stickers, unit.id]
-        : progress.stickers;
-    const gainedStars = alreadyDone ? 1 : earnedSticker ? 5 : 3;
-
+  const persistStore = (nextStore: LewStoreState, gainedXp = 0) => {
+    const allStickers = Array.from(
+      new Set(Object.values(nextStore.stickersByChild).flat())
+    );
+    const allCompleted = Array.from(
+      new Set(Object.values(nextStore.completedKeys).flat())
+    );
     onProgressChange(
       {
-        completedLessonIds,
-        stickers,
-        stars: (progress.stars || 0) + gainedStars,
+        completedLessonIds: allCompleted,
+        stickers: allStickers,
+        stars: allStickers.length * 3,
         lastLessonAt: new Date().toISOString(),
+        lew: {
+          children: nextStore.children,
+          activeChildId: nextStore.activeChildId,
+          completedKeys: nextStore.completedKeys,
+          stickersByChild: nextStore.stickersByChild,
+          observations: nextStore.observations,
+        },
       },
-      gainedStars * 10
+      gainedXp
     );
-
-    setActiveSession(null);
-    setScreen('home');
   };
 
-  if (parentMode) {
+  const handleSelectChild = (childId: string) => {
+    persistStore({ ...store, activeChildId: childId });
+  };
+
+  const handleChangeLevel = (levelId: LewAgeLevelId) => {
+    const updatedChildren = store.children.map((c) =>
+      c.id === activeChild.id ? { ...c, ageLevelId: levelId } : c
+    );
+    persistStore({ ...store, children: updatedChildren });
+  };
+
+  const handleCreateChild = (name: string, levelId: LewAgeLevelId, avatar: LewAvatarId) => {
+    const newChild: LewChildProfile = {
+      id: `child-${Date.now()}`,
+      name,
+      ageLevelId: levelId,
+      avatar,
+    };
+    persistStore({
+      ...store,
+      children: [...store.children, newChild],
+      activeChildId: newChild.id,
+    });
+  };
+
+  const handleFinishLesson = (
+    topic: LewTopic,
+    observations: LewObservationCode[],
+    parentNote: string
+  ) => {
+    const key = `${topic.id}:${activeChild.ageLevelId}`;
+    const prevKeys = store.completedKeys[activeChild.id] || [];
+    const nextKeys = prevKeys.includes(key) ? prevKeys : [...prevKeys, key];
+
+    const prevStickers = store.stickersByChild[activeChild.id] || [];
+    const nextStickers = prevStickers.includes(topic.id)
+      ? prevStickers
+      : [...prevStickers, topic.id];
+
+    const newObs = {
+      id: `obs-${Date.now()}`,
+      childId: activeChild.id,
+      topicId: topic.id,
+      levelId: activeChild.ageLevelId,
+      observations: observations.length ? observations : (['recognized'] as LewObservationCode[]),
+      parentNote: parentNote.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    persistStore(
+      {
+        ...store,
+        completedKeys: {
+          ...store.completedKeys,
+          [activeChild.id]: nextKeys,
+        },
+        stickersByChild: {
+          ...store.stickersByChild,
+          [activeChild.id]: nextStickers,
+        },
+        observations: [newObs, ...store.observations],
+      },
+      30
+    );
+
+    setActiveLesson(null);
+  };
+
+  if (parentZoneOpen) {
     return (
-      <ParentZone
-        profile={profile}
-        units={units}
-        schedule={schedule}
-        progress={progress}
-        isAdmin={isAdmin}
+      <LewParentZone
+        childrenList={store.children}
+        activeChild={activeChild}
+        completedKeys={childCompleted}
+        earnedStickers={childStickers}
+        observations={store.observations}
         isPreview={isPreview}
-        onBackToKid={() => setParentMode(false)}
-        onSaveProfile={onSaveProfile}
+        onBackToKid={() => setParentZoneOpen(false)}
+        onSelectChild={handleSelectChild}
+        onChangeLevel={handleChangeLevel}
+        onOpenTopicLesson={(topic) => {
+          setParentZoneOpen(false);
+          setActiveLesson({ topic, initialStep: 1 });
+        }}
         onOpenProfileModal={onOpenProfileModal}
         onExitPreview={onExitPreview}
         onLogout={onLogout}
+        onSpeak={(text) => audio.speak(text, 0.85)}
       />
     );
   }
 
-  if (activeSession) {
+  if (activeLesson) {
     return (
-      <>
-        <LessonPlayer
-          unit={activeSession.unit}
-          lesson={activeSession.lesson}
-          level={levelMeta}
-          audio={audio}
-          onComplete={handleLessonComplete}
-          onExit={() => setActiveSession(null)}
-        />
-        <BreakReminder visible={breakDue} onDone={dismissBreak} />
-      </>
+      <LessonFlow
+        topic={activeLesson.topic}
+        child={activeChild}
+        levelMeta={levelMeta}
+        initialStep={activeLesson.initialStep}
+        audio={audio}
+        onFinishLesson={(obs, note) =>
+          handleFinishLesson(activeLesson.topic, obs, note)
+        }
+        onExit={() => setActiveLesson(null)}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FFF8EC] flex flex-col font-kid">
-      <KidTopBar
-        childName={childName}
-        stars={progress.stars || 0}
-        termUnitLabel={termUnitLabel}
-        levelColor={levelMeta.color}
-        onGreet={() => audio.speak(`Hi ${childName}! Let's play!`, 0.85)}
-        onOpenParentGate={() => setGateOpen(true)}
-      />
-
-      <main className="flex-1 overflow-y-auto">
-        {screen === 'home' && (
-          <HomeMap
-            units={units}
-            schedule={schedule}
-            progress={progress}
-            levelColor={levelMeta.color}
-            levelColorDark={levelMeta.colorDark}
-            allowAll={isAdmin}
-            onStartLesson={(unit, lesson) => {
-              audio.playSfx('whoosh');
-              setActiveSession({ unit, lesson });
-            }}
-            onSpeak={(text) => audio.speak(text, 0.82)}
-          />
-        )}
-
-        {screen === 'songs' && (
-          <SongsCorner
-            units={units}
-            completedLessonIds={progress.completedLessonIds}
-            allowAll={isAdmin}
-            onStartMelody={(melodyId, opts) => audio.startMelody(melodyId, opts)}
-            onSpeak={(text, rate, onEnd) => audio.speak(text, rate ?? 0.85, onEnd)}
-            onStopAll={audio.stopAll}
-          />
-        )}
-
-        {screen === 'stories' && (
-          <StoryCorner
-            units={units}
-            completedLessonIds={progress.completedLessonIds}
-            allowAll={isAdmin}
-            onSpeak={(text, rate) => audio.speak(text, rate ?? 0.8)}
-          />
-        )}
-
-        {screen === 'stickers' && (
-          <StickerBook
-            units={units}
-            earnedStickers={progress.stickers}
-            onSpeak={(text) => audio.speak(text, 0.85)}
-          />
-        )}
-      </main>
-
-      <KidDock
-        active={screen}
-        onSelect={(next, spoken) => {
-          audio.stopAll();
-          audio.playSfx('tap');
-          audio.speak(spoken, 0.85);
-          setScreen(next);
-        }}
-      />
-
-      <ParentGate
-        isOpen={gateOpen}
-        onClose={() => setGateOpen(false)}
-        onUnlock={() => {
-          setGateOpen(false);
-          setParentMode(true);
-        }}
-      />
-
-      <BreakReminder visible={breakDue} onDone={dismissBreak} />
-    </div>
+    <ChildHome
+      childrenList={store.children}
+      activeChild={activeChild}
+      earnedStickers={childStickers}
+      completedKeys={childCompleted}
+      recommendedTopic={recommendedTopic}
+      audio={audio}
+      onSelectChild={handleSelectChild}
+      onChangeLevel={handleChangeLevel}
+      onCreateChild={handleCreateChild}
+      onOpenTopic={(topic, initialStep) => {
+        audio.playSfx('whoosh');
+        setActiveLesson({ topic, initialStep });
+      }}
+      onOpenParentZone={() => {
+        audio.stopAll();
+        setParentZoneOpen(true);
+      }}
+      onSpeak={(text) => audio.speak(text, 0.85)}
+    />
   );
 };

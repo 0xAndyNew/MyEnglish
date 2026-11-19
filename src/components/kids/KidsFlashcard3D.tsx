@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { KidsUnit, KidsVocabWord } from '../../data/kids/kidsCurriculumData';
 import { AccentMode } from '../../types/learning';
+import { resolveFlashcardImage } from '../../utils/flashcardMedia';
 import { speakText } from '../../utils/speechEngine';
 
 export interface KidsFlashcard3DProps {
@@ -253,10 +254,14 @@ export const KidsFlashcard3D: React.FC<KidsFlashcard3DProps> = ({
                             e.stopPropagation();
                             speakText(currentWord.word, accent, speechRate);
                           }}
-                          className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 text-white font-black text-5xl sm:text-6xl shadow-xl border-4 border-white flex items-center justify-center hover:scale-105 active:scale-95 transition"
+                          className="w-32 h-32 sm:w-36 sm:h-36 rounded-3xl bg-white border-4 border-amber-200 p-2 shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition"
                           title="Chạm để nghe số"
                         >
-                          {currentWord.countNumber}
+                          <img
+                            src={resolveFlashcardImage(currentWord.word, currentWord.meaningVi, unit.id)}
+                            alt={currentWord.word}
+                            className="w-full h-full object-contain"
+                          />
                         </button>
                       </div>
                       <TenFrameCounter
@@ -272,24 +277,34 @@ export const KidsFlashcard3D: React.FC<KidsFlashcard3DProps> = ({
                         e.stopPropagation();
                         speakText(currentWord.word, accent, speechRate);
                       }}
-                      className="w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-white shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition"
+                      className="w-36 h-36 sm:w-40 sm:h-40 rounded-3xl bg-white border-4 border-white p-3 shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition relative overflow-hidden"
                       style={swatchStyle}
                       title="Chạm để nghe màu sắc"
                     >
-                      <span className="text-5xl drop-shadow">{currentWord.emoji}</span>
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white p-1.5 shadow-md flex items-center justify-center">
+                        <img
+                          src={resolveFlashcardImage(currentWord.word, currentWord.meaningVi, unit.id)}
+                          alt={currentWord.word}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
                     </button>
                   ) : (
-                    /* 3. Standard 3D Picture Podium */
+                    /* 3. Standard Flashcard Studio Illustration */
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         speakText(currentWord.word, accent, speechRate);
                       }}
-                      className="w-32 h-32 sm:w-36 sm:h-36 rounded-[2rem] bg-white dark:bg-slate-800 border-4 border-amber-200 dark:border-slate-700 shadow-xl flex items-center justify-center text-7xl sm:text-8xl hover:scale-105 active:scale-95 transition"
+                      className="w-40 h-40 sm:w-48 sm:h-48 rounded-[2rem] bg-white border-4 border-amber-200 p-3 shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition"
                       title="Chạm vào hình để nghe"
                     >
-                      {currentWord.emoji}
+                      <img
+                        src={resolveFlashcardImage(currentWord.word, currentWord.meaningVi, unit.id)}
+                        alt={currentWord.word}
+                        className="w-full h-full object-contain"
+                      />
                     </button>
                   )}
 

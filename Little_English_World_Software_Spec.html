@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Đặc tả yêu cầu sản phẩm và kỹ thuật cho ứng dụng học tiếng Anh cho trẻ từ 1 đến 6 tuổi, có chế độ phụ huynh và CMS quản trị." />
+  <title>Đặc tả phần mềm | Little English World</title>
+  <style>
+    :root{
+      --ink:#243044;--muted:#64748b;--line:#e5eaf1;--paper:#ffffff;--bg:#f3f6fb;
+      --navy:#253858;--blue:#4778d8;--mint:#dff5ee;--mint-ink:#176b56;
+      --peach:#fff0e5;--peach-ink:#9b552a;--lav:#f0eaff;--lav-ink:#6946a8;
+      --yellow:#fff7d9;--yellow-ink:#8a6714;--shadow:0 14px 38px rgba(27,45,76,.08);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.68 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+    a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+    .hero{background:linear-gradient(135deg,#233653 0%,#345d83 58%,#5d9b96 100%);color:#fff;padding:54px 22px 48px}
+    .hero-inner{max-width:1120px;margin:auto}
+    .eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#c8e5e1;font-weight:800}
+    h1{font-size:clamp(32px,5vw,54px);line-height:1.12;letter-spacing:-.035em;margin:14px 0 12px}
+    .hero p{max-width:790px;color:#e2edf5;font-size:17px;margin:0}
+    .meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}
+    .pill{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);border-radius:999px;padding:6px 12px;font-size:12px;color:#f3f8fb}
+    .layout{max-width:1120px;margin:28px auto;padding:0 18px;display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px;align-items:start}
+    aside{position:sticky;top:18px;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);max-height:calc(100vh - 36px);overflow:auto}
+    aside strong{display:block;margin:0 0 10px;color:var(--navy);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+    aside a{display:block;padding:7px 9px;border-radius:8px;color:#526176;font-size:13px}
+    aside a:hover{background:#f1f5fb;text-decoration:none;color:var(--navy)}
+    main{min-width:0}
+    section{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:28px 30px;margin-bottom:18px;box-shadow:var(--shadow);scroll-margin-top:18px}
+    h2{font-size:25px;line-height:1.25;color:var(--navy);margin:0 0 17px;letter-spacing:-.02em}
+    h3{font-size:18px;line-height:1.35;color:#304664;margin:24px 0 9px}
+    h4{font-size:15px;color:#304664;margin:18px 0 6px}
+    p{margin:8px 0 13px}ul,ol{padding-left:22px;margin:8px 0 15px}li{margin:5px 0}
+    .lead{font-size:16px;color:#4a5b70}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .tile{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fff}
+    .tile h3,.tile h4{margin:0 0 6px}
+    .tile p{font-size:14px;color:var(--muted);margin:0}
+    .callout{border-left:4px solid var(--blue);background:#eef4ff;padding:14px 16px;border-radius:8px;margin:14px 0;color:#304765}
+    .warning{border-left-color:#d58c36;background:var(--yellow);color:#6f571c}
+    .success{border-left-color:#40a487;background:var(--mint);color:#235f50}
+    .tag{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;background:#edf2f8;color:#526176;margin:2px 4px 2px 0}
+    .tag.mint{background:var(--mint);color:var(--mint-ink)}.tag.peach{background:var(--peach);color:var(--peach-ink)}.tag.lav{background:var(--lav);color:var(--lav-ink)}
+    table{width:100%;border-collapse:collapse;margin:12px 0 16px;font-size:13.5px}
+    th,td{border:1px solid var(--line);padding:10px 11px;vertical-align:top;text-align:left}
+    th{background:#f4f7fb;color:#334862;font-weight:800}
+    tr:nth-child(even) td{background:#fcfdff}
+    .small{font-size:12px;color:var(--muted)}
+    .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+    .flow span{background:#f1f5fa;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;font-weight:650}
+    .arrow{color:#8da0b6;font-weight:900}
+    .code{background:#172338;color:#e3edf7;border-radius:10px;padding:16px;overflow:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
+    .checklist{list-style:none;padding:0}.checklist li{padding-left:27px;position:relative;margin:8px 0}.checklist li:before{content:"□";position:absolute;left:2px;top:-1px;color:#3d8f79;font-size:19px;font-weight:800}
+    .footer{max-width:1120px;margin:0 auto 38px;padding:0 18px;color:#77859a;font-size:12px;text-align:center}
+    .no-break{white-space:nowrap}
+    @media(max-width:850px){.layout{grid-template-columns:1fr}aside{position:static;max-height:none}.grid-3{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.hero{padding:38px 18px}.layout{padding:0 10px;margin:14px auto}section{padding:21px 17px}.grid,.grid-3{grid-template-columns:1fr}table{display:block;overflow-x:auto;white-space:normal}h2{font-size:22px}}
+    @media print{body{background:#fff}.hero{background:#fff;color:#172338;padding:20px 0}.hero p,.eyebrow{color:#42556e}.layout{display:block;margin:0;padding:0}aside{display:none}section{box-shadow:none;break-inside:avoid;margin:0 0 12px;border:1px solid #ccd4df}.footer{margin:10px auto}.pill{border-color:#ccd4df;color:#34465d;background:#fff}}
+  </style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">Product Requirements & Technical Specification</div>
+    <h1>Little English World</h1>
+    <p>Đặc tả yêu cầu xây dựng ứng dụng học tiếng Anh cho trẻ từ 1–6 tuổi, kết hợp học qua chơi, hoạt động ngoài màn hình và hướng dẫn cha mẹ đồng hành tại nhà.</p>
+    <div class="meta">
+      <span class="pill">Tài liệu giao cho đội phát triển / AI coding</span>
+      <span class="pill">Ngôn ngữ sản phẩm: Tiếng Việt + Tiếng Anh</span>
+      <span class="pill">Phiên bản tài liệu: 1.0</span>
+      <span class="pill">Ngày: 18/11/2026</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <strong>Mục lục</strong>
+    <a href="#overview">1. Tổng quan sản phẩm</a>
+    <a href="#principles">2. Nguyên tắc giáo dục</a>
+    <a href="#levels">3. Lộ trình 5 nhóm tuổi</a>
+    <a href="#curriculum">4. Khung giáo trình 12 chủ đề</a>
+    <a href="#lesson">5. Cấu trúc một bài học</a>
+    <a href="#parent">6. Chế độ phụ huynh</a>
+    <a href="#child-ui">7. Ứng dụng dành cho bé</a>
+    <a href="#games">8. Trò chơi và phần thưởng</a>
+    <a href="#admin">9. CMS quản trị</a>
+    <a href="#architecture">10. Kiến trúc kỹ thuật</a>
+    <a href="#data">11. Cơ sở dữ liệu</a>
+    <a href="#security">12. An toàn và riêng tư</a>
+    <a href="#analytics">13. Theo dõi tiến bộ</a>
+    <a href="#acceptance">14. Tiêu chí nghiệm thu</a>
+    <a href="#delivery">15. Giai đoạn bàn giao</a>
+    <a href="#prompt">16. Chỉ dẫn cho AI/lập trình viên</a>
+  </aside>
+
+  <main>
+    <section id="overview">
+      <h2>1. Tổng quan sản phẩm</h2>
+      <p class="lead"><strong>Mục tiêu:</strong> Xây dựng một nền tảng học tiếng Anh đầu đời cho trẻ 1–6 tuổi. Ứng dụng không chỉ cung cấp trò chơi hoặc video mà phải hướng dẫn phụ huynh tổ chức hoạt động học tiếng Anh đơn giản, vui vẻ và phù hợp với độ tuổi của trẻ.</p>
+      <div class="grid">
+        <div class="tile"><h3>Đối tượng sử dụng</h3><p>Trẻ 1–6 tuổi sử dụng cùng cha mẹ; phụ huynh là người quản lý tài khoản, lựa chọn nội dung và theo dõi tiến bộ.</p></div>
+        <div class="tile"><h3>Định vị sản phẩm</h3><p>Học qua chơi – nghe hiểu – tương tác – thực hành đời sống – cha mẹ đồng hành.</p></div>
+        <div class="tile"><h3>Giá trị khác biệt</h3><p>Mỗi bài học có giáo án cho phụ huynh, audio mẫu, hoạt động thực tế và hướng dẫn ôn tập, không chỉ có phần bé tương tác trên màn hình.</p></div>
+        <div class="tile"><h3>Thiết bị mục tiêu</h3><p>Điện thoại và máy tính bảng trước; giao diện quản trị và phụ huynh hỗ trợ trình duyệt máy tính.</p></div>
+      </div>
+      <h3>Phân hệ sản phẩm</h3>
+      <div class="grid-3">
+        <div class="tile"><span class="tag mint">01</span><h4>Child Experience</h4><p>Giao diện bé: thế giới học tập, audio, trò chơi, truyện tranh và sticker.</p></div>
+        <div class="tile"><span class="tag peach">02</span><h4>Parent Experience</h4><p>Hồ sơ bé, giáo án, hướng dẫn dạy tại nhà, lịch học và báo cáo.</p></div>
+        <div class="tile"><span class="tag lav">03</span><h4>Admin CMS</h4><p>Quản lý chương trình, bài học, từ vựng, hình ảnh, audio, trò chơi và tài khoản.</p></div>
+      </div>
+      <div class="callout success"><strong>Yêu cầu cốt lõi:</strong> Tách riêng trải nghiệm của bé và khu vực phụ huynh. Bé không được truy cập vào chức năng tài khoản, thanh toán, cài đặt hoặc dữ liệu cá nhân của gia đình.</div>
+      <h3>Phạm vi phiên bản đầu tiên (MVP)</h3>
+      <ul>
+        <li>Hồ sơ phụ huynh và tạo hồ sơ cho một hoặc nhiều bé.</li>
+        <li>Chọn nhóm tuổi, chương trình học và chủ đề.</li>
+        <li>Bài học từ vựng có hình ảnh, audio, câu mẫu và hoạt động tương tác.</li>
+        <li>Tối thiểu 4 dạng trò chơi đơn giản, phù hợp độ tuổi.</li>
+        <li>Góc phụ huynh với giáo án từng bài và hoạt động ngoài màn hình.</li>
+        <li>Ghi nhận tiến độ, nội dung đã học và nội dung cần ôn tập.</li>
+        <li>CMS để quản trị viên thêm/sửa/xuất bản nội dung mà không sửa mã nguồn.</li>
+      </ul>
+    </section>
+
+    <section id="principles">
+      <h2>2. Nguyên tắc giáo dục và thiết kế nội dung</h2>
+      <div class="grid">
+        <div class="tile"><h3>Học qua chơi</h3><p>Trẻ tiếp nhận nội dung qua hình ảnh, âm thanh, vận động, trò chơi và tương tác với người lớn.</p></div>
+        <div class="tile"><h3>Phát triển theo độ tuổi</h3><p>Không dùng chung một giao diện, thời lượng, mục tiêu hoặc độ khó cho cả trẻ 1 và 6 tuổi.</p></div>
+        <div class="tile"><h3>Nghe trước, nói dần</h3><p>Không ép trẻ phát âm hoặc trả lời. Chấp nhận phản hồi bằng chỉ tay, chọn hình, hành động hoặc lời nói.</p></div>
+        <div class="tile"><h3>Lặp lại có ý nghĩa</h3><p>Từ và mẫu câu cũ được xuất hiện lại trong câu chuyện, trò chơi và hoạt động đời sống mới.</p></div>
+        <div class="tile"><h3>Học cùng cha mẹ</h3><p>Mỗi bài có chỉ dẫn phụ huynh bằng tiếng Việt, câu tiếng Anh mẫu và cách thực hành cùng đồ vật thật.</p></div>
+        <div class="tile"><h3>Không tạo áp lực</h3><p>Không phạt, không mất điểm, không tạo bảng xếp hạng gây áp lực hoặc bắt buộc hoàn thành mỗi ngày.</p></div>
+      </div>
+      <h3>Nguyên tắc thời lượng và màn hình</h3>
+      <div class="callout warning"><strong>Nhóm 1 tuổi:</strong> Không thiết kế trải nghiệm xem màn hình tĩnh độc lập cho bé. Ứng dụng chủ yếu là công cụ cho cha mẹ mở audio, xem hướng dẫn và tổ chức hoạt động trực tiếp với bé.</div>
+      <ul>
+        <li>Theo hướng dẫn WHO: trẻ 1 tuổi không được khuyến nghị thời gian màn hình tĩnh; trẻ 2 tuổi và trẻ 3–4 tuổi không quá 1 giờ/ngày, càng ít càng tốt. Đây là tổng thời gian màn hình từ mọi nguồn, không phải ngân sách riêng cho ứng dụng.</li>
+        <li>Với nhóm 5–6 tuổi, thiết kế phiên ngắn, có nghỉ và ưu tiên thực hành ngoài màn hình; thời lượng cần được phụ huynh điều chỉnh theo trẻ và hướng dẫn phù hợp tại địa phương.</li>
+        <li>Thời lượng bài học gợi ý trong tài liệu này là quyết định thiết kế sản phẩm, không phải khuyến nghị y tế hoặc giới hạn phát triển bắt buộc.</li>
+        <li>Không tự phát video liên tục; cần có điểm kết thúc bài học và thông điệp gợi ý hoạt động cùng cha mẹ.</li>
+      </ul>
+      <p class="small">Tham chiếu cần được đội nội dung kiểm tra lại trước khi phát hành: WHO Guidelines on physical activity, sedentary behaviour and sleep for children under 5 years of age; hướng dẫn giáo dục mầm non dựa trên vui chơi của NAEYC. Tài liệu này không thay thế tư vấn của chuyên gia giáo dục hoặc y tế.</p>
+    </section>
+
+    <section id="levels">
+      <h2>3. Lộ trình giáo trình theo 5 nhóm tuổi</h2>
+      <p>Mốc tuổi là định hướng phân nhóm nội dung, không phải tiêu chuẩn đánh giá cứng. Phụ huynh có thể chọn mức phù hợp với khả năng và sự sẵn sàng của bé. Không bắt buộc trẻ phải hoàn tất cấp trước mới được tiếp cận nội dung phù hợp.</p>
+      <table>
+        <thead><tr><th>Cấp độ</th><th>Độ tuổi</th><th>Mục tiêu chính</th><th>Nội dung / kỹ năng</th><th>Cách tương tác</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Level 1<br>Little Listener</strong></td><td>1–2 tuổi</td><td>Làm quen âm thanh và ngôn ngữ qua người chăm sóc.</td><td>Nghe từ quen thuộc; liên hệ từ với đồ vật, người thân, hành động; phản hồi bằng nhìn, chỉ hoặc cử chỉ.</td><td>Cha mẹ dùng audio, tranh in, đồ vật thật, bài hát và vận động. Không giao bé tự học trên màn hình.</td></tr>
+          <tr><td><strong>Level 2<br>Little Explorer</strong></td><td>2–3 tuổi</td><td>Nhận biết từ đơn, hiểu chỉ dẫn ngắn và bắt đầu dùng từ/cụm từ.</td><td>Màu sắc, số 1–5, con vật, trái cây, đồ chơi, bộ phận cơ thể, hành động.</td><td>Chạm/chọn hình cùng cha mẹ, nghe và tìm đồ vật, bắt chước hành động, trò chơi ngắn.</td></tr>
+          <tr><td><strong>Level 3<br>Little Speaker</strong></td><td>3–4 tuổi</td><td>Hiểu câu đơn giản, nói từ và câu ngắn trong tình huống quen thuộc.</td><td>Đồ ăn, ngôi nhà, trường học, quần áo, phương tiện, thời tiết, cảm xúc.</td><td>Nghe – chọn – ghép – trả lời; đóng vai và kể chuyện tranh cùng cha mẹ.</td></tr>
+          <tr><td><strong>Level 4<br>Little Communicator</strong></td><td>4–5 tuổi</td><td>Diễn đạt ý tưởng, miêu tả và tham gia hội thoại ngắn.</td><td>Từ vựng mở rộng; tính từ; vị trí; sở thích; mô tả đồ vật; câu hỏi – trả lời.</td><td>Trò chơi theo nhiệm vụ, kể chuyện theo chuỗi tranh, hội thoại tình huống.</td></tr>
+          <tr><td><strong>Level 5<br>Little English Star</strong></td><td>5–6 tuổi</td><td>Giao tiếp cơ bản và chuẩn bị nền tảng ngôn ngữ đầu tiểu học.</td><td>Giới thiệu bản thân, gia đình, sở thích; nghe truyện ngắn; nhận biết chữ/âm cơ bản; làm quen đọc viết sớm.</td><td>Đóng vai, kể lại truyện, mô tả tranh, phonics qua trò chơi; không biến thành luyện thi nặng.</td></tr>
+        </tbody>
+      </table>
+      <h3>Mục tiêu theo kỹ năng</h3>
+      <table>
+        <thead><tr><th>Kỹ năng</th><th>1–2 tuổi</th><th>2–3 tuổi</th><th>3–4 tuổi</th><th>4–5 tuổi</th><th>5–6 tuổi</th></tr></thead>
+        <tbody>
+          <tr><td>Listening</td><td>Quen âm thanh, nhận ra từ quen.</td><td>Hiểu từ và chỉ dẫn ngắn.</td><td>Hiểu câu hỏi/câu lệnh quen thuộc.</td><td>Hiểu hội thoại ngắn có ngữ cảnh.</td><td>Hiểu hướng dẫn và truyện ngắn phù hợp.</td></tr>
+          <tr><td>Speaking</td><td>Không ép nói; chấp nhận cử chỉ.</td><td>Bắt đầu dùng từ/cụm từ.</td><td>Nói cụm từ và câu ngắn.</td><td>Miêu tả, trả lời câu hỏi.</td><td>Hội thoại và kể lại nội dung đơn giản.</td></tr>
+          <tr><td>Vocabulary</td><td>Từ rất gần gũi.</td><td>Nhóm từ cơ bản.</td><td>Từ theo chủ đề và hành động.</td><td>Từ mô tả và quan hệ.</td><td>Mở rộng vốn từ theo tình huống.</td></tr>
+          <tr><td>Early literacy</td><td>Nghe nhịp điệu, sách tranh cùng người lớn.</td><td>Sách tranh và vần điệu.</td><td>Nhận biết hình ảnh/ký hiệu; chưa yêu cầu đọc.</td><td>Làm quen chữ và âm qua trò chơi.</td><td>Phonics, chữ cái và đọc từ ngắn theo mức sẵn sàng.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout"><strong>Nguyên tắc kiểm tra:</strong> Không dùng số từ trẻ nói được làm chỉ số duy nhất. Ghi nhận cả nghe hiểu, nhận diện, phản hồi bằng hành động, mức tự tin và khả năng sử dụng từ trong bối cảnh.</div>
+    </section>
+
+    <section id="curriculum">
+      <h2>4. Khung giáo trình 12 chủ đề lớn</h2>
+      <p>MVP cần có 12 chủ đề xuyên suốt 5 cấp độ. Mỗi chủ đề có độ khó khác nhau theo tuổi; từ vựng và mẫu câu được tái sử dụng có chủ đích.</p>
+      <table>
+        <thead><tr><th>#</th><th>Chủ đề</th><th>Từ vựng / ngữ cảnh mẫu</th><th>Hoạt động thực tế cho gia đình</th></tr></thead>
+        <tbody>
+          <tr><td>01</td><td>My Family</td><td>Mommy, Daddy, baby, sister, brother, grandparents.</td><td>Xem ảnh gia đình, gọi tên người thân, chào hỏi.</td></tr>
+          <tr><td>02</td><td>My Body</td><td>Head, eyes, ears, nose, mouth, hands, feet.</td><td>Chỉ vào bộ phận cơ thể, hát và làm động tác.</td></tr>
+          <tr><td>03</td><td>Animals</td><td>Cat, dog, bird, cow, duck, rabbit, lion, elephant.</td><td>Tìm hình con vật trong sách, bắt chước tiếng kêu.</td></tr>
+          <tr><td>04</td><td>Colors & Shapes</td><td>Red, blue, yellow, green; circle, square, triangle.</td><td>Tìm đồ vật theo màu hoặc hình dạng trong nhà.</td></tr>
+          <tr><td>05</td><td>Fruits & Food</td><td>Apple, banana, orange, rice, bread, milk, water.</td><td>Gọi tên thực phẩm khi chuẩn bị bữa ăn.</td></tr>
+          <tr><td>06</td><td>My Toys</td><td>Ball, doll, car, blocks, teddy bear, train.</td><td>Thu dọn đồ chơi, tìm và phân loại đồ vật.</td></tr>
+          <tr><td>07</td><td>My Home</td><td>Home, bedroom, kitchen, bathroom, chair, table.</td><td>Đi quanh nhà và gọi tên đồ vật quen thuộc.</td></tr>
+          <tr><td>08</td><td>My School</td><td>Teacher, friend, book, bag, pencil, classroom.</td><td>Chuẩn bị cặp, kể về lớp và bạn bè.</td></tr>
+          <tr><td>09</td><td>Numbers</td><td>One–five ở mức đầu; mở rộng dần theo tuổi.</td><td>Đếm đồ chơi, bậc thang hoặc trái cây.</td></tr>
+          <tr><td>10</td><td>Nature & Weather</td><td>Sun, rain, cloud, tree, flower, hot, cold.</td><td>Quan sát thời tiết, cây và hoa khi đi dạo.</td></tr>
+          <tr><td>11</td><td>Daily Activities</td><td>Wake up, eat, wash, play, sleep, jump, run.</td><td>Nói về các hoạt động trong ngày bằng câu ngắn.</td></tr>
+          <tr><td>12</td><td>Feelings & Communication</td><td>Happy, sad, tired, excited; hello, please, thank you.</td><td>Gọi tên cảm xúc, luyện chào hỏi và lời cảm ơn.</td></tr>
+        </tbody>
+      </table>
+      <h3>Cách tăng độ khó theo một chủ đề – ví dụ Animals</h3>
+      <table>
+        <thead><tr><th>Độ tuổi</th><th>Nội dung</th><th>Đầu ra kỳ vọng</th></tr></thead>
+        <tbody>
+          <tr><td>1–2</td><td>Nghe Cat, Dog, Bird; xem tranh và con vật đồ chơi.</td><td>Bé chú ý, nhìn hoặc chỉ đúng hình khi có người lớn hỗ trợ.</td></tr>
+          <tr><td>2–3</td><td>Nghe tên và chọn một trong hai hình; bắt chước tiếng kêu.</td><td>Bé nhận diện một số con vật quen thuộc.</td></tr>
+          <tr><td>3–4</td><td>What's this? – It's a dog. Where is the cat?</td><td>Bé hiểu câu hỏi quen thuộc và thử nói từ/câu ngắn.</td></tr>
+          <tr><td>4–5</td><td>The dog is big. It can run. What animal do you like?</td><td>Bé miêu tả đơn giản và trả lời về sở thích.</td></tr>
+          <tr><td>5–6</td><td>Truyện ngắn về một con vật; mô tả nơi sống, hoạt động.</td><td>Bé kể lại một vài ý theo tranh và hội thoại đơn giản.</td></tr>
+        </tbody>
+      </table>
+      <h3>Cấu trúc triển khai nội dung theo tháng</h3>
+      <p>Mỗi chủ đề là một module. Có thể triển khai một chủ đề trong 3–4 tuần tùy nhóm tuổi và độ sâu nội dung. Không bắt buộc tất cả nhóm tuổi học cùng tốc độ.</p>
+      <ul>
+        <li><strong>Tuần 1 – Làm quen:</strong> từ khóa và hình ảnh chủ đề.</li>
+        <li><strong>Tuần 2 – Nhận biết:</strong> nghe, chọn, ghép, tìm đồ vật.</li>
+        <li><strong>Tuần 3 – Sử dụng:</strong> mẫu câu, hội thoại, hoạt động với cha mẹ.</li>
+        <li><strong>Tuần 4 – Ôn tập và ứng dụng:</strong> truyện, trò chơi tổng hợp, hoạt động ngoài màn hình.</li>
+      </ul>
+    </section>
+
+    <section id="lesson">
+      <h2>5. Cấu trúc chuẩn của một bài học</h2>
+      <p>Một lesson là đơn vị nội dung nhỏ, có mục tiêu rõ ràng và có thể được CMS tái sử dụng trong nhiều chương trình. Hệ thống phải hỗ trợ bật/tắt từng hoạt động theo độ tuổi.</p>
+      <div class="flow">
+        <span>1. Chào hỏi / khởi động</span><b class="arrow">→</b><span>2. Từ mới / mẫu câu</span><b class="arrow">→</b><span>3. Nghe hiểu</span><b class="arrow">→</b><span>4. Trò chơi</span><b class="arrow">→</b><span>5. Cùng cha mẹ thực hành</span><b class="arrow">→</b><span>6. Ôn tập</span>
+      </div>
+      <table>
+        <thead><tr><th>Phần</th><th>Nội dung bắt buộc</th><th>Ghi chú phát triển</th></tr></thead>
+        <tbody>
+          <tr><td>Warm-up</td><td>Lời chào, nhân vật, bài hát hoặc câu hỏi mở đầu.</td><td>Không tự phát nội dung dài; có nút bỏ qua.</td></tr>
+          <tr><td>Input</td><td>1–5 mục tiêu từ/câu tùy độ tuổi, hình ảnh và audio.</td><td>Mỗi từ có phát âm, nghĩa tiếng Việt, ví dụ và hình minh họa.</td></tr>
+          <tr><td>Listening</td><td>Nghe từ/câu và phản hồi bằng chọn hình, chỉ hoặc hành động.</td><td>Không đánh giá phát âm qua microphone trong MVP.</td></tr>
+          <tr><td>Game</td><td>Một hoạt động tương tác phù hợp nhóm tuổi.</td><td>Phản hồi tích cực, không phạt hoặc trừ điểm.</td></tr>
+          <tr><td>Parent activity</td><td>Kịch bản cha mẹ nói gì, làm gì, cần chuẩn bị gì.</td><td>Ưu tiên hoạt động không cần điện thoại.</td></tr>
+          <tr><td>Review</td><td>Gặp lại mục tiêu cũ trong ngữ cảnh mới.</td><td>Ghi nhận kết quả học tập nhưng không kết luận năng lực chỉ từ một lần chơi.</td></tr>
+        </tbody>
+      </table>
+      <h3>Bài học mẫu: Animals – độ tuổi 3–4</h3>
+      <div class="tile">
+        <p><span class="tag mint">Mục tiêu</span> Nhận biết Cat, Dog, Duck, Cow; hiểu “What's this?” và “It's a …”.</p>
+        <p><strong>Audio:</strong> giọng tiếng Anh tự nhiên đọc từ đơn, câu mẫu; có nút nghe lại và tốc độ chậm.</p>
+        <p><strong>Trò chơi:</strong> phát “Where is the dog?” rồi bé chọn đúng hình trong 2–3 hình.</p>
+        <p><strong>Cha mẹ nói:</strong> “Look! It's a dog. Con tìm con chó nhé. What is it? It's a dog.”</p>
+        <p><strong>Hoạt động thật:</strong> cùng bé xem sách tranh hoặc đồ chơi con vật, chỉ và gọi tên 2–3 con vật.</p>
+        <p><strong>Đánh giá:</strong> phụ huynh ghi nhận bé nghe hiểu, nhận diện, thử nói hoặc chỉ hình. Không bắt buộc bé phải nói đúng ngay.</p>
+      </div>
+      <h3>Trường dữ liệu tối thiểu cho mỗi lesson</h3>
+      <ul>
+        <li>Mã bài, tên tiếng Việt, tên tiếng Anh, mô tả, chủ đề, cấp độ tuổi.</li>
+        <li>Mục tiêu học tập, từ vựng, mẫu câu, kỹ năng mục tiêu.</li>
+        <li>Danh sách hoạt động theo thứ tự và loại hoạt động.</li>
+        <li>Hình ảnh, audio, phụ đề, bản dịch và nội dung hướng dẫn cha mẹ.</li>
+        <li>Thời lượng ước tính, điều kiện hiển thị, trạng thái bản nháp/xuất bản.</li>
+        <li>Thông tin bản quyền/nguồn cấp phép của media.</li>
+      </ul>
+    </section>
+
+    <section id="parent">
+      <h2>6. Chế độ phụ huynh – Parent Zone</h2>
+      <p class="lead">Đây là phân hệ tạo khác biệt chính. Phụ huynh cần biết hôm nay dạy gì, nói câu nào, mở audio nào, chơi trò gì và làm hoạt động nào ngoài màn hình.</p>
+      <h3>Chức năng</h3>
+      <div class="grid">
+        <div class="tile"><h4>Hồ sơ bé</h4><p>Tên hiển thị, tháng/năm sinh hoặc nhóm tuổi, ngôn ngữ gia đình, sở thích và cấp độ do phụ huynh chọn.</p></div>
+        <div class="tile"><h4>Giáo án hôm nay</h4><p>Bài học gợi ý, mục tiêu, thời lượng thiết kế, nội dung cần chuẩn bị và các bước thực hiện.</p></div>
+        <div class="tile"><h4>Cha mẹ nói gì?</h4><p>Câu tiếng Anh, nghĩa tiếng Việt, nút nghe audio, gợi ý cách nói tự nhiên và biến thể đơn giản.</p></div>
+        <div class="tile"><h4>Hoạt động ngoài màn hình</h4><p>Trò chơi với đồ vật trong nhà, vận động, tô màu, sách tranh và hội thoại gia đình.</p></div>
+        <div class="tile"><h4>Ôn tập</h4><p>Đề xuất nội dung cần gặp lại dựa trên lịch sử học và ghi nhận của cha mẹ.</p></div>
+        <div class="tile"><h4>Báo cáo</h4><p>Tóm tắt bài đã học, mức độ tương tác và ghi chú của cha mẹ; tránh xếp hạng trẻ.</p></div>
+      </div>
+      <h3>Mẫu giáo án phụ huynh – Apple</h3>
+      <table>
+        <tbody>
+          <tr><th style="width:25%">Từ mục tiêu</th><td>Apple – quả táo; Red – màu đỏ; Eat – ăn.</td></tr>
+          <tr><th>Câu mẫu</th><td>“Look, an apple.” / “The apple is red.” / “Let's eat an apple.”</td></tr>
+          <tr><th>Cha mẹ chuẩn bị</th><td>Một quả táo thật hoặc tranh quả táo; audio phát âm mẫu.</td></tr>
+          <tr><th>Cách hướng dẫn</th><td>Cho bé nhìn/chạm quả táo; cha mẹ nói từ mẫu rõ ràng; khuyến khích bé chỉ, nghe hoặc thử nói.</td></tr>
+          <tr><th>Trò chơi</th><td>Đặt hai loại quả trước mặt bé, hỏi “Where is the apple?” và chờ bé phản hồi.</td></tr>
+          <tr><th>Ghi nhận</th><td>Nhận diện được / hiểu từ / thử phát âm / cần gặp lại. Có lựa chọn “Chưa quan sát được”.</td></tr>
+        </tbody>
+      </table>
+      <h3>Yêu cầu trải nghiệm</h3>
+      <ul>
+        <li>Phụ huynh chuyển đổi nhanh giữa hồ sơ các bé.</li>
+        <li>Giáo án hiển thị theo dạng từng bước, dễ xem trên điện thoại.</li>
+        <li>Audio có thể nghe lại; có chỉ dẫn phát âm rõ ràng, không dùng phiên âm tiếng Việt gây sai lệch.</li>
+        <li>Có thể in/tải flashcard hoặc phiếu hoạt động khi CMS cung cấp tệp.</li>
+        <li>Cho phép phụ huynh ghi chú, đánh dấu hoạt động đã thực hiện hoặc bỏ qua.</li>
+        <li>Không mặc định phụ huynh biết tiếng Anh; mọi chỉ dẫn thao tác phải bằng tiếng Việt dễ hiểu.</li>
+      </ul>
+    </section>
+
+    <section id="child-ui">
+      <h2>7. Giao diện và luồng sử dụng của bé</h2>
+      <h3>Phong cách giao diện</h3>
+      <ul>
+        <li>Phong cách hoạt hình thân thiện, màu pastel tươi sáng, hình minh họa nhất quán.</li>
+        <li>Nhân vật đồng hành xuyên suốt, ví dụ Benny (gấu nhỏ) và Toto (gà con); tên và hình tượng có thể thay đổi khi xây dựng thương hiệu.</li>
+        <li>Nút lớn, vùng chạm rộng, ít chữ, một nhiệm vụ chính trên mỗi màn hình.</li>
+        <li>Hỗ trợ âm thanh và phụ đề; không phụ thuộc hoàn toàn vào màu sắc để truyền đạt đáp án.</li>
+        <li>Không dùng quảng cáo, liên kết ngoài hoặc nội dung mua hàng trong khu vực bé.</li>
+      </ul>
+      <h3>Danh sách màn hình chính</h3>
+      <table>
+        <thead><tr><th>Màn hình</th><th>Nội dung</th><th>Vai trò</th></tr></thead>
+        <tbody>
+          <tr><td>Parent sign-in</td><td>Đăng nhập/đăng ký phụ huynh, khôi phục tài khoản.</td><td>Phụ huynh</td></tr>
+          <tr><td>Child profile select</td><td>Chọn hồ sơ bé, thêm hồ sơ mới.</td><td>Phụ huynh</td></tr>
+          <tr><td>Child home</td><td>Nhân vật, bài học gợi ý, thế giới chủ đề và nút nghe.</td><td>Bé cùng phụ huynh</td></tr>
+          <tr><td>Learning map</td><td>Các chủ đề/cấp độ, tiến độ trực quan.</td><td>Bé cùng phụ huynh</td></tr>
+          <tr><td>Lesson intro</td><td>Nhân vật giới thiệu chủ đề và mục tiêu đơn giản.</td><td>Bé</td></tr>
+          <tr><td>Vocabulary card</td><td>Ảnh lớn, từ tiếng Anh, audio, nghĩa cho phụ huynh.</td><td>Bé cùng phụ huynh</td></tr>
+          <tr><td>Game activity</td><td>Nghe/chọn, ghép cặp, tìm hình, phân loại.</td><td>Bé cùng phụ huynh</td></tr>
+          <tr><td>Story time</td><td>Truyện tranh từng trang, audio tùy chọn, cha mẹ đọc cùng bé.</td><td>Bé cùng phụ huynh</td></tr>
+          <tr><td>Lesson complete</td><td>Phản hồi tích cực, sticker và đề xuất hoạt động ngoài màn hình.</td><td>Bé cùng phụ huynh</td></tr>
+          <tr><td>Parent zone</td><td>Giáo án, báo cáo, cài đặt và quản lý hồ sơ.</td><td>Phụ huynh</td></tr>
+        </tbody>
+      </table>
+      <h3>Luồng sử dụng cơ bản</h3>
+      <div class="flow"><span>Phụ huynh đăng nhập</span><b class="arrow">→</b><span>Tạo hồ sơ bé</span><b class="arrow">→</b><span>Chọn độ tuổi</span><b class="arrow">→</b><span>Gợi ý chương trình</span><b class="arrow">→</b><span>Mở bài học</span><b class="arrow">→</b><span>Thực hành cùng bé</span><b class="arrow">→</b><span>Ghi nhận tiến độ</span></div>
+      <div class="callout warning"><strong>Luồng trẻ 1–2 tuổi:</strong> Màn hình mặc định phải là Parent-led Mode. Cha mẹ xem hướng dẫn và phát audio; không hiển thị thông điệp khuyến khích trẻ tự dùng điện thoại hoặc tự hoàn thành chuỗi nhiệm vụ.</div>
+    </section>
+
+    <section id="games">
+      <h2>8. Trò chơi, phản hồi và phần thưởng</h2>
+      <table>
+        <thead><tr><th>Dạng trò chơi</th><th>Cách chơi</th><th>Nhóm tuổi gợi ý</th></tr></thead>
+        <tbody>
+          <tr><td>Listen & Find</td><td>Nghe từ/câu rồi tìm hình phù hợp.</td><td>2–6 tuổi; 1–2 tuổi chỉ do cha mẹ điều khiển.</td></tr>
+          <tr><td>Match the Picture</td><td>Ghép hình với hình hoặc từ với hình.</td><td>3–6 tuổi.</td></tr>
+          <tr><td>Sort by Category</td><td>Phân loại động vật, thức ăn, đồ vật.</td><td>3–6 tuổi.</td></tr>
+          <tr><td>What's Missing?</td><td>Quan sát các hình, tìm hình biến mất.</td><td>3–6 tuổi.</td></tr>
+          <tr><td>Story Order</td><td>Sắp xếp 2–4 tranh theo trình tự câu chuyện.</td><td>4–6 tuổi.</td></tr>
+          <tr><td>Move & Say</td><td>Nghe câu lệnh và làm động tác cùng cha mẹ.</td><td>2–6 tuổi; ưu tiên ngoài màn hình.</td></tr>
+        </tbody>
+      </table>
+      <h3>Quy tắc phản hồi</h3>
+      <ul>
+        <li>Đúng: phản hồi tích cực, ngắn gọn, âm thanh vui vừa phải.</li>
+        <li>Chưa đúng: gợi ý nhẹ, phát lại âm thanh hoặc cho thử lại; không dùng âm thanh gây thất vọng.</li>
+        <li>Không có giới hạn số lần thử và không mất điểm.</li>
+        <li>Cho phép phụ huynh bỏ qua hoặc kết thúc bài học bất cứ lúc nào.</li>
+      </ul>
+      <h3>Phần thưởng</h3>
+      <p>Dùng sticker, huy hiệu chủ đề, mở khóa tranh/trang truyện. Không sử dụng cơ chế mất chuỗi ngày, bảng xếp hạng công khai, hộp quà ngẫu nhiên trả phí hoặc thông báo gây áp lực cho trẻ.</p>
+    </section>
+
+    <section id="admin">
+      <h2>9. CMS quản trị nội dung</h2>
+      <p>CMS là thành phần bắt buộc. Quản trị viên cần tự tạo, chỉnh sửa, sắp xếp, xem trước và xuất bản nội dung mà không cần lập trình viên sửa code.</p>
+      <h3>Danh mục quản trị</h3>
+      <table>
+        <thead><tr><th>Module CMS</th><th>Chức năng</th></tr></thead>
+        <tbody>
+          <tr><td>Dashboard</td><td>Tổng quan số tài khoản, hồ sơ bé, bài học, nội dung nháp/đã xuất bản và tình trạng media.</td></tr>
+          <tr><td>Age levels</td><td>Quản lý 5 nhóm tuổi, mục tiêu, thứ tự hiển thị và quy tắc nội dung.</td></tr>
+          <tr><td>Curriculum</td><td>Quản lý chương trình theo cấp độ, tháng, tuần, chủ đề và bài học.</td></tr>
+          <tr><td>Topics</td><td>Tạo chủ đề, ảnh đại diện, mô tả, thứ tự và liên kết tới bài học.</td></tr>
+          <tr><td>Lessons</td><td>Tạo bài học, mục tiêu, hoạt động, câu mẫu, từ vựng và hướng dẫn phụ huynh.</td></tr>
+          <tr><td>Vocabulary</td><td>Từ tiếng Anh, nghĩa tiếng Việt, từ loại cơ bản, audio, ví dụ và hình ảnh.</td></tr>
+          <tr><td>Media library</td><td>Tải lên, phân loại, xem trước, thay thế và kiểm tra bản quyền ảnh/audio/video.</td></tr>
+          <tr><td>Games</td><td>Cấu hình câu hỏi, lựa chọn, đáp án, gợi ý, hình ảnh và phản hồi.</td></tr>
+          <tr><td>Stories</td><td>Quản lý trang truyện, lời thoại, audio, thứ tự trang và nhóm tuổi.</td></tr>
+          <tr><td>Parent guides</td><td>Soạn hướng dẫn, câu thoại, hoạt động ở nhà và vật dụng cần chuẩn bị.</td></tr>
+          <tr><td>Users & roles</td><td>Quản lý phụ huynh, quản trị viên, biên tập viên và quyền truy cập.</td></tr>
+          <tr><td>Reports</td><td>Báo cáo sử dụng tổng hợp, nội dung phổ biến, lỗi media và tiến độ.</td></tr>
+        </tbody>
+      </table>
+      <h3>Quy trình xuất bản nội dung</h3>
+      <div class="flow"><span>Tạo bản nháp</span><b class="arrow">→</b><span>Nhập nội dung/media</span><b class="arrow">→</b><span>Xem trước</span><b class="arrow">→</b><span>Kiểm tra</span><b class="arrow">→</b><span>Xuất bản</span><b class="arrow">→</b><span>Ẩn / lưu trữ</span></div>
+      <ul>
+        <li>Phân quyền Admin, Editor và Viewer.</li>
+        <li>Có trạng thái Draft, Review, Published, Archived.</li>
+        <li>Có lịch sử cập nhật nội dung, người sửa và thời gian.</li>
+        <li>Kiểm tra trường bắt buộc trước khi xuất bản.</li>
+        <li>Không xóa cứng dữ liệu đang được bài học sử dụng; ưu tiên lưu trữ (archive).</li>
+      </ul>
+    </section>
+
+    <section id="architecture">
+      <h2>10. Kiến trúc kỹ thuật đề xuất</h2>
+      <p>Ưu tiên kiến trúc dễ mở rộng, nội dung quản trị động và API tách biệt khỏi ứng dụng. Có thể điều chỉnh stack nếu đội phát triển đề xuất giải pháp tốt hơn, nhưng phải giữ đầy đủ chức năng và tiêu chí nghiệm thu.</p>
+      <div class="grid-3">
+        <div class="tile"><h4>Mobile App</h4><p><strong>Flutter</strong><br>Android/iOS, giao diện tương tác cho bé và phụ huynh.</p></div>
+        <div class="tile"><h4>Backend API</h4><p><strong>Node.js + NestJS</strong><br>Authentication, curriculum, lesson, progress, CMS API.</p></div>
+        <div class="tile"><h4>Database</h4><p><strong>PostgreSQL</strong><br>Dữ liệu tài khoản, giáo trình, nội dung và tiến độ.</p></div>
+        <div class="tile"><h4>Admin CMS</h4><p><strong>React / Next.js</strong><br>Giao diện quản trị nội dung và báo cáo.</p></div>
+        <div class="tile"><h4>Media Storage</h4><p><strong>S3-compatible storage</strong><br>Ảnh, audio, video, file flashcard.</p></div>
+        <div class="tile"><h4>Deployment</h4><p><strong>Docker</strong><br>Biến môi trường, backup, logging và triển khai staging/production.</p></div>
+      </div>
+      <h3>Sơ đồ logic</h3>
+      <div class="code">Flutter Mobile App ─────┐
+                        ├── HTTPS REST API ── NestJS Backend ── PostgreSQL
+React Admin CMS ────────┘                         │
+                                                  ├── Object Storage (image/audio/video)
+                                                  ├── Background jobs (nếu cần)
+                                                  └── Logs / monitoring</div>
+      <h3>Yêu cầu kỹ thuật</h3>
+      <ul>
+        <li>API có version prefix, ví dụ <span class="no-break">/api/v1</span>.</li>
+        <li>Validate dữ liệu ở backend; không tin dữ liệu gửi từ client.</li>
+        <li>Phân quyền theo vai trò và quyền sở hữu hồ sơ bé.</li>
+        <li>Phân trang cho danh sách nội dung và báo cáo.</li>
+        <li>Audio cần hỗ trợ streaming/tải trước tùy cấu hình, có trạng thái tải và lỗi rõ ràng.</li>
+        <li>Ứng dụng có trạng thái loading, empty, offline/error cho các màn hình dữ liệu.</li>
+        <li>Có môi trường development, staging và production; cấu hình bí mật bằng environment variables.</li>
+        <li>Có tài liệu cài đặt, migration, seed dữ liệu mẫu và hướng dẫn backup/restore.</li>
+      </ul>
+      <h3>API nhóm chức năng dự kiến</h3>
+      <table>
+        <thead><tr><th>Nhóm endpoint</th><th>Ví dụ</th></tr></thead>
+        <tbody>
+          <tr><td>Auth</td><td>POST /api/v1/auth/register, /login, /refresh, /logout</td></tr>
+          <tr><td>Children</td><td>GET/POST /api/v1/children; GET/PATCH/DELETE /api/v1/children/:id</td></tr>
+          <tr><td>Curriculum</td><td>GET /api/v1/age-levels, /curriculum, /topics</td></tr>
+          <tr><td>Lessons</td><td>GET /api/v1/lessons/:id; GET /api/v1/lessons/:id/activities</td></tr>
+          <tr><td>Progress</td><td>POST /api/v1/children/:id/progress; GET /api/v1/children/:id/progress</td></tr>
+          <tr><td>Parent guides</td><td>GET /api/v1/lessons/:id/parent-guide</td></tr>
+          <tr><td>Admin</td><td>/api/v1/admin/topics, /lessons, /vocabulary, /media, /users</td></tr>
+        </tbody>
+      </table>
+      <p class="small">Đây là nhóm endpoint tham khảo. Đội phát triển cần thiết kế API contract đầy đủ, thống nhất naming, status code, validation, error format và tài liệu OpenAPI/Swagger.</p>
+    </section>
+
+    <section id="data">
+      <h2>11. Mô hình cơ sở dữ liệu</h2>
+      <table>
+        <thead><tr><th>Bảng / Entity</th><th>Trường quan trọng</th><th>Ghi chú</th></tr></thead>
+        <tbody>
+          <tr><td>users</td><td>id, name, email/phone, password_hash, status, created_at</td><td>Tài khoản phụ huynh và nhân sự CMS tùy role.</td></tr>
+          <tr><td>roles / user_roles</td><td>id, role_name, user_id</td><td>Phân quyền hệ thống.</td></tr>
+          <tr><td>children</td><td>id, parent_user_id, display_name, birth_month/year hoặc age_band, avatar_id, preferences</td><td>Hạn chế thu thập dữ liệu trẻ không cần thiết.</td></tr>
+          <tr><td>age_levels</td><td>id, code, title, min_age, max_age, objectives, sort_order</td><td>5 nhóm tuổi.</td></tr>
+          <tr><td>curricula</td><td>id, age_level_id, title, description, status</td><td>Chương trình theo nhóm tuổi.</td></tr>
+          <tr><td>topics</td><td>id, curriculum_id, title, description, thumbnail_id, sort_order</td><td>12 chủ đề hoặc mở rộng.</td></tr>
+          <tr><td>lessons</td><td>id, topic_id, title, objectives, estimated_minutes, status, sort_order</td><td>Bài học.</td></tr>
+          <tr><td>lesson_activities</td><td>id, lesson_id, activity_type, content_json, sort_order</td><td>Các bước trong bài học/trò chơi.</td></tr>
+          <tr><td>vocabulary</td><td>id, word, meaning_vi, pronunciation_ipa, example_sentence, audio_id, image_id</td><td>Từ vựng và media.</td></tr>
+          <tr><td>lesson_vocabulary</td><td>lesson_id, vocabulary_id</td><td>Liên kết nhiều-nhiều.</td></tr>
+          <tr><td>media_assets</td><td>id, type, storage_key, mime_type, duration, license_note, status</td><td>Quản lý media và quyền sử dụng.</td></tr>
+          <tr><td>stories / story_pages</td><td>id, title; page_no, text_en, text_vi, image_id, audio_id</td><td>Truyện tranh nhiều trang.</td></tr>
+          <tr><td>parent_guides</td><td>id, lesson_id, parent_script, materials, offline_activity, notes</td><td>Hướng dẫn phụ huynh.</td></tr>
+          <tr><td>child_progress</td><td>id, child_id, lesson_id, status, started_at, completed_at</td><td>Tiến độ bài học.</td></tr>
+          <tr><td>progress_observations</td><td>id, child_id, vocabulary_id/skill, observation, parent_note, created_at</td><td>Ghi nhận của phụ huynh; có trạng thái chưa quan sát.</td></tr>
+          <tr><td>rewards</td><td>id, name, type, asset_id, criteria</td><td>Sticker/huy hiệu không mang tính gây áp lực.</td></tr>
+          <tr><td>child_rewards</td><td>id, child_id, reward_id, awarded_at</td><td>Phần thưởng của bé.</td></tr>
+          <tr><td>audit_logs</td><td>id, actor_id, action, entity_type, entity_id, created_at</td><td>Lịch sử thao tác CMS và hệ thống.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout"><strong>Thiết kế dữ liệu:</strong> Nội dung bài học nên lưu theo cấu trúc có version hoặc có lịch sử chỉnh sửa. Không hard-code danh sách từ vựng, trò chơi hay chủ đề trong ứng dụng di động.</div>
+    </section>
+
+    <section id="security">
+      <h2>12. An toàn trẻ em, quyền riêng tư và bảo mật</h2>
+      <ul>
+        <li>Tài khoản do phụ huynh tạo và quản lý; khu vực người lớn cần cơ chế xác nhận trước khi mở từ giao diện bé.</li>
+        <li>Không có quảng cáo, liên kết mạng xã hội, chat công khai hoặc nội dung do người dùng khác tạo trong khu vực trẻ em.</li>
+        <li>Không yêu cầu trẻ cung cấp họ tên đầy đủ, địa chỉ, trường học, số điện thoại hoặc thông tin nhạy cảm.</li>
+        <li>Không thu âm, ghi hình hoặc phân tích giọng nói của trẻ trong MVP. Nếu bổ sung về sau phải có mục đích rõ ràng, thông báo minh bạch, cơ chế đồng ý của phụ huynh và chính sách lưu/xóa dữ liệu.</li>
+        <li>Mọi chức năng mua hàng/gói thuê bao (nếu có) chỉ hiển thị trong Parent Zone và yêu cầu xác nhận của phụ huynh.</li>
+        <li>Mã hóa kết nối bằng HTTPS; mật khẩu phải được hash bằng thuật toán phù hợp; token có thời hạn và cơ chế thu hồi.</li>
+        <li>Phân quyền truy cập dữ liệu theo parent_user_id; phụ huynh không thể xem hồ sơ của gia đình khác.</li>
+        <li>Có chính sách xóa tài khoản và dữ liệu; có lịch backup và quy trình khôi phục.</li>
+        <li>Rà soát quy định bảo vệ dữ liệu cá nhân và quyền trẻ em áp dụng tại thị trường phát hành trước khi ra mắt. Không coi tài liệu này là tư vấn pháp lý.</li>
+      </ul>
+    </section>
+
+    <section id="analytics">
+      <h2>13. Theo dõi tiến bộ và báo cáo</h2>
+      <p>Hệ thống đo sự tham gia và biểu hiện học tập theo thời gian, không dùng một lần chơi để gắn nhãn khả năng của bé.</p>
+      <h3>Chỉ số cần ghi nhận</h3>
+      <ul>
+        <li>Bài học đã bắt đầu/hoàn thành/bỏ qua.</li>
+        <li>Hoạt động bé đã thử; số lần nghe lại audio; số lần thử trò chơi.</li>
+        <li>Ghi nhận của phụ huynh: nhận biết, hiểu chỉ dẫn, thử nói, sử dụng trong đời sống, cần ôn lại, chưa quan sát được.</li>
+        <li>Thời điểm học và chủ đề được quan tâm; không tối ưu ứng dụng theo hướng kéo dài thời gian màn hình.</li>
+      </ul>
+      <h3>Báo cáo cho phụ huynh</h3>
+      <div class="grid">
+        <div class="tile"><h4>Hôm nay</h4><p>Bài học đã làm, từ/câu được tiếp xúc, gợi ý một hoạt động thực tế.</p></div>
+        <div class="tile"><h4>Tuần này</h4><p>Các chủ đề đã khám phá, hoạt động bé thích và nội dung nên ôn lại.</p></div>
+        <div class="tile"><h4>Theo kỹ năng</h4><p>Nghe hiểu, nhận diện, phản hồi bằng hành động, thử nói và tham gia hội thoại.</p></div>
+        <div class="tile"><h4>Gợi ý tiếp theo</h4><p>Đề xuất bài học phù hợp, cho phép phụ huynh thay đổi hoặc bỏ qua.</p></div>
+      </div>
+    </section>
+
+    <section id="acceptance">
+      <h2>14. Tiêu chí nghiệm thu</h2>
+      <p>Sản phẩm chỉ được xem là hoàn thành khi đáp ứng các tiêu chí chức năng, nội dung và kỹ thuật dưới đây. Không nghiệm thu chỉ dựa trên ảnh giao diện tĩnh hoặc các nút bấm chưa kết nối dữ liệu.</p>
+      <h3>Chức năng người dùng</h3>
+      <ul class="checklist">
+        <li>Phụ huynh đăng ký, đăng nhập, đăng xuất và quản lý hồ sơ.</li>
+        <li>Phụ huynh tạo và chuyển đổi giữa nhiều hồ sơ bé.</li>
+        <li>Hệ thống lọc/gợi ý chương trình theo nhóm tuổi.</li>
+        <li>Bé mở được chủ đề, bài học, audio, hình ảnh và trò chơi tương ứng.</li>
+        <li>Audio có thể phát, tạm dừng, nghe lại và xử lý lỗi tải.</li>
+        <li>Hoạt động của bài học có thể lưu tiến độ và tiếp tục phù hợp.</li>
+        <li>Parent Zone hiển thị giáo án, câu mẫu, hướng dẫn và hoạt động ngoài màn hình.</li>
+        <li>Phụ huynh ghi nhận tiến bộ, ghi chú và xem báo cáo.</li>
+        <li>Khu vực bé không chứa quảng cáo, thanh toán hoặc liên kết ngoài.</li>
+      </ul>
+      <h3>Chức năng quản trị</h3>
+      <ul class="checklist">
+        <li>Admin tạo/sửa/ẩn nhóm tuổi, giáo trình, chủ đề, bài học và từ vựng.</li>
+        <li>Admin tải lên và gắn ảnh/audio vào đúng nội dung.</li>
+        <li>Admin cấu hình trò chơi bằng CMS và xem trước trước khi xuất bản.</li>
+        <li>Có phân quyền, trạng thái xuất bản và nhật ký chỉnh sửa.</li>
+        <li>Nội dung mới được cập nhật tới app qua API mà không cần phát hành phiên bản app mới, trừ khi có thay đổi logic ứng dụng.</li>
+      </ul>
+      <h3>Kỹ thuật và chất lượng</h3>
+      <ul class="checklist">
+        <li>Responsive trên thiết bị mục tiêu; không vỡ giao diện ở kích thước điện thoại phổ biến.</li>
+        <li>Không có lỗi nghiêm trọng ở luồng đăng nhập, học bài, phát audio và lưu tiến độ.</li>
+        <li>API có validate, phân quyền, xử lý lỗi và tài liệu.</li>
+        <li>Có migration database, dữ liệu seed demo và hướng dẫn cài đặt.</li>
+        <li>Có test cho các luồng quan trọng và hướng dẫn kiểm thử thủ công.</li>
+        <li>Có hướng dẫn backup/restore và cấu hình triển khai.</li>
+      </ul>
+    </section>
+
+    <section id="delivery">
+      <h2>15. Lộ trình phát triển và bộ bàn giao</h2>
+      <table>
+        <thead><tr><th>Giai đoạn</th><th>Phạm vi</th><th>Sản phẩm bàn giao</th></tr></thead>
+        <tbody>
+          <tr><td>1. Phân tích & UX/UI</td><td>Chốt sitemap, user flow, wireframe, design system và mẫu màn hình.</td><td>Figma hoặc file thiết kế; đặc tả UX; danh sách component.</td></tr>
+          <tr><td>2. Nền tảng kỹ thuật</td><td>Backend, database, auth, phân quyền, CMS cơ bản, media storage.</td><td>Mã nguồn backend, schema/migration, API docs, Docker/dev setup.</td></tr>
+          <tr><td>3. MVP ứng dụng</td><td>Child app, Parent Zone, lesson player, audio, game và progress.</td><td>Mã nguồn mobile app, bản build thử nghiệm, test cases.</td></tr>
+          <tr><td>4. Nội dung mẫu</td><td>5 cấp độ, 12 chủ đề ở mức khung; ưu tiên nội dung hoàn chỉnh cho nhóm tuổi MVP được thống nhất.</td><td>File nội dung import được, audio/hình có quyền sử dụng, giáo án phụ huynh.</td></tr>
+          <tr><td>5. QA & triển khai</td><td>Kiểm thử, bảo mật, tối ưu hiệu năng, backup, tài liệu vận hành.</td><td>Bản release, source code, tài liệu cài đặt, tài khoản demo và biên bản nghiệm thu.</td></tr>
+        </tbody>
+      </table>
+      <h3>Danh sách tệp và tài liệu bắt buộc bàn giao</h3>
+      <ul class="checklist">
+        <li>Toàn bộ source code frontend/mobile, backend và admin CMS.</li>
+        <li>Database schema, migration và seed data.</li>
+        <li>File cấu hình mẫu .env.example, không chứa mật khẩu hoặc khóa bí mật thật.</li>
+        <li>API documentation (Swagger/OpenAPI).</li>
+        <li>Hướng dẫn chạy local, staging và production.</li>
+        <li>Hướng dẫn tạo admin, quản lý nội dung, tải media và xuất bản bài học.</li>
+        <li>Hướng dẫn backup/restore database và media.</li>
+        <li>Test cases, danh sách lỗi còn tồn tại và hướng dẫn phát hành.</li>
+        <li>File nội dung giáo trình có cấu trúc để có thể cập nhật/import về sau.</li>
+      </ul>
+    </section>
+
+    <section id="prompt">
+      <h2>16. Chỉ dẫn có thể giao trực tiếp cho AI / lập trình viên</h2>
+      <p>Sử dụng phần yêu cầu sau làm chỉ dẫn triển khai. Đội phát triển cần xây dựng sản phẩm hoạt động thực tế, không chỉ tạo giao diện minh họa.</p>
+      <div class="code">Hãy xây dựng ứng dụng Little English World theo toàn bộ đặc tả trong tài liệu HTML này.
+
+YÊU CẦU BẮT BUỘC:
+1. Phát triển ứng dụng học tiếng Anh cho trẻ 1–6 tuổi, có trải nghiệm riêng cho Bé,
+   Parent Zone và Admin CMS.
+2. Nội dung phải theo 5 nhóm tuổi, 12 chủ đề lớn và có mức độ tăng dần theo tuổi.
+3. Mỗi bài học phải có mục tiêu, từ/câu mẫu, audio, hoạt động tương tác,
+   hướng dẫn cha mẹ và hoạt động thực tế ngoài màn hình.
+4. Nhóm 1–2 tuổi phải ưu tiên Parent-led Mode; không thiết kế cho bé tự ngồi
+   xem hoặc thao tác màn hình độc lập.
+5. CMS phải quản lý được chương trình, chủ đề, bài học, từ vựng, media,
+   trò chơi và parent guide. Nội dung không được hard-code trong app.
+6. Có tài khoản phụ huynh, nhiều hồ sơ bé, phân quyền, tiến độ và báo cáo.
+7. Có backend API, database thật, validation, authentication, authorization,
+   logging và xử lý lỗi.
+8. Không để nút bấm giả. Mọi chức năng trong phạm vi MVP phải hoạt động và
+   kết nối backend/database hoặc được ghi rõ là chưa triển khai.
+9. Không sử dụng quảng cáo trong khu vực trẻ em; không thu âm/ghi hình trẻ
+   mặc định; các chức năng người lớn phải nằm trong Parent Zone.
+10. Bàn giao toàn bộ mã nguồn, migration, seed data, .env.example, API docs,
+    hướng dẫn cài đặt, backup/restore và tài khoản demo.
+
+QUY TRÌNH TRIỂN KHAI:
+- Đọc toàn bộ đặc tả và lập danh sách yêu cầu trước khi code.
+- Thiết kế sitemap, user flow, wireframe và design system.
+- Chốt kiến trúc, database schema và API contract.
+- Phát triển backend/CMS và ứng dụng theo module.
+- Seed dữ liệu demo để kiểm thử đầy đủ các luồng.
+- Chạy test, sửa lỗi, kiểm tra phân quyền và responsive.
+- Bàn giao source code và tài liệu; không chỉ gửi snippet hoặc ảnh chụp giao diện.
+
+TIÊU CHÍ NGHIỆM THU:
+- Phụ huynh tạo được tài khoản và hồ sơ bé.
+- Bé/cha mẹ mở được bài học theo nhóm tuổi, nghe audio và chơi game.
+- Parent Zone hiển thị đúng hướng dẫn dạy bé và hoạt động ngoài màn hình.
+- Tiến độ được lưu và hiển thị sau khi đăng nhập lại.
+- Admin tạo/sửa/xuất bản nội dung và nội dung được cập nhật lên ứng dụng.
+- Dữ liệu của mỗi gia đình được phân quyền riêng.
+- Có thể cài đặt lại dự án theo tài liệu bàn giao.</div>
+      <div class="callout success"><strong>Khuyến nghị khi giao việc:</strong> Yêu cầu đội phát triển trình diễn một luồng hoàn chỉnh từ CMS tạo bài học → ứng dụng tải bài học → phụ huynh hướng dẫn bé → hệ thống lưu tiến độ → phụ huynh xem báo cáo. Đây là cách kiểm tra sản phẩm có hoạt động thật hay chỉ là giao diện.</div>
+    </section>
+  </main>
+</div>
+<div class="footer">Little English World · Tài liệu đặc tả sản phẩm và kỹ thuật · Phiên bản 1.0 · 18/11/2026</div>
+</body>
+</html>

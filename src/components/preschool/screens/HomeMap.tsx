@@ -118,7 +118,11 @@ export const HomeMap: React.FC<HomeMapProps> = ({
                   : 'bg-white/45 border-white/60 opacity-50 cursor-not-allowed'
               }`}
             >
-              <span className="text-2xl sm:text-3xl leading-none">{u.emoji}</span>
+              <img
+                src={unitCoverUrl(u.id)}
+                alt={u.title}
+                className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-contain shrink-0"
+              />
               <div className="text-left">
                 <div className="font-kid font-extrabold text-slate-800 text-xs sm:text-base leading-tight">
                   {u.order}. {u.title}

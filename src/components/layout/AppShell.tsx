@@ -30,6 +30,7 @@ import {
   LearnerProfile,
 } from '../../types/audience';
 import { UserAccount, UserProgress } from '../../types/learning';
+import { AUDIENCE_IMAGE_MAP } from '../../utils/flashcardMedia';
 
 export interface AppShellProps {
   currentUser: UserAccount;
@@ -176,7 +177,11 @@ export const AppShell: React.FC<AppShellProps> = ({
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold border transition hover:shadow-sm ${audienceMeta.badgeColor}`}
                   title="Quản trị: Đổi nhóm đối tượng hoặc tùy chỉnh mục tiêu học tập"
                 >
-                  <span>{audienceMeta.emoji}</span>
+                  <img
+                    src={AUDIENCE_IMAGE_MAP[audienceMeta.id]}
+                    alt={audienceMeta.shortLabel}
+                    className="w-5 h-5 rounded-md bg-white p-0.5 object-contain shrink-0"
+                  />
                   <span className="truncate max-w-[96px] sm:max-w-none">{audienceMeta.shortLabel}</span>
                   <span className="opacity-80 hidden md:inline">• {audienceSubTag}</span>
                   <ChevronDown className="w-3.5 h-3.5 opacity-75 shrink-0" />
@@ -211,7 +216,11 @@ export const AppShell: React.FC<AppShellProps> = ({
                             }`}
                           >
                             <span className="flex items-center gap-2">
-                              <span className="text-base">{aud.emoji}</span>
+                              <img
+                                src={AUDIENCE_IMAGE_MAP[aud.id]}
+                                alt={aud.shortLabel}
+                                className="w-5 h-5 rounded-md bg-white p-0.5 object-contain shrink-0"
+                              />
                               <span>{aud.label}</span>
                             </span>
                             {isSelected && <CheckCircle2 className="w-4 h-4 shrink-0" />}
@@ -644,7 +653,11 @@ export const AppShell: React.FC<AppShellProps> = ({
           <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xl shrink-0">{audienceMeta.emoji}</span>
+                <img
+                  src={AUDIENCE_IMAGE_MAP[audienceMeta.id]}
+                  alt={audienceMeta.shortLabel}
+                  className="w-9 h-9 rounded-xl bg-white p-1 border border-slate-200 object-contain shrink-0"
+                />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-black text-slate-900 dark:text-white truncate">

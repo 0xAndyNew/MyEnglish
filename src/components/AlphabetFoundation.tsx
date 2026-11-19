@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Volume2, Turtle, Mic, Square, Sparkles, CheckCircle2, Headphones, RotateCw } from 'lucide-react';
 import { AccentMode } from '../types/learning';
+import { resolveFlashcardImage } from '../utils/flashcardMedia';
 import {
   isSpeechRecognitionSupported,
   playLoudAudioUrl,
@@ -700,13 +701,15 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
                           e.stopPropagation();
                           speakText(selected.examples[0].word, accent, 0.85);
                         }}
-                        className="w-24 h-28 rounded-3xl bg-white dark:bg-slate-800 border-2 border-amber-200 dark:border-slate-700 shadow-lg flex flex-col items-center justify-center gap-1 hover:scale-105 transition"
+                        className="w-24 h-28 rounded-3xl bg-white border-2 border-amber-200 p-2 shadow-lg flex flex-col items-center justify-center gap-1 hover:scale-105 transition"
                         title="Nghe từ minh họa"
                       >
-                        <span className="text-4xl">
-                          {KIDS_WORD_EMOJI[selected.examples[0].word] || '🌟'}
-                        </span>
-                        <span className="text-xs font-black text-slate-800 dark:text-white">
+                        <img
+                          src={resolveFlashcardImage(selected.examples[0].word, selected.examples[0].meaning)}
+                          alt={selected.examples[0].word}
+                          className="w-16 h-16 object-contain"
+                        />
+                        <span className="text-xs font-black text-slate-800">
                           {selected.examples[0].word}
                         </span>
                       </button>
@@ -749,15 +752,19 @@ export const AlphabetFoundation: React.FC<AlphabetFoundationProps> = ({
                 <div className="space-y-2 my-auto">
                   {selected.examples.map((ex) => {
                     const isMicActive = listeningWord === ex.word;
-                    const wordEmoji = KIDS_WORD_EMOJI[ex.word] || '🌟';
+                    const wordImg = resolveFlashcardImage(ex.word, ex.meaning);
                     return (
                       <div
                         key={ex.word}
                         onClick={(e) => e.stopPropagation()}
-                        className="px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
+                        className="px-3.5 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
                       >
                         <div className="min-w-0 flex items-center gap-2.5">
-                          <span className="text-2xl shrink-0">{wordEmoji}</span>
+                          <img
+                            src={wordImg}
+                            alt={ex.word}
+                            className="w-10 h-10 rounded-xl bg-white p-1 border border-slate-200 object-contain shrink-0"
+                          />
                           <div className="min-w-0">
                             <div className="text-base font-black text-slate-900 dark:text-white">
                               {renderHighlightedWord(ex.word, selected.letter, selected.isVowel)}

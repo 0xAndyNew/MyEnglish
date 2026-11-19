@@ -222,6 +222,7 @@ export function loadFullProgress(emailRaw) {
     stickers: Array.isArray(rawPreschool?.stickers) ? rawPreschool.stickers : [],
     stars: Number(rawPreschool?.stars || 0),
     ...(rawPreschool?.lastLessonAt ? { lastLessonAt: String(rawPreschool.lastLessonAt) } : {}),
+    ...(rawPreschool?.lew && typeof rawPreschool.lew === 'object' ? { lew: rawPreschool.lew } : {}),
   };
 
   return {

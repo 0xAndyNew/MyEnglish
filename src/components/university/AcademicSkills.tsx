@@ -61,6 +61,7 @@ import {
 } from '../../utils/speechEngine';
 import { PronunciationReportCard } from '../PronunciationReportCard';
 import { ExerciseRunner } from '../practice/ExerciseRunner';
+import { PaginationBar, usePagination } from '../common/PaginationBar';
 
 export interface AcademicSkillsProps {
   accent: AccentMode;
@@ -566,6 +567,25 @@ export const AcademicSkills: React.FC<AcademicSkillsProps> = ({
   const currentAbstract: AcademicAbstract =
     ACADEMIC_ABSTRACTS[selectedAbstractIdx] || ACADEMIC_ABSTRACTS[0];
 
+  const awlListRef = useRef<HTMLDivElement | null>(null);
+  const stagePhrasesRef = useRef<HTMLDivElement | null>(null);
+  const seminarPhrasesRef = useRef<HTMLDivElement | null>(null);
+  const abstractsRef = useRef<HTMLDivElement | null>(null);
+  const writingPromptsRef = useRef<HTMLDivElement | null>(null);
+
+  const awlPagination = usePagination(filteredAwlWords, 10, {
+    resetKey: `${awlDomainFilter}:${awlLevelFilter}:${awlQuery}`,
+  });
+  const stagePhrasePagination = usePagination(stagePhrases, 8, {
+    resetKey: activeStage,
+  });
+  const seminarPhrasePagination = usePagination(filteredSeminarPhrases, 8, {
+    resetKey: seminarCategory,
+  });
+  const abstractPagination = usePagination(ACADEMIC_ABSTRACTS, 8, {
+    activeIndex: selectedAbstractIdx,
+  });
+
   const writingTypes = useMemo(
     () => Array.from(new Set(ACADEMIC_WRITING_PROMPTS.map((p) => p.type))),
     []
@@ -578,6 +598,10 @@ export const AcademicSkills: React.FC<AcademicSkillsProps> = ({
         : ACADEMIC_WRITING_PROMPTS.filter((p) => p.type === writingTypeFilter),
     [writingTypeFilter]
   );
+
+  const writingPromptPagination = usePagination(filteredWritingPrompts, 8, {
+    resetKey: writingTypeFilter,
+  });
 
   const activeWritingPrompt = useMemo(
     () =>
@@ -904,63 +928,83 @@ ${draftText}
 
           {awlMode === 'browse' ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* Word List */}
-              <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[640px]">
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
-                    Danh sách từ ({filteredAwlWords.length})
-                  </span>
-                  <span className="text-[11px] text-slate-400">Chọn từ để xem chi tiết</span>
-                </div>
-                <div className="overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredAwlWords.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-500">
-                      Không tìm thấy từ AWL phù hợp với bộ lọc hiện tại.
-                    </div>
-                  ) : (
-                    filteredAwlWords.map((item) => {
-                      const isSelected = activeAwlWord.id === item.id;
-                      const isSaved = savedAwlIds.includes(item.id);
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedAwlId(item.id);
-                            speakText(item.word, accent, 0.95);
-                          }}
-                          className={`w-full text-left px-4 py-3 transition flex items-start justify-between gap-3 ${
-                            isSelected
-                              ? 'bg-violet-50/90 dark:bg-violet-950/40 border-l-4 border-l-violet-600'
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-extrabold text-sm text-slate-900 dark:text-white">
-                                {item.word}
-                              </span>
-                              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                                ({item.pos}) {accent === 'en-US' ? item.ipa : item.ipaUK}
+              {/* Word List (10 words/page) */}
+              <div ref={awlListRef} className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
+                      Danh sách từ ({filteredAwlWords.length})
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Trang {awlPagination.page}/{awlPagination.totalPages}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredAwlWords.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-500">
+                        Không tìm thấy từ AWL phù hợp với bộ lọc hiện tại.
+                      </div>
+                    ) : (
+                      awlPagination.pageItems.map((item) => {
+                        const isSelected = activeAwlWord.id === item.id;
+                        const isSaved = savedAwlIds.includes(item.id);
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAwlId(item.id);
+                              speakText(item.word, accent, 0.95);
+                            }}
+                            className={`w-full text-left px-4 py-3 transition flex items-start justify-between gap-3 ${
+                              isSelected
+                                ? 'bg-violet-50/90 dark:bg-violet-950/40 border-l-4 border-l-violet-600'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                  {item.word}
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                  ({item.pos}) {accent === 'en-US' ? item.ipa : item.ipaUK}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 line-clamp-1">
+                                {item.meaningVi}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isSaved && <BookmarkCheck className="w-4 h-4 text-emerald-600" />}
+                              <span
+                                className={`px-2 py-0.5 rounded-md border text-[10px] font-extrabold ${LEVEL_BADGE_CLASS[item.level]}`}
+                              >
+                                {item.level}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 line-clamp-1">
-                              {item.meaningVi}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isSaved && <BookmarkCheck className="w-4 h-4 text-emerald-600" />}
-                            <span
-                              className={`px-2 py-0.5 rounded-md border text-[10px] font-extrabold ${LEVEL_BADGE_CLASS[item.level]}`}
-                            >
-                              {item.level}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
+
+                {filteredAwlWords.length > 0 && (
+                  <div className="p-2.5 border-t border-slate-100 dark:border-slate-800">
+                    <PaginationBar
+                      page={awlPagination.page}
+                      totalPages={awlPagination.totalPages}
+                      totalItems={awlPagination.totalItems}
+                      startIdx={awlPagination.startIdx}
+                      endIdx={awlPagination.endIdx}
+                      onPageChange={awlPagination.setPage}
+                      itemLabel="từ"
+                      compact
+                      scrollTargetRef={awlListRef}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Word Inspector */}
@@ -1524,8 +1568,8 @@ ${draftText}
                 </p>
               </div>
 
-              <div className="space-y-3">
-                {stagePhrases.map((phrase) => {
+              <div ref={stagePhrasesRef} className="space-y-3">
+                {stagePhrasePagination.pageItems.map((phrase) => {
                   const isPracticingThis = practicingId === phrase.id;
                   return (
                     <div
@@ -1617,6 +1661,17 @@ ${draftText}
                   );
                 })}
               </div>
+
+              <PaginationBar
+                page={stagePhrasePagination.page}
+                totalPages={stagePhrasePagination.totalPages}
+                totalItems={stagePhrasePagination.totalItems}
+                startIdx={stagePhrasePagination.startIdx}
+                endIdx={stagePhrasePagination.endIdx}
+                onPageChange={stagePhrasePagination.setPage}
+                itemLabel="cụm thuyết trình"
+                scrollTargetRef={stagePhrasesRef}
+              />
             </div>
           )}
 
@@ -1657,8 +1712,8 @@ ${draftText}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredSeminarPhrases.map((item) => {
+              <div ref={seminarPhrasesRef} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {seminarPhrasePagination.pageItems.map((item) => {
                   const isPracticingThis = practicingId === item.id;
                   return (
                     <div
@@ -1741,47 +1796,72 @@ ${draftText}
                   );
                 })}
               </div>
+
+              <PaginationBar
+                page={seminarPhrasePagination.page}
+                totalPages={seminarPhrasePagination.totalPages}
+                totalItems={seminarPhrasePagination.totalItems}
+                startIdx={seminarPhrasePagination.startIdx}
+                endIdx={seminarPhrasePagination.endIdx}
+                onPageChange={seminarPhrasePagination.setPage}
+                itemLabel="cụm thảo luận"
+                scrollTargetRef={seminarPhrasesRef}
+              />
             </div>
           )}
 
           {/* 2C. ACADEMIC ABSTRACTS READING */}
           {presSubMode === 'reading' && (
             <div className="space-y-5">
-              {/* Abstract Selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                {ACADEMIC_ABSTRACTS.map((abs, idx) => {
-                  const active = idx === selectedAbstractIdx;
-                  const done = rewardedAbstractIds.includes(abs.id);
-                  return (
-                    <button
-                      key={abs.id}
-                      type="button"
-                      onClick={() => {
-                        window.speechSynthesis?.cancel();
-                        setSelectedAbstractIdx(idx);
-                        setShowAbstractTrans(false);
-                      }}
-                      className={`p-3 rounded-2xl border text-left transition ${
-                        active
-                          ? 'border-violet-600 bg-violet-50 dark:bg-violet-950/40 shadow-sm'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-violet-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${LEVEL_BADGE_CLASS[abs.level]}`}
-                        >
-                          {abs.level}
-                        </span>
-                        {done && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-                      </div>
-                      <div className="text-xs font-extrabold text-slate-900 dark:text-white line-clamp-2">
-                        {abs.title}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-1">{abs.domain}</div>
-                    </button>
-                  );
-                })}
+              {/* Abstract Selector (8/page) */}
+              <div ref={abstractsRef} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {abstractPagination.pageItems.map((abs, localIdx) => {
+                    const idx = abstractPagination.startIdx + localIdx;
+                    const active = idx === selectedAbstractIdx;
+                    const done = rewardedAbstractIds.includes(abs.id);
+                    return (
+                      <button
+                        key={abs.id}
+                        type="button"
+                        onClick={() => {
+                          window.speechSynthesis?.cancel();
+                          setSelectedAbstractIdx(idx);
+                          setShowAbstractTrans(false);
+                        }}
+                        className={`p-3 rounded-2xl border text-left transition ${
+                          active
+                            ? 'border-violet-600 bg-violet-50 dark:bg-violet-950/40 shadow-sm'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-violet-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${LEVEL_BADGE_CLASS[abs.level]}`}
+                          >
+                            {abs.level}
+                          </span>
+                          {done && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                        </div>
+                        <div className="text-xs font-extrabold text-slate-900 dark:text-white line-clamp-2">
+                          {abs.title}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">{abs.domain}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <PaginationBar
+                  page={abstractPagination.page}
+                  totalPages={abstractPagination.totalPages}
+                  totalItems={abstractPagination.totalItems}
+                  startIdx={abstractPagination.startIdx}
+                  endIdx={abstractPagination.endIdx}
+                  onPageChange={abstractPagination.setPage}
+                  itemLabel="bài đọc Abstract"
+                  scrollTargetRef={abstractsRef}
+                />
               </div>
 
               {/* Abstract Passage + Comprehension Questions */}
@@ -1967,39 +2047,52 @@ ${draftText}
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
-              {filteredWritingPrompts.map((pr) => {
-                const active = pr.id === activeWritingPrompt.id;
-                return (
-                  <button
-                    key={pr.id}
-                    type="button"
-                    onClick={() => handleSelectPrompt(pr.id)}
-                    className={`p-3 rounded-xl border text-left transition ${
-                      active
-                        ? 'border-violet-600 bg-violet-50/90 dark:bg-violet-950/40 shadow-sm'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-violet-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-[10px] font-extrabold uppercase text-violet-700 dark:text-violet-300">
-                        {pr.type}
-                      </span>
-                      <span
-                        className={`px-1.5 py-0.5 rounded border text-[10px] font-extrabold ${LEVEL_BADGE_CLASS[pr.level]}`}
-                      >
-                        {pr.level}
-                      </span>
-                    </div>
-                    <div className="text-xs font-extrabold text-slate-900 dark:text-white line-clamp-2">
-                      {pr.title}
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-1">
-                      Mục tiêu ~{pr.recommendedWords} từ
-                    </div>
-                  </button>
-                );
-              })}
+            <div ref={writingPromptsRef} className="space-y-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {writingPromptPagination.pageItems.map((pr) => {
+                  const active = pr.id === activeWritingPrompt.id;
+                  return (
+                    <button
+                      key={pr.id}
+                      type="button"
+                      onClick={() => handleSelectPrompt(pr.id)}
+                      className={`p-3 rounded-xl border text-left transition ${
+                        active
+                          ? 'border-violet-600 bg-violet-50/90 dark:bg-violet-950/40 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-violet-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[10px] font-extrabold uppercase text-violet-700 dark:text-violet-300">
+                          {pr.type}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded border text-[10px] font-extrabold ${LEVEL_BADGE_CLASS[pr.level]}`}
+                        >
+                          {pr.level}
+                        </span>
+                      </div>
+                      <div className="text-xs font-extrabold text-slate-900 dark:text-white line-clamp-2">
+                        {pr.title}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Mục tiêu ~{pr.recommendedWords} từ
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <PaginationBar
+                page={writingPromptPagination.page}
+                totalPages={writingPromptPagination.totalPages}
+                totalItems={writingPromptPagination.totalItems}
+                startIdx={writingPromptPagination.startIdx}
+                endIdx={writingPromptPagination.endIdx}
+                onPageChange={writingPromptPagination.setPage}
+                itemLabel="đề luyện viết"
+                scrollTargetRef={writingPromptsRef}
+              />
             </div>
           </div>
 

@@ -44,6 +44,7 @@ import {
 } from '../../data/exam/examPrepData';
 import { ExamType, getExamMeta, LearnerProfile } from '../../types/audience';
 import { AccentMode } from '../../types/learning';
+import { EXAM_IMAGE_MAP } from '../../utils/flashcardMedia';
 import { callGeminiText } from '../../utils/geminiClient';
 import {
   isSpeechRecognitionSupported,
@@ -930,8 +931,12 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-[11px] font-extrabold uppercase tracking-wider">
               <Award className="w-3.5 h-3.5" /> Trung Tâm Luyện Thi 5 Chứng Chỉ Quốc Tế & VSTEP
             </span>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
-              <span>{examData.badgeEmoji}</span>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2.5">
+              <img
+                src={EXAM_IMAGE_MAP[selectedExam] || '/img/art/exam-ielts.webp'}
+                alt={examData.title}
+                className="w-10 h-10 rounded-xl bg-white p-1 object-contain shadow-sm shrink-0"
+              />
               <span>{examData.title}</span>
             </h2>
             <p className="text-xs sm:text-sm text-rose-100 leading-relaxed">{examData.subtitle}</p>
@@ -988,7 +993,11 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                       : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
                   }`}
                 >
-                  <span>{meta.emoji}</span>
+                  <img
+                    src={EXAM_IMAGE_MAP[exId] || '/img/art/exam-ielts.webp'}
+                    alt={meta.shortLabel}
+                    className="w-5 h-5 rounded-md bg-white p-0.5 object-contain shrink-0"
+                  />
                   <span>{meta.shortLabel}</span>
                   {isProfileTarget && (
                     <span

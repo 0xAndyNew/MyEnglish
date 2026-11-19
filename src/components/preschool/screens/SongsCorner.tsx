@@ -1,6 +1,6 @@
 import { Play, Square } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import type { PreschoolUnit } from '../../../data/preschool/types';
+import { unitCoverUrl, type PreschoolUnit } from '../../../data/preschool/types';
 import { Mascot } from '../shell/Mascot';
 import { BigButton } from '../ui/BigButton';
 
@@ -100,7 +100,11 @@ export const SongsCorner: React.FC<SongsCornerProps> = ({
                   : 'bg-white text-slate-700 border-white hover:border-pink-200'
               }`}
             >
-              <span className="text-2xl">{u.emoji}</span>
+              <img
+                src={unitCoverUrl(u.id)}
+                alt={u.title}
+                className="w-9 h-9 rounded-xl object-contain shrink-0 bg-white p-0.5"
+              />
               <span className="text-sm sm:text-base">{u.song.title}</span>
             </button>
           );

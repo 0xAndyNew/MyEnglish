@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { wordImageUrl } from '../../../data/preschool/types';
 import { Mascot } from '../shell/Mascot';
 import { BigButton } from '../ui/BigButton';
 import type { ActivityProps } from './activityTypes';
@@ -18,7 +19,14 @@ export const CountTap: React.FC<ActivityProps> = ({ words, level, audio, onDone 
   const [wiggleNum, setWiggleNum] = useState<number | null>(null);
 
   const targetCount = rounds[rIdx] || 3;
-  const itemEmoji = ['🍎', '⭐', '🎈', '🐥', '🌸'][rIdx % 5];
+  const countItems = [
+    { slug: 'apple', emoji: '🍎' },
+    { slug: 'star', emoji: '⭐' },
+    { slug: 'balloon', emoji: '🎈' },
+    { slug: 'duck', emoji: '🐥' },
+    { slug: 'flower', emoji: '🌸' },
+  ];
+  const itemVisual = countItems[rIdx % countItems.length];
 
   const options = useMemo(() => {
     const set = new Set<number>([targetCount]);
@@ -74,9 +82,13 @@ export const CountTap: React.FC<ActivityProps> = ({ words, level, audio, onDone 
               audio.playSfx('pop');
               audio.speak(String(i + 1), 0.85);
             }}
-            className="text-5xl sm:text-6xl leading-none hover:scale-110 active:scale-95 transition select-none"
+            className="w-16 h-16 sm:w-20 sm:h-20 hover:scale-110 active:scale-95 transition select-none flex items-center justify-center"
           >
-            {itemEmoji}
+            <img
+              src={wordImageUrl(itemVisual.slug)}
+              alt={itemVisual.slug}
+              className="w-full h-full object-contain pointer-events-none"
+            />
           </button>
         ))}
       </div>

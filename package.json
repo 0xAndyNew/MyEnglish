@@ -10,7 +10,8 @@
     "start": "node server/server.mjs",
     "preview": "vite preview",
     "validate": "tsx scripts/validate-content.ts",
-    "images:preschool": "node scripts/optimize-preschool-images.mjs"
+    "images:preschool": "node scripts/optimize-preschool-images.mjs",
+    "images:preschool:vectors": "tsx scripts/generate-preschool-vectors.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.2",

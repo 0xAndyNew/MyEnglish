@@ -22,6 +22,7 @@ import { AccentMode, CefrLevel } from '../types/learning';
 import { filterAndSortByProfile } from '../utils/audienceFilter';
 import { callGeminiText } from '../utils/geminiClient';
 import { speakText } from '../utils/speechEngine';
+import { PaginationBar, usePagination } from './common/PaginationBar';
 
 interface WritingGrammarLabProps {
   accent: AccentMode;
@@ -365,6 +366,14 @@ export const WritingGrammarLab: React.FC<WritingGrammarLabProps> = ({
   const activeLessonQuiz = currentLesson.quiz.slice(0, lessonQuizCount);
   const activeExamQuestions = COMPREHENSIVE_GRAMMAR_EXAM.slice(0, examCount);
 
+  const grammarPagination = usePagination(GRAMMAR_LESSONS, 8, {
+    activeIndex: selectedGrammarIdx < GRAMMAR_LESSONS.length ? selectedGrammarIdx : undefined,
+  });
+  const promptPagination = usePagination(visiblePrompts, 8, {
+    resetKey: visiblePrompts.length,
+    activeIndex: promptIdx % Math.max(1, visiblePrompts.length),
+  });
+
   // Inline drill tokens for currentLesson
   const currentDrill = currentLesson.sentenceDrills[drillIdx % currentLesson.sentenceDrills.length];
   const drillTokens = useMemo(() => currentDrill.en.split(/\s+/), [currentDrill]);
@@ -516,42 +525,56 @@ Bài viết của học viên:
               </span>
             </div>
 
-            <div className="space-y-1.5 max-h-56 lg:max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
-              {GRAMMAR_LESSONS.map((lesson, idx) => {
-                const done = completedGrammarIds.includes(lesson.id);
-                const locked =
-                  !devUnlockAll &&
-                  idx > 0 &&
-                  !completedGrammarIds.includes(GRAMMAR_LESSONS[idx - 1].id) &&
-                  !done;
-                const active = selectedGrammarIdx === idx;
-                return (
-                  <button
-                    key={lesson.id}
-                    disabled={locked}
-                    onClick={() => handleSelectGrammarItem(idx)}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left text-xs font-semibold transition ${
-                      active
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : locked
-                        ? 'bg-slate-100/60 dark:bg-slate-800/30 text-slate-400 border-slate-200/60 cursor-not-allowed'
-                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {locked ? (
-                        <Lock className="w-3.5 h-3.5 shrink-0" />
-                      ) : done ? (
-                        <CheckCircle2 className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-300' : 'text-emerald-500'}`} />
-                      ) : (
-                        <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0" />
-                      )}
-                      <span className="leading-snug">{lesson.title}</span>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  </button>
-                );
-              })}
+            <div className="space-y-2.5">
+              <div className="space-y-1.5">
+                {grammarPagination.pageItems.map((lesson, localIdx) => {
+                  const idx = grammarPagination.startIdx + localIdx;
+                  const done = completedGrammarIds.includes(lesson.id);
+                  const locked =
+                    !devUnlockAll &&
+                    idx > 0 &&
+                    !completedGrammarIds.includes(GRAMMAR_LESSONS[idx - 1].id) &&
+                    !done;
+                  const active = selectedGrammarIdx === idx;
+                  return (
+                    <button
+                      key={lesson.id}
+                      disabled={locked}
+                      onClick={() => handleSelectGrammarItem(idx)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left text-xs font-semibold transition ${
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : locked
+                          ? 'bg-slate-100/60 dark:bg-slate-800/30 text-slate-400 border-slate-200/60 cursor-not-allowed'
+                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {locked ? (
+                          <Lock className="w-3.5 h-3.5 shrink-0" />
+                        ) : done ? (
+                          <CheckCircle2 className={`w-4 h-4 shrink-0 ${active ? 'text-emerald-300' : 'text-emerald-500'}`} />
+                        ) : (
+                          <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0" />
+                        )}
+                        <span className="leading-snug">{lesson.title}</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <PaginationBar
+                page={grammarPagination.page}
+                totalPages={grammarPagination.totalPages}
+                totalItems={grammarPagination.totalItems}
+                startIdx={grammarPagination.startIdx}
+                endIdx={grammarPagination.endIdx}
+                onPageChange={grammarPagination.setPage}
+                itemLabel="bài ngữ pháp"
+                compact
+              />
 
               {/* Final Comprehensive Exam Button */}
               {(() => {
@@ -1147,26 +1170,40 @@ Bài viết của học viên:
           <div className="lg:col-span-5 space-y-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2.5">
               <div className="text-xs font-bold uppercase text-slate-500">Chọn đề bài luyện viết</div>
-              {visiblePrompts.map((p, i) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setPromptIdx(i);
-                    setOfflineCheck(null);
-                    setAiReview(null);
-                  }}
-                  className={`w-full text-left p-3 rounded-xl border transition ${
-                    (promptIdx % visiblePrompts.length) === i
-                      ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30'
-                      : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 mr-2">
-                    {p.level}
-                  </span>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">{p.title}</span>
-                </button>
-              ))}
+              {promptPagination.pageItems.map((p, localIdx) => {
+                const i = promptPagination.startIdx + localIdx;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setPromptIdx(i);
+                      setOfflineCheck(null);
+                      setAiReview(null);
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition ${
+                      (promptIdx % visiblePrompts.length) === i
+                        ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/30'
+                        : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 mr-2">
+                      {p.level}
+                    </span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">{p.title}</span>
+                  </button>
+                );
+              })}
+
+              <PaginationBar
+                page={promptPagination.page}
+                totalPages={promptPagination.totalPages}
+                totalItems={promptPagination.totalItems}
+                startIdx={promptPagination.startIdx}
+                endIdx={promptPagination.endIdx}
+                onPageChange={promptPagination.setPage}
+                itemLabel="đề viết"
+                compact
+              />
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">

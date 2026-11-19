@@ -33,6 +33,7 @@ import {
   WORKPLACE_VOCAB_DRILLS,
 } from '../../data/worker/workplaceScenariosData';
 import { ExerciseRunner } from '../practice/ExerciseRunner';
+import { PaginationBar, usePagination } from '../common/PaginationBar';
 import { LearnerProfile } from '../../types/audience';
 import { AccentMode, CefrLevel } from '../../types/learning';
 import { speakText } from '../../utils/speechEngine';
@@ -286,6 +287,24 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
     () => (activeCase ? filteredCases.findIndex((c) => c.id === activeCase.id) : -1),
     [filteredCases, activeCase]
   );
+
+  const sharedFilterKey = `${industryFilter}:${levelFilter}:${searchQuery}`;
+  const meetingPagination = usePagination(filteredMeetings, 8, {
+    resetKey: `${sharedFilterKey}:${meetingSubFilter}`,
+    activeIndex: activeMeetingIdx >= 0 ? activeMeetingIdx : undefined,
+  });
+  const emailPagination = usePagination(filteredEmails, 8, {
+    resetKey: `${sharedFilterKey}:${channelFilter}`,
+    activeIndex: activeEmailIdx >= 0 ? activeEmailIdx : undefined,
+  });
+  const starPagination = usePagination(filteredStars, 8, {
+    resetKey: sharedFilterKey,
+    activeIndex: activeStarIdx >= 0 ? activeStarIdx : undefined,
+  });
+  const casePagination = usePagination(filteredCases, 8, {
+    resetKey: sharedFilterKey,
+    activeIndex: activeCaseIdx >= 0 ? activeCaseIdx : undefined,
+  });
 
   const filteredDrills = useMemo(() => {
     if (industryFilter === 'ALL') return WORKPLACE_VOCAB_DRILLS;
@@ -586,9 +605,11 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
             <div
               className={`${
                 mobileListOpen ? 'block' : 'hidden lg:block'
-              } space-y-2 max-h-64 lg:max-h-[480px] overflow-y-auto pr-1`}
+              } space-y-2.5`}
             >
-              {filteredMeetings.map((item, idx) => {
+              <div className="space-y-2">
+              {meetingPagination.pageItems.map((item, localIdx) => {
+                const idx = meetingPagination.startIdx + localIdx;
                 const active = activeMeeting?.id === item.id;
                 const isMine = userIndustrySet.has(item.industry);
                 const done = completedIds.includes(item.id);
@@ -628,6 +649,18 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
                   </button>
                 );
               })}
+              </div>
+
+              <PaginationBar
+                page={meetingPagination.page}
+                totalPages={meetingPagination.totalPages}
+                totalItems={meetingPagination.totalItems}
+                startIdx={meetingPagination.startIdx}
+                endIdx={meetingPagination.endIdx}
+                onPageChange={meetingPagination.setPage}
+                itemLabel="kịch bản"
+                compact
+              />
             </div>
           </div>
 
@@ -808,9 +841,11 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
             <div
               className={`${
                 mobileListOpen ? 'block' : 'hidden lg:block'
-              } space-y-2 max-h-64 lg:max-h-[480px] overflow-y-auto pr-1`}
+              } space-y-2.5`}
             >
-              {filteredEmails.map((tpl, idx) => {
+              <div className="space-y-2">
+              {emailPagination.pageItems.map((tpl, localIdx) => {
+                const idx = emailPagination.startIdx + localIdx;
                 const active = activeEmail?.id === tpl.id;
                 const isMine = userIndustrySet.has(tpl.industry);
                 const done = completedIds.includes(tpl.id);
@@ -848,6 +883,18 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
                   </button>
                 );
               })}
+              </div>
+
+              <PaginationBar
+                page={emailPagination.page}
+                totalPages={emailPagination.totalPages}
+                totalItems={emailPagination.totalItems}
+                startIdx={emailPagination.startIdx}
+                endIdx={emailPagination.endIdx}
+                onPageChange={emailPagination.setPage}
+                itemLabel="mẫu"
+                compact
+              />
             </div>
           </div>
 
@@ -1046,9 +1093,11 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
             <div
               className={`${
                 mobileListOpen ? 'block' : 'hidden lg:block'
-              } space-y-2 max-h-64 lg:max-h-[500px] overflow-y-auto pr-1`}
+              } space-y-2.5`}
             >
-              {filteredStars.map((q, idx) => {
+              <div className="space-y-2">
+              {starPagination.pageItems.map((q, localIdx) => {
+                const idx = starPagination.startIdx + localIdx;
                 const active = activeStar?.id === q.id;
                 const isMine = userIndustrySet.has(q.industry);
                 const done = completedIds.includes(q.id);
@@ -1086,6 +1135,18 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
                   </button>
                 );
               })}
+              </div>
+
+              <PaginationBar
+                page={starPagination.page}
+                totalPages={starPagination.totalPages}
+                totalItems={starPagination.totalItems}
+                startIdx={starPagination.startIdx}
+                endIdx={starPagination.endIdx}
+                onPageChange={starPagination.setPage}
+                itemLabel="câu hỏi"
+                compact
+              />
             </div>
           </div>
 
@@ -1318,9 +1379,11 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
             <div
               className={`${
                 mobileListOpen ? 'block' : 'hidden lg:block'
-              } space-y-2 max-h-64 lg:max-h-[500px] overflow-y-auto pr-1`}
+              } space-y-2.5`}
             >
-              {filteredCases.map((c, idx) => {
+              <div className="space-y-2">
+              {casePagination.pageItems.map((c, localIdx) => {
+                const idx = casePagination.startIdx + localIdx;
                 const active = activeCase?.id === c.id;
                 const isMine = userIndustrySet.has(c.industry);
                 const done = completedIds.includes(c.id);
@@ -1358,6 +1421,18 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
                   </button>
                 );
               })}
+              </div>
+
+              <PaginationBar
+                page={casePagination.page}
+                totalPages={casePagination.totalPages}
+                totalItems={casePagination.totalItems}
+                startIdx={casePagination.startIdx}
+                endIdx={casePagination.endIdx}
+                onPageChange={casePagination.setPage}
+                itemLabel="tình huống"
+                compact
+              />
             </div>
           </div>
 

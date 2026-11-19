@@ -13,6 +13,7 @@ import {
   LearnerProfile,
 } from '../types/audience';
 import { CefrLevel } from '../types/learning';
+import { AUDIENCE_IMAGE_MAP } from '../utils/flashcardMedia';
 
 interface LearnerProfilePanelProps {
   isOpen: boolean;
@@ -151,7 +152,11 @@ export const LearnerProfilePanel: React.FC<LearnerProfilePanelProps> = ({
                         : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300'
                     }`}
                   >
-                    <span className="text-2xl">{item.emoji}</span>
+                    <img
+                      src={AUDIENCE_IMAGE_MAP[item.id]}
+                      alt={item.shortLabel}
+                      className="w-10 h-10 rounded-xl bg-white p-1 border border-slate-200 object-contain shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
                         {item.label}

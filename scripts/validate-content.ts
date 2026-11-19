@@ -24,6 +24,8 @@ import {
   PRESCHOOL_LEVELS,
   buildUnitLessons,
 } from '../src/data/preschool';
+import { LEW_AGE_LEVELS, LEW_LEVEL_ORDER } from '../src/data/preschool/lewLevels';
+import { LEW_TOPICS } from '../src/data/preschool/lewTopics';
 import { Exercise } from '../src/types/exercise';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -265,7 +267,39 @@ for (const key of EXAM_ORDER) {
 // 6. GRAMMAR
 checkUniqueIds('GRAMMAR_LESSONS', GRAMMAR_LESSONS.map((g) => g.id));
 
-// 7. PRESCHOOL (1-6)
+// 7. PRESCHOOL (1-6) & LITTLE ENGLISH WORLD
+checkUniqueIds('LEW_TOPICS', LEW_TOPICS.map((t) => t.id));
+if (LEW_TOPICS.length !== 36) {
+  error(`LEW_TOPICS expected 36 core topics, got ${LEW_TOPICS.length}`);
+}
+if (LEW_LEVEL_ORDER.length !== 5) {
+  error(`LEW_LEVEL_ORDER expected 5 age levels, got ${LEW_LEVEL_ORDER.length}`);
+}
+const songAudioRoot = path.join(process.cwd(), 'public', 'audio', 'kids-songs');
+const songMp3Files = fs.existsSync(songAudioRoot)
+  ? fs.readdirSync(songAudioRoot).filter((f) => f.endsWith('.mp3'))
+  : [];
+if (songMp3Files.length < 18) {
+  error(`Kids songs expected >= 18 MP3 files, got ${songMp3Files.length}`);
+}
+const lewImgRoot = path.join(process.cwd(), 'public', 'preschool', 'img');
+for (const topic of LEW_TOPICS) {
+  checkUniqueIds(`LEW_TOPIC[${topic.id}].words`, topic.words.map((w) => w.id));
+  if (!fs.existsSync(path.join(lewImgRoot, 'units', `${topic.coverSlug}.webp`))) {
+    error(`LEW_TOPIC[${topic.id}] missing cover banner "${topic.coverSlug}.webp"`);
+  }
+  for (const w of topic.words) {
+    if (!fs.existsSync(path.join(lewImgRoot, 'words', `${w.imageSlug}.webp`))) {
+      error(`LEW_TOPIC[${topic.id}] word [${w.word}] missing image "${w.imageSlug}.webp"`);
+    }
+  }
+  for (const lvId of LEW_LEVEL_ORDER) {
+    if (!topic.levels[lvId]) {
+      error(`LEW_TOPIC[${topic.id}] missing level variant "${lvId}"`);
+    }
+  }
+}
+
 checkUniqueIds('ALL_PRESCHOOL_UNITS', ALL_PRESCHOOL_UNITS.map((u) => u.id));
 const preschoolWordIds = ALL_PRESCHOOL_UNITS.flatMap((u) => u.words.map((w) => w.id));
 checkUniqueIds('PRESCHOOL_WORDS', preschoolWordIds);
@@ -302,9 +336,21 @@ for (const u of ALL_PRESCHOOL_UNITS) {
   if (!fs.existsSync(path.join(imgRoot, 'units', `${u.id}.webp`))) {
     missingImagesCount++;
   }
+  for (let pIdx = 0; pIdx < u.story.pages.length; pIdx++) {
+    if (!fs.existsSync(path.join(imgRoot, 'stories', `${u.id}-${pIdx + 1}.webp`))) {
+      missingImagesCount++;
+    }
+  }
+}
+for (const ph of PHONICS_LETTERS) {
+  if (!fs.existsSync(path.join(imgRoot, 'words', `${ph.exampleImage}.webp`))) {
+    missingImagesCount++;
+  }
 }
 if (missingImagesCount > 0) {
   warn(`Preschool illustrations missing: ${missingImagesCount} WebP files under public/preschool/img/ (emoji fallback active)`);
+} else {
+  console.log(`✅ Preschool illustrations: 100% WebP ready (${wordSlugsSeen.size} words + ${ALL_PRESCHOOL_UNITS.length} covers + stories + phonics)`);
 }
 
 console.log('\n=== Inventory Summary ===');

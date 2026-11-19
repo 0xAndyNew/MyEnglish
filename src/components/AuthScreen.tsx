@@ -11,6 +11,7 @@ import {
   LearnerProfile,
 } from '../types/audience';
 import { UserAccount, UserProgress } from '../types/learning';
+import { AUDIENCE_IMAGE_MAP } from '../utils/flashcardMedia';
 import { loginAccount, registerAccount } from '../utils/storage';
 
 interface AuthScreenProps {
@@ -172,7 +173,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-lg leading-none">{item.emoji}</span>
+                          <img
+                            src={AUDIENCE_IMAGE_MAP[item.id]}
+                            alt={item.shortLabel}
+                            className="w-7 h-7 rounded-lg bg-white p-0.5 border border-slate-200 object-contain shrink-0"
+                          />
                           <div className="min-w-0">
                             <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                               {item.label}

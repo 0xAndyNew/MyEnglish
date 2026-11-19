@@ -7,14 +7,15 @@ interface KidDockProps {
   onSelect: (screen: KidScreenId, spokenLabel: string) => void;
 }
 
-const DOCK_ITEMS: { id: KidScreenId; emoji: string; label: string; speakEn: string; bg: string }[] = [
-  { id: 'home', emoji: '🏠', label: 'Học', speakEn: 'Home', bg: '#FF9F43' },
-  { id: 'songs', emoji: '🎵', label: 'Bài hát', speakEn: 'Songs', bg: '#EC4899' },
-  { id: 'stories', emoji: '📚', label: 'Truyện', speakEn: 'Stories', bg: '#4CC38A' },
-  { id: 'stickers', emoji: '⭐', label: 'Sticker', speakEn: 'Stickers', bg: '#5B8DEF' },
+const DOCK_ITEMS: { id: KidScreenId; img: string; emoji: string; label: string; speakEn: string; bg: string }[] = [
+  { id: 'home', img: '/preschool/img/ui/dock-home.webp', emoji: '🏠', label: 'Học', speakEn: 'Home', bg: '#FF9F43' },
+  { id: 'songs', img: '/preschool/img/ui/dock-songs.webp', emoji: '🎵', label: 'Bài hát', speakEn: 'Songs', bg: '#EC4899' },
+  { id: 'stories', img: '/preschool/img/ui/dock-stories.webp', emoji: '📚', label: 'Truyện', speakEn: 'Stories', bg: '#4CC38A' },
+  { id: 'stickers', img: '/preschool/img/ui/dock-stickers.webp', emoji: '⭐', label: 'Sticker', speakEn: 'Stickers', bg: '#5B8DEF' },
 ];
 
 export const KidDock: React.FC<KidDockProps> = ({ active, onSelect }) => {
+  const [failed, setFailed] = React.useState<Record<string, boolean>>({});
   return (
     <nav
       aria-label="Menu chính của bé"
@@ -42,7 +43,16 @@ export const KidDock: React.FC<KidDockProps> = ({ active, onSelect }) => {
                   : 'bg-amber-50/70 hover:bg-amber-100/80 text-slate-700 border-2 border-amber-100'
               }`}
             >
-              <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+              {!failed[item.id] ? (
+                <img
+                  src={item.img}
+                  alt={item.label}
+                  onError={() => setFailed((p) => ({ ...p, [item.id]: true }))}
+                  className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-sm select-none pointer-events-none"
+                />
+              ) : (
+                <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+              )}
               <span className="font-kid font-extrabold text-sm sm:text-base">{item.label}</span>
             </button>
           );

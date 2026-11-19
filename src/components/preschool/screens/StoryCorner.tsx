@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { storyPageUrl, type PreschoolUnit } from '../../../data/preschool/types';
+import { storyPageUrl, unitCoverUrl, type PreschoolUnit } from '../../../data/preschool/types';
 import { Mascot } from '../shell/Mascot';
 import { BigButton } from '../ui/BigButton';
 
@@ -52,7 +52,11 @@ export const StoryCorner: React.FC<StoryCornerProps> = ({
                   : 'bg-white text-slate-700 border-white hover:border-emerald-200'
               }`}
             >
-              <span className="text-2xl">{u.emoji}</span>
+              <img
+                src={unitCoverUrl(u.id)}
+                alt={u.title}
+                className="w-9 h-9 rounded-xl object-contain shrink-0 bg-white p-0.5"
+              />
               <span className="text-sm sm:text-base">{u.story.title}</span>
             </button>
           );

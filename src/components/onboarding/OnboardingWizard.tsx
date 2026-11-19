@@ -22,6 +22,7 @@ import {
   LearnerProfile,
 } from '../../types/audience';
 import { CefrLevel } from '../../types/learning';
+import { AUDIENCE_IMAGE_MAP } from '../../utils/flashcardMedia';
 
 interface OnboardingWizardProps {
   displayName: string;
@@ -201,7 +202,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           : 'border-slate-200 dark:border-slate-800 hover:border-indigo-300 bg-white dark:bg-slate-900'
                       }`}
                     >
-                      <div className="text-3xl leading-none shrink-0 mt-0.5">{item.emoji}</div>
+                      <img
+                        src={AUDIENCE_IMAGE_MAP[item.id]}
+                        alt={item.shortLabel}
+                        className="w-12 h-12 rounded-2xl bg-white p-1 border border-slate-200 object-contain shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-extrabold text-sm text-slate-900 dark:text-white">

@@ -42,6 +42,7 @@ import { AccentMode, LearnerProfile, WordEntry } from '../../types/learning';
 import { speakText } from '../../utils/speechEngine';
 import { detectPhonicsHint, detectSilentIndices, splitSyllables } from '../../utils/wordAnalyzer';
 import { ExerciseRunner } from '../practice/ExerciseRunner';
+import { PaginationBar, usePagination } from '../common/PaginationBar';
 
 export interface SchoolCurriculumProps {
   accent: AccentMode;
@@ -244,6 +245,30 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
     () => gradeUnits.find((u) => u.id === selectedUnitId) || gradeUnits[0] || SCHOOL_UNITS[0],
     [gradeUnits, selectedUnitId]
   );
+
+  const filteredGradeUnits = useMemo(() => {
+    const splitPoint = selectedGrade <= 9 ? 6 : 5;
+    return gradeUnits.filter((u) => {
+      if (semesterFilter === 'hk1') return u.unitNumber <= splitPoint;
+      if (semesterFilter === 'hk2') return u.unitNumber > splitPoint;
+      return true;
+    });
+  }, [gradeUnits, selectedGrade, semesterFilter]);
+
+  const teenUnitsRef = useRef<HTMLDivElement | null>(null);
+  const teenVocabRef = useRef<HTMLDivElement | null>(null);
+  const teenExamsRef = useRef<HTMLDivElement | null>(null);
+
+  const unitPagination = usePagination(filteredGradeUnits, 8, {
+    resetKey: `${selectedGrade}:${semesterFilter}`,
+  });
+  const unitVocabPagination = usePagination(activeUnit.vocabulary, 8, {
+    resetKey: activeUnit.id,
+  });
+  const examSetPagination = usePagination(availableExamSets, 6, {
+    resetKey: selectedExamId,
+    activeIndex: selectedExamSetIdx,
+  });
 
   const activeGradeMeta = useMemo(
     () => SCHOOL_GRADES.find((g) => g.grade === selectedGrade) || SCHOOL_GRADES[0],
@@ -725,17 +750,11 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {gradeUnits
-                  .filter((u) => {
-                    const splitPoint = selectedGrade <= 9 ? 6 : 5;
-                    if (semesterFilter === 'hk1') return u.unitNumber <= splitPoint;
-                    if (semesterFilter === 'hk2') return u.unitNumber > splitPoint;
-                    return true;
-                  })
-                  .map((unit) => {
-                  const isActive = unit.id === activeUnit.id;
-                  const isDone = completedUnitIds.includes(unit.id);
+              <div ref={teenUnitsRef} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {unitPagination.pageItems.map((unit) => {
+                    const isActive = unit.id === activeUnit.id;
+                    const isDone = completedUnitIds.includes(unit.id);
                   return (
                     <button
                       type="button"
@@ -773,6 +792,18 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                     </button>
                   );
                 })}
+                </div>
+
+                <PaginationBar
+                  page={unitPagination.page}
+                  totalPages={unitPagination.totalPages}
+                  totalItems={unitPagination.totalItems}
+                  startIdx={unitPagination.startIdx}
+                  endIdx={unitPagination.endIdx}
+                  onPageChange={unitPagination.setPage}
+                  itemLabel="Unit"
+                  scrollTargetRef={teenUnitsRef}
+                />
               </div>
 
               {gradeReviews.length > 0 && (
@@ -953,8 +984,9 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {activeUnit.vocabulary.map((item) => {
+                <div ref={teenVocabRef} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {unitVocabPagination.pageItems.map((item) => {
                     const key = `${activeUnit.id}::${item.word.toLowerCase()}`;
                     const isSaved = Boolean(savedWordKeys[key]);
                     return (
@@ -1049,6 +1081,18 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                       </div>
                     );
                   })}
+                  </div>
+
+                  <PaginationBar
+                    page={unitVocabPagination.page}
+                    totalPages={unitVocabPagination.totalPages}
+                    totalItems={unitVocabPagination.totalItems}
+                    startIdx={unitVocabPagination.startIdx}
+                    endIdx={unitVocabPagination.endIdx}
+                    onPageChange={unitVocabPagination.setPage}
+                    itemLabel="từ vựng"
+                    scrollTargetRef={teenVocabRef}
+                  />
                 </div>
               </div>
             )}
@@ -1339,14 +1383,15 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
             })}
           </div>
 
-          {/* Exam Set Picker (10 đề) */}
+          {/* Exam Set Picker (6 đề/trang) */}
           {availableExamSets.length > 1 && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2.5">
+            <div ref={teenExamsRef} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
               <div className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
                 Chọn bộ đề luyện tập ({availableExamSets.length} đề có sẵn):
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {availableExamSets.map((set, idx) => {
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {examSetPagination.pageItems.map((set, localIdx) => {
+                  const idx = examSetPagination.startIdx + localIdx;
                   const isCurrent = idx === selectedExamSetIdx;
                   return (
                     <button
@@ -1367,6 +1412,17 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                   );
                 })}
               </div>
+
+              <PaginationBar
+                page={examSetPagination.page}
+                totalPages={examSetPagination.totalPages}
+                totalItems={examSetPagination.totalItems}
+                startIdx={examSetPagination.startIdx}
+                endIdx={examSetPagination.endIdx}
+                onPageChange={examSetPagination.setPage}
+                itemLabel="đề thi"
+                scrollTargetRef={teenExamsRef}
+              />
             </div>
           )}
 
