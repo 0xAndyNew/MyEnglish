@@ -1,14 +1,28 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AccentMode } from '../../../types/learning';
 import { playKidsMelody, type KidsMelodyId } from '../../../utils/kidsSongPlayer';
-import { speakText, stopActiveAudioPlayback } from '../../../utils/speechEngine';
+import {
+  getStoredTtsVoicePreset,
+  prefetchTtsAudio,
+  setStoredTtsVoicePreset,
+  speakText,
+  stopActiveAudioPlayback,
+  type TtsVoicePreset,
+} from '../../../utils/speechEngine';
 
 export type KidSfxKind = 'tap' | 'ding' | 'pop' | 'whoosh' | 'celebrate';
 
 export function useKidAudio(accent: AccentMode = 'en-US') {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const stopMelodyRef = useRef<(() => void) | null>(null);
-  const speakTimerRef = useRef<number | null>(null);
+  const [voicePreset, setVoicePresetState] = useState<TtsVoicePreset>(() =>
+    getStoredTtsVoicePreset()
+  );
+
+  const setVoicePreset = useCallback((next: TtsVoicePreset) => {
+    setVoicePresetState(next);
+    setStoredTtsVoicePreset(next);
+  }, []);
 
   const getCtx = useCallback((): AudioContext | null => {
     if (typeof window === 'undefined') return null;
@@ -74,26 +88,24 @@ export function useKidAudio(accent: AccentMode = 'en-US') {
   );
 
   const speak = useCallback(
-    (text: string, rate = 0.8, onEnd?: () => void) => {
-      if (speakTimerRef.current) {
-        window.clearTimeout(speakTimerRef.current);
-        speakTimerRef.current = null;
-      }
+    (text: string, rate = 0.85, onEnd?: () => void) => {
       if (!text.trim()) {
         onEnd?.();
         return;
       }
-      speakText(text, accent, rate);
-      if (onEnd) {
-        const wordsCount = Math.max(1, text.trim().split(/\s+/).length);
-        const estMs = Math.max(1300, Math.round((wordsCount * 460) / Math.max(0.5, rate)));
-        speakTimerRef.current = window.setTimeout(() => {
-          speakTimerRef.current = null;
-          onEnd();
-        }, estMs);
-      }
+      speakText(text, accent, rate, undefined, {
+        voicePreset,
+        onEnded: onEnd,
+      });
     },
-    [accent]
+    [accent, voicePreset]
+  );
+
+  const prefetchWords = useCallback(
+    (texts: string[], rate = 0.85) => {
+      prefetchTtsAudio(texts, accent, rate, voicePreset);
+    },
+    [accent, voicePreset]
   );
 
   const stopMelody = useCallback(() => {
@@ -124,10 +136,6 @@ export function useKidAudio(accent: AccentMode = 'en-US') {
   );
 
   const stopAll = useCallback(() => {
-    if (speakTimerRef.current) {
-      window.clearTimeout(speakTimerRef.current);
-      speakTimerRef.current = null;
-    }
     stopActiveAudioPlayback();
     stopMelody();
   }, [stopMelody]);
@@ -138,5 +146,14 @@ export function useKidAudio(accent: AccentMode = 'en-US') {
     };
   }, [stopAll]);
 
-  return { speak, playSfx, startMelody, stopMelody, stopAll };
+  return {
+    speak,
+    playSfx,
+    startMelody,
+    stopMelody,
+    stopAll,
+    voicePreset,
+    setVoicePreset,
+    prefetchWords,
+  };
 }

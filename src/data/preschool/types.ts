@@ -144,8 +144,18 @@ export interface PreschoolProgress {
   lastLessonAt?: string;
 }
 
-export const wordImageUrl = (slug: string) => `/preschool/img/words/${slug}.webp`;
-export const unitCoverUrl = (unitId: string) => `/preschool/img/units/${unitId}.webp`;
+export const wordImageUrl = (slug: string) =>
+  !slug
+    ? '/preschool/img/words/apple.webp'
+    : slug.startsWith('/') || slug.startsWith('http') || slug.startsWith('data:')
+    ? slug
+    : `/preschool/img/words/${slug}.webp`;
+export const unitCoverUrl = (unitId: string) =>
+  !unitId
+    ? '/preschool/img/units/ex-u1.webp'
+    : unitId.startsWith('/') || unitId.startsWith('http') || unitId.startsWith('data:')
+    ? unitId
+    : `/preschool/img/units/${unitId}.webp`;
 export const storyPageUrl = (unitId: string, pageIdx: number) =>
   `/preschool/img/stories/${unitId}-${pageIdx + 1}.webp`;
 export const mascotUrl = (pose: string) => `/preschool/img/mascot/${pose}.webp`;

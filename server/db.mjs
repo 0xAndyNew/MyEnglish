@@ -83,6 +83,103 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS lew_age_levels (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    age_range_vi TEXT NOT NULL,
+    min_age INTEGER NOT NULL DEFAULT 1,
+    max_age INTEGER NOT NULL DEFAULT 6,
+    is_parent_led INTEGER NOT NULL DEFAULT 0,
+    max_choices INTEGER NOT NULL DEFAULT 3,
+    sort_order INTEGER NOT NULL DEFAULT 1,
+    meta_json TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS lew_topics (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 1,
+    title_en TEXT NOT NULL,
+    title_vi TEXT NOT NULL,
+    subtitle_vi TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'published',
+    version INTEGER NOT NULL DEFAULT 1,
+    estimated_minutes INTEGER NOT NULL DEFAULT 10,
+    license_note TEXT NOT NULL DEFAULT 'Internal SVG/WebP Illustration Library (CC0 / Project Owned)',
+    enabled_activities_json TEXT NOT NULL DEFAULT '{}',
+    payload_json TEXT NOT NULL,
+    updated_by TEXT NOT NULL DEFAULT 'admin',
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS lew_media_assets (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'image',
+    title TEXT NOT NULL,
+    storage_key TEXT NOT NULL,
+    url TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    license_note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_by TEXT NOT NULL DEFAULT 'admin',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS lew_children (
+    id TEXT PRIMARY KEY,
+    parent_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    display_name TEXT NOT NULL,
+    birth_month INTEGER,
+    birth_year INTEGER,
+    age_level_id TEXT NOT NULL DEFAULT 'level3',
+    avatar_id TEXT NOT NULL DEFAULT 'benny',
+    family_language TEXT NOT NULL DEFAULT 'Tiếng Việt',
+    interests_json TEXT NOT NULL DEFAULT '[]',
+    preferences_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS lew_child_progress (
+    id TEXT PRIMARY KEY,
+    child_id TEXT NOT NULL REFERENCES lew_children(id) ON DELETE CASCADE,
+    parent_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    topic_id TEXT NOT NULL,
+    level_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'started',
+    audio_replays INTEGER NOT NULL DEFAULT 0,
+    game_attempts INTEGER NOT NULL DEFAULT 0,
+    activities_tried_json TEXT NOT NULL DEFAULT '[]',
+    offline_done INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS lew_observations (
+    id TEXT PRIMARY KEY,
+    child_id TEXT NOT NULL REFERENCES lew_children(id) ON DELETE CASCADE,
+    parent_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    topic_id TEXT NOT NULL,
+    level_id TEXT NOT NULL,
+    observations_json TEXT NOT NULL DEFAULT '[]',
+    parent_note TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS lew_audit_logs (
+    id TEXT PRIMARY KEY,
+    actor_email TEXT NOT NULL,
+    actor_role TEXT NOT NULL,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 function ensureColumnExists(tableName, columnName, columnDef) {

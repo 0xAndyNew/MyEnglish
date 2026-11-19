@@ -30,6 +30,8 @@ import {
   transcribeWavBase64Local,
   warmupCachedSttIfPresent,
 } from './speechStt.mjs';
+import { handleLewV1Request } from './lewApi.mjs';
+import { synthesizeKokoroTtsWav, warmupKokoroIfCached } from './kokoroTts.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -323,7 +325,11 @@ function serveStatic(req, reqPath, res) {
 
 const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url || '/', `http://localhost:${PORT}`);
-  const pathname = parsedUrl.pathname;
+  const rawPathname = parsedUrl.pathname;
+  // Support /api/v1/auth/* as alias for /api/auth/* (Section 10 API specification)
+  const pathname = rawPathname.startsWith('/api/v1/auth/')
+    ? rawPathname.replace('/api/v1/auth/', '/api/auth/')
+    : rawPathname;
   const method = req.method || 'GET';
 
   if (!pathname.startsWith('/api/')) {
@@ -332,8 +338,63 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    if (pathname.startsWith('/api/v1/')) {
+      return await handleLewV1Request(req, res, pathname, parsedUrl, method, {
+        sendJson,
+        readJsonBody,
+        extractToken,
+      });
+    }
+
     if (method === 'GET' && pathname === '/api/health') {
-      return sendJson(res, 200, { ok: true, database: 'sqlite', path: 'data/myenglish.db' });
+      return sendJson(res, 200, { ok: true, database: 'sqlite', path: 'data/myenglish.db', apiVersion: 'v1' });
+    }
+
+    // NEURAL FEMALE TTS ENDPOINT (Local Kokoro-82M Neural Female Voices + WAV disk cache)
+    if ((method === 'GET' || method === 'HEAD') && pathname === '/api/tts') {
+      const text = parsedUrl.searchParams.get('text') || '';
+      const accent = parsedUrl.searchParams.get('accent') || 'en-US';
+      const rate = parsedUrl.searchParams.get('rate') || '0.9';
+      const preset = parsedUrl.searchParams.get('preset') || 'teacher-warm';
+      if (!text.trim()) {
+        return sendJson(res, 400, { error: 'Thiếu tham số text.' });
+      }
+      try {
+        const { filePath } = await synthesizeKokoroTtsWav({ text, accent, rate, preset });
+        const stat = fs.statSync(filePath);
+        const total = stat.size;
+        const rangeHeader = String(req.headers.range || '');
+        if (rangeHeader) {
+          const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+          if (match) {
+            const start = match[1] ? Number(match[1]) : 0;
+            const end = match[2] ? Math.min(Number(match[2]), total - 1) : total - 1;
+            if (Number.isFinite(start) && Number.isFinite(end) && start <= end && start < total) {
+              res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${total}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': end - start + 1,
+                'Content-Type': 'audio/wav',
+                'Cache-Control': 'public, max-age=86400',
+              });
+              if (method === 'HEAD') return res.end();
+              fs.createReadStream(filePath, { start, end }).pipe(res);
+              return;
+            }
+          }
+        }
+        res.writeHead(200, {
+          'Accept-Ranges': 'bytes',
+          'Content-Length': total,
+          'Content-Type': 'audio/wav',
+          'Cache-Control': 'public, max-age=86400',
+        });
+        if (method === 'HEAD') return res.end();
+        fs.createReadStream(filePath).pipe(res);
+        return;
+      } catch (err) {
+        return sendJson(res, 502, { error: err?.message || 'Không tạo được giọng đọc AI.' });
+      }
     }
 
     // KIDS SONGS MEDIA METADATA & STREAMING (Public read so kids audio works seamlessly)
@@ -837,4 +898,5 @@ server.listen(PORT, () => {
   console.log(`✅ MyEnglish SQLite API Server running on http://localhost:${PORT}`);
   const { sttModel } = getSttSettings();
   warmupCachedSttIfPresent(sttModel);
+  warmupKokoroIfCached();
 });

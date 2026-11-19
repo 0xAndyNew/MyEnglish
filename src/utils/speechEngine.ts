@@ -90,19 +90,63 @@ export interface SpeechRecognitionResultMeta {
   provider?: 'web-speech' | 'server-stt';
 }
 
+export type TtsVoicePreset = 'teacher-warm' | 'kid-cute';
+
+const TTS_VOICE_PRESET_KEY = 'myenglish_tts_voice_preset_v1';
+
+export function getStoredTtsVoicePreset(): TtsVoicePreset {
+  try {
+    const raw = localStorage.getItem(TTS_VOICE_PRESET_KEY);
+    return raw === 'kid-cute' ? 'kid-cute' : 'teacher-warm';
+  } catch {
+    return 'teacher-warm';
+  }
+}
+
+export function setStoredTtsVoicePreset(preset: TtsVoicePreset): void {
+  try {
+    localStorage.setItem(TTS_VOICE_PRESET_KEY, preset);
+  } catch {
+    // ignore storage restrictions
+  }
+}
+
+export interface SpeakTextOptions {
+  onEnded?: () => void;
+  voicePreset?: TtsVoicePreset;
+  preferNeural?: boolean;
+}
+
 let ttsScheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let activeAudioPlayer: HTMLAudioElement | null = null;
 let activeAudioCtx: AudioContext | null = null;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+let activePlaybackCancelHook: (() => void) | null = null;
+let cachedVoices: SpeechSynthesisVoice[] = [];
 
-// Pre-warm speechSynthesis voice list on browser load
+// Pre-warm speechSynthesis voice list on browser load & listen for async voice hydration
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  window.speechSynthesis.getVoices();
+  const refreshVoices = () => {
+    cachedVoices = window.speechSynthesis.getVoices();
+  };
+  refreshVoices();
+  window.speechSynthesis.addEventListener?.('voiceschanged', refreshVoices);
 }
 
 export function stopActiveAudioPlayback(): void {
+  if (ttsScheduleTimer) {
+    clearTimeout(ttsScheduleTimer);
+    ttsScheduleTimer = null;
+  }
+  if (activePlaybackCancelHook) {
+    const hook = activePlaybackCancelHook;
+    activePlaybackCancelHook = null;
+    hook();
+  }
   if (activeAudioPlayer) {
     try {
+      activeAudioPlayer.onended = null;
+      activeAudioPlayer.onerror = null;
       activeAudioPlayer.pause();
       activeAudioPlayer.currentTime = 0;
     } catch {
@@ -113,6 +157,14 @@ export function stopActiveAudioPlayback(): void {
   if (activeAudioCtx && activeAudioCtx.state !== 'closed') {
     activeAudioCtx.close().catch(() => {});
     activeAudioCtx = null;
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // ignore
+    }
+    activeUtterance = null;
   }
 }
 
@@ -125,9 +177,15 @@ export function playLoudAudioUrl(
   options: { gain?: number; onEnded?: () => void; onError?: () => void } = {}
 ): () => void {
   stopActiveAudioPlayback();
+  let cancelled = false;
+  const cancelSelf = () => {
+    cancelled = true;
+  };
+  activePlaybackCancelHook = cancelSelf;
+
   const gainValue = options.gain ?? 1.5;
   const audio = new Audio();
-  if (!url.startsWith('blob:') && !url.startsWith('data:')) {
+  if (!url.startsWith('blob:') && !url.startsWith('data:') && !url.startsWith('/')) {
     audio.crossOrigin = 'anonymous';
   }
   audio.src = url;
@@ -165,48 +223,176 @@ export function playLoudAudioUrl(
   }
 
   audio.onended = () => {
+    if (cancelled) return;
+    if (activePlaybackCancelHook === cancelSelf) activePlaybackCancelHook = null;
     stopActiveAudioPlayback();
     options.onEnded?.();
   };
   audio.onerror = () => {
+    if (cancelled) return;
+    if (activePlaybackCancelHook === cancelSelf) activePlaybackCancelHook = null;
     stopActiveAudioPlayback();
     options.onError?.();
   };
 
-  audio.play().catch(() => {
+  audio.play().catch((err) => {
+    if (cancelled) return;
+    const errName = err?.name || '';
+    if (errName === 'AbortError') return;
+    if (activePlaybackCancelHook === cancelSelf) activePlaybackCancelHook = null;
     stopActiveAudioPlayback();
+    if (errName === 'NotAllowedError') {
+      // Browser autoplay blocked before first user gesture — don't cascade into blocked fallback
+      return;
+    }
     options.onError?.();
   });
 
-  return () => stopActiveAudioPlayback();
+  return () => {
+    cancelSelf();
+    stopActiveAudioPlayback();
+  };
+}
+
+function buildNeuralTtsUrl(
+  text: string,
+  accent: AccentMode,
+  rate: number,
+  preset: TtsVoicePreset
+): string {
+  const params = new URLSearchParams({
+    text: text.trim().slice(0, 500),
+    accent,
+    rate: String(Number.isFinite(rate) ? Number(rate.toFixed(2)) : 1.0),
+    preset,
+  });
+  return `/api/tts?${params.toString()}`;
 }
 
 /**
- * Phát âm văn bản tiếng Anh chuẩn qua Web Speech API (hỗ trợ US/UK & tốc độ chậm 0.5x - 1.0x).
+ * Tải trước âm thanh giọng nữ Neural vào cache server/trình duyệt để chạm là phát tức thì.
+ */
+export function prefetchTtsAudio(
+  texts: string[],
+  accent: AccentMode = 'en-US',
+  rate: number = 0.85,
+  preset: TtsVoicePreset = getStoredTtsVoicePreset()
+): void {
+  if (typeof window === 'undefined' || !texts.length) return;
+  const unique = Array.from(new Set(texts.map((t) => t.trim()).filter(Boolean))).slice(0, 14);
+  let idx = 0;
+  const pump = () => {
+    if (idx >= unique.length) return;
+    const text = unique[idx++];
+    const url = buildNeuralTtsUrl(text, accent, rate, preset);
+    fetch(url, { method: 'GET' })
+      .catch(() => {})
+      .finally(() => {
+        if (idx < unique.length) {
+          setTimeout(pump, 120);
+        }
+      });
+  };
+  setTimeout(pump, 150);
+}
+
+function pickBestFemaleVoice(
+  voices: SpeechSynthesisVoice[],
+  accent: AccentMode
+): SpeechSynthesisVoice | undefined {
+  if (!voices.length) return undefined;
+  const targetLang = accent.toLowerCase();
+  const targetPrefix = targetLang.split('-')[0];
+  const normLang = (v: SpeechSynthesisVoice) => (v.lang || '').replace('_', '-').toLowerCase();
+
+  const maleRegex =
+    /david|mark|george|ryan|guy|daniel|richard|james|eric|roger|steffan|andrew|brian|christopher|liam|connor|mitchell|william|thomas|\bmale\b/i;
+  const neuralFemaleRegex =
+    /\b(ana|ava|aria|jenny|emma|sonia|libby|maisie|michelle)\b|natural|neural/i;
+  const sweetFemaleRegex =
+    /google us english|google uk english female|samantha|victoria|karen|moira|tessa|fiona|zira|hazel|susan|catherine|female/i;
+
+  let best: SpeechSynthesisVoice | undefined;
+  let bestScore = -Infinity;
+
+  for (const v of voices) {
+    const lang = normLang(v);
+    if (!lang.startsWith(targetPrefix)) continue;
+
+    let score = lang === targetLang ? 100 : 50;
+    const name = v.name || '';
+    if (maleRegex.test(name)) {
+      score -= 1000;
+    } else {
+      if (neuralFemaleRegex.test(name)) score += 220;
+      if (sweetFemaleRegex.test(name)) score += 150;
+      if (/online/i.test(name)) score += 40;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = v;
+    }
+  }
+  return best;
+}
+
+/**
+ * Phát âm văn bản tiếng Anh chuẩn bằng giọng nữ Neural AI (tự động fallback giọng nữ trình duyệt nếu offline).
  */
 export function speakText(
   text: string,
   accent: AccentMode = 'en-US',
   rate: number = 1.0,
-  audioUrl?: string
+  audioUrl?: string,
+  options?: SpeakTextOptions
 ): void {
+  const cleanText = String(text || '').trim();
+  if (!cleanText) {
+    options?.onEnded?.();
+    return;
+  }
+
+  const preset = options?.voicePreset || getStoredTtsVoicePreset();
+  const preferNeural = options?.preferNeural !== false;
+
+  const playNeuralOrFallback = () => {
+    if (!preferNeural) {
+      fallbackTTS(cleanText, accent, rate, options?.onEnded);
+      return;
+    }
+    const ttsUrl = buildNeuralTtsUrl(cleanText, accent, rate, preset);
+    playLoudAudioUrl(ttsUrl, {
+      gain: 1.0,
+      onEnded: options?.onEnded,
+      onError: () => fallbackTTS(cleanText, accent, rate, options?.onEnded),
+    });
+  };
+
   if (rate === 1.0 && audioUrl) {
     playLoudAudioUrl(audioUrl, {
       gain: 1.85,
-      onError: () => fallbackTTS(text, accent, rate),
+      onEnded: options?.onEnded,
+      onError: playNeuralOrFallback,
     });
     return;
   }
-  fallbackTTS(text, accent, rate);
+
+  playNeuralOrFallback();
 }
 
-function fallbackTTS(text: string, accent: AccentMode, rate: number): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  const synth = window.speechSynthesis;
-  if (ttsScheduleTimer) {
-    clearTimeout(ttsScheduleTimer);
-    ttsScheduleTimer = null;
+function fallbackTTS(
+  text: string,
+  accent: AccentMode,
+  rate: number,
+  onEnded?: () => void
+): void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    onEnded?.();
+    return;
   }
+  stopActiveAudioPlayback();
+  const synth = window.speechSynthesis;
 
   const speakNow = () => {
     if (synth.paused) {
@@ -215,26 +401,12 @@ function fallbackTTS(text: string, accent: AccentMode, rate: number): void {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = accent;
     utterance.rate = rate;
+    utterance.pitch = 1.06;
     utterance.volume = 1.0;
 
-    const voices = synth.getVoices();
-    const targetLang = accent.toLowerCase();
-    const targetPrefix = targetLang.split('-')[0];
-    const normLang = (v: SpeechSynthesisVoice) => (v.lang || '').replace('_', '-').toLowerCase();
-
-    const preferred =
-      voices.find(
-        (v) =>
-          normLang(v) === targetLang &&
-          /natural|neural|aria|jenny|ryan|sonia|google/i.test(v.name)
-      ) ||
-      voices.find((v) => normLang(v) === targetLang) ||
-      voices.find(
-        (v) =>
-          normLang(v).startsWith(targetPrefix) &&
-          /natural|neural|google/i.test(v.name)
-      ) ||
-      voices.find((v) => normLang(v).startsWith(targetPrefix));
+    const liveVoices = synth.getVoices();
+    const voices = liveVoices.length ? liveVoices : cachedVoices;
+    const preferred = pickBestFemaleVoice(voices, accent);
 
     if (preferred) {
       utterance.voice = preferred;
@@ -243,6 +415,7 @@ function fallbackTTS(text: string, accent: AccentMode, rate: number): void {
     activeUtterance = utterance;
     utterance.onend = () => {
       if (activeUtterance === utterance) activeUtterance = null;
+      onEnded?.();
     };
     utterance.onerror = () => {
       if (activeUtterance === utterance) activeUtterance = null;
@@ -252,15 +425,10 @@ function fallbackTTS(text: string, accent: AccentMode, rate: number): void {
   };
 
   // Chromium/Edge clips the start of short single words if cancel() and speak() fire on the same tick
-  if (synth.speaking || synth.pending) {
-    synth.cancel();
-    ttsScheduleTimer = setTimeout(() => {
-      ttsScheduleTimer = null;
-      speakNow();
-    }, 55);
-  } else {
+  ttsScheduleTimer = setTimeout(() => {
+    ttsScheduleTimer = null;
     speakNow();
-  }
+  }, 55);
 }
 
 export function startControllableAudioRecording(durationMs = 4000): {

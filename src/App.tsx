@@ -501,6 +501,8 @@ export function App() {
             progress={progress.preschool || { completedLessonIds: [], stickers: [], stars: 0 }}
             accent={progress.accent}
             displayName={currentUser.displayName}
+            userEmail={currentUser.email}
+            userRole={currentUser.role}
             isAdmin={isAdminUser}
             isPreview={Boolean(adminPreviewAudience)}
             onProgressChange={(nextPreschool, gainedXp = 0) =>
@@ -1056,7 +1058,7 @@ export function App() {
         savedWordsCount={progress.savedWords.length}
       />
 
-      {isDevAccount(currentUser.email) && (
+      {(isAdminUser || currentUser.role === 'editor' || currentUser.role === 'viewer') && (
         <AdminPanelModal
           isOpen={showAdminModal}
           onClose={() => setShowAdminModal(false)}
@@ -1064,6 +1066,10 @@ export function App() {
           onApiKeyStatusChange={setHasServerApiKey}
           currentEmail={currentUser.email}
           onCustomLessonsChange={setCustomLessons}
+          onOpenPreschoolMode={() => {
+            setShowAdminModal(false);
+            setAdminPreviewAudience('preschool');
+          }}
           onResetCurrentProgress={() => {
             setProgress(getDefaultProgress());
             setActiveStepIdx(0);

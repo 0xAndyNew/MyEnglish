@@ -65,6 +65,7 @@ interface AdminPanelModalProps {
   currentEmail: string;
   onResetCurrentProgress: () => void;
   onCustomLessonsChange?: (lessons: CustomLessonRecord[]) => void;
+  onOpenPreschoolMode?: () => void;
 }
 
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
@@ -75,6 +76,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   currentEmail,
   onResetCurrentProgress,
   onCustomLessonsChange,
+  onOpenPreschoolMode,
 }) => {
   const [activeTab, setActiveTab] = useState<'system' | 'lessons'>('system');
 
@@ -575,6 +577,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenPreschoolMode && (
+              <button
+                type="button"
+                onClick={onOpenPreschoolMode}
+                className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-900 text-xs font-extrabold inline-flex items-center gap-1.5 shadow-2xs"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Mở Little English World (1–6 tuổi) & CMS</span>
+              </button>
+            )}
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
               <button
                 onClick={() => setActiveTab('system')}

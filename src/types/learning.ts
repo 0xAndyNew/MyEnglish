@@ -146,7 +146,7 @@ export interface UserAccount {
   email: string;
   displayName: string;
   passwordHash?: string;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'editor' | 'viewer' | 'user';
   createdAt: string;
   profile?: LearnerProfile | null;
 }
@@ -179,6 +179,11 @@ export interface UserProgress {
         name: string;
         ageLevelId: 'level1' | 'level2' | 'level3' | 'level4' | 'level5';
         avatar: 'benny' | 'toto' | 'bunny' | 'kitty';
+        birthMonth?: number;
+        birthYear?: number;
+        familyLanguage?: string;
+        interests?: string[];
+        skippedTopicIds?: string[];
       }[];
       activeChildId: string;
       completedKeys: Record<string, string[]>;
@@ -198,6 +203,20 @@ export interface UserProgress {
         )[];
         parentNote?: string;
         createdAt: string;
+      }[];
+      lessonProgress?: {
+        id: string;
+        childId: string;
+        topicId: string;
+        levelId: 'level1' | 'level2' | 'level3' | 'level4' | 'level5';
+        status: 'started' | 'completed' | 'skipped';
+        audioReplays: number;
+        gameAttempts: number;
+        activitiesTried: string[];
+        offlineActivityDone?: boolean;
+        startedAt: string;
+        completedAt?: string;
+        updatedAt: string;
       }[];
     };
   };

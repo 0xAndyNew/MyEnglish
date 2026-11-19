@@ -1,8 +1,9 @@
-import { Music, Pause, Play, Sparkles, Volume2 } from 'lucide-react';
+import { Music, Pause, Play, SkipBack, SkipForward, Sparkles, Volume2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { PHONICS_LETTERS } from '../../data/preschool/phonics';
 import { wordImageUrl } from '../../data/preschool/types';
 import { PaginationBar, usePagination } from '../common/PaginationBar';
+import { KIDS_PASTEL_TILES, KidsSongStageArt } from './ui/KidsSceneShell';
 import type { useKidAudio } from './ui/useKidAudio';
 
 export interface KidsSongEntry {
@@ -224,102 +225,219 @@ interface LewSongsViewProps {
 
 export const LewSongsView: React.FC<LewSongsViewProps> = ({ audio }) => {
   const playerRef = useRef<HTMLAudioElement | null>(null);
-  const [playingId, setPlayingId] = useState<string | null>(null);
+  const defaultIdx = Math.max(0, LEW_SONGS_LIST.findIndex((s) => s.id === 'body-parts'));
+  const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progressPct, setProgressPct] = useState(0);
   const sectionRef = useRef<HTMLElement | null>(null);
-  const songPagination = usePagination(LEW_SONGS_LIST, 6);
+  const songPagination = usePagination(LEW_SONGS_LIST, 6, { activeIndex: selectedIdx });
+
+  const currentSong = LEW_SONGS_LIST[selectedIdx] || LEW_SONGS_LIST[0];
+
+  const stopPlayer = () => {
+    if (playerRef.current) {
+      playerRef.current.pause();
+      playerRef.current = null;
+    }
+    setIsPlaying(false);
+    setProgressPct(0);
+  };
 
   useEffect(() => {
     return () => {
-      if (playerRef.current) {
-        playerRef.current.pause();
-        playerRef.current = null;
-      }
+      stopPlayer();
     };
   }, []);
 
-  const togglePlay = (song: KidsSongEntry) => {
+  const playSongAtIndex = (idx: number) => {
+    const safeIdx = (idx + LEW_SONGS_LIST.length) % LEW_SONGS_LIST.length;
+    const song = LEW_SONGS_LIST[safeIdx];
     audio.stopAll();
-    if (playingId === song.id && playerRef.current) {
-      playerRef.current.pause();
-      setPlayingId(null);
-      return;
-    }
     if (playerRef.current) {
       playerRef.current.pause();
+      playerRef.current = null;
     }
+    setSelectedIdx(safeIdx);
     const nextAudio = new Audio(song.audioUrl);
     playerRef.current = nextAudio;
-    setPlayingId(song.id);
-    nextAudio.onended = () => setPlayingId(null);
-    nextAudio.onerror = () => setPlayingId(null);
-    nextAudio.play().catch(() => setPlayingId(null));
+    setIsPlaying(true);
+    setProgressPct(0);
+    nextAudio.ontimeupdate = () => {
+      if (nextAudio.duration && Number.isFinite(nextAudio.duration)) {
+        setProgressPct(Math.min(100, Math.round((nextAudio.currentTime / nextAudio.duration) * 100)));
+      }
+    };
+    nextAudio.onended = () => {
+      setIsPlaying(false);
+      setProgressPct(0);
+    };
+    nextAudio.onerror = () => {
+      setIsPlaying(false);
+    };
+    nextAudio.play().catch(() => setIsPlaying(false));
+  };
+
+  const togglePlayCurrent = () => {
+    if (isPlaying && playerRef.current) {
+      playerRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+    if (playerRef.current && playerRef.current.src.includes(currentSong.audioUrl)) {
+      audio.stopAll();
+      playerRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      return;
+    }
+    playSongAtIndex(selectedIdx);
   };
 
   return (
     <section ref={sectionRef} className="space-y-4">
-      <div>
-        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-          <Music className="w-6 h-6 text-pink-500" />
-          <span>Phòng Hát Vận Động ({LEW_SONGS_LIST.length} Bài Hát Thiếu Nhi MP3)</span>
-        </h2>
-        <p className="text-xs font-bold text-slate-500 mt-0.5">
-          Cha mẹ bật nhạc để bé nghe thụ động tự nhiên hoặc vỗ tay, nhún nhảy làm động tác cùng con.
-        </p>
+      {/* Featured Song Player Stage (Exact Mockup #8: Học qua bài hát) */}
+      <div
+        className="rounded-[32px] border-4 border-white shadow-[0_14px_32px_-10px_rgba(22,128,246,0.3)] overflow-hidden p-4 sm:p-6 space-y-4"
+        style={{
+          background: 'linear-gradient(180deg, #74D2FF 0%, #C6EEFF 52%, #E8F9FF 100%)',
+        }}
+      >
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/85 text-[#1474DB] text-xs font-extrabold shadow-2xs">
+            <Music className="w-3.5 h-3.5 text-pink-500" />
+            <span>
+              Bài hát {selectedIdx + 1} / {LEW_SONGS_LIST.length}
+            </span>
+          </div>
+          <h2 className="kids-song-title font-kid font-extrabold text-2xl sm:text-4xl leading-tight px-2">
+            {currentSong.titleEn}
+          </h2>
+          <p className="text-xs sm:text-sm font-extrabold text-[#15427A]">
+            {currentSong.titleVi}
+          </p>
+        </div>
+
+        {/* 3 Happy Singing Kids + Floating Notes Stage */}
+        <KidsSongStageArt coverImg={wordImageUrl(currentSong.coverWord)} />
+
+        {/* Audio Progress + 3 Glossy Blue Controls (⏮ | ⏸/▶ | ⏭) */}
+        <div className="bg-white/95 rounded-[24px] p-4 shadow-sm space-y-3 border-2 border-white">
+          <div className="h-2.5 rounded-full bg-[#DCEEFF] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#FF6FB5] via-[#4DC0FF] to-[#1684F0] transition-all duration-200"
+              style={{ width: `${Math.max(isPlaying ? 4 : 0, progressPct)}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-center gap-5">
+            <button
+              type="button"
+              onClick={() => playSongAtIndex(selectedIdx - 1)}
+              aria-label="Bài trước"
+              className="w-12 h-12 rounded-full bg-[#E3F4FF] hover:bg-[#CDEAFF] text-[#1684F0] border-2 border-white shadow-sm flex items-center justify-center active:scale-95 transition"
+            >
+              <SkipBack className="w-6 h-6 fill-current" />
+            </button>
+
+            <button
+              type="button"
+              onClick={togglePlayCurrent}
+              aria-label={isPlaying ? 'Tạm dừng bài hát' : 'Phát bài hát'}
+              className="kids-btn-blue w-16 h-16 rounded-full text-white flex items-center justify-center"
+            >
+              {isPlaying ? (
+                <Pause className="w-8 h-8 fill-current" />
+              ) : (
+                <Play className="w-8 h-8 fill-current ml-1" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playSongAtIndex(selectedIdx + 1)}
+              aria-label="Bài tiếp theo"
+              className="w-12 h-12 rounded-full bg-[#E3F4FF] hover:bg-[#CDEAFF] text-[#1684F0] border-2 border-white shadow-sm flex items-center justify-center active:scale-95 transition"
+            >
+              <SkipForward className="w-6 h-6 fill-current" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+            {currentSong.keyWords.map((kw) => (
+              <button
+                key={kw}
+                type="button"
+                onClick={() => audio.speak(kw, 0.82)}
+                className="px-3 py-1 rounded-full bg-[#EAF6FF] hover:bg-[#FFF3B8] text-[#123A6F] font-extrabold text-xs inline-flex items-center gap-1 border border-[#CBE7FF] transition"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-[#1684F0]" />
+                <span>{kw}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="text-center text-xs font-bold text-[#486B94] bg-[#F4FAFF] rounded-xl px-3 py-2 border border-[#DCEEFF]">
+            🤸 Gợi ý vận động: {currentSong.actionVi}
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {songPagination.pageItems.map((song) => {
-          const isPlaying = playingId === song.id;
+      {/* Playlist Grid (Pastel Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {songPagination.pageItems.map((song, localIdx) => {
+          const globalIdx = songPagination.startIdx + localIdx;
+          const active = globalIdx === selectedIdx;
+          const tile = KIDS_PASTEL_TILES[globalIdx % KIDS_PASTEL_TILES.length];
           return (
-            <div
+            <button
               key={song.id}
-              className="rounded-[28px] bg-white border-3 border-slate-100 hover:border-pink-300 p-4 shadow-sm flex flex-col justify-between gap-3 transition"
+              type="button"
+              onClick={() => playSongAtIndex(globalIdx)}
+              style={{
+                backgroundColor: active ? '#1684F0' : tile.bg,
+                borderColor: active ? '#0C5BB8' : tile.border,
+              }}
+              className={`rounded-[24px] border-2 p-3 text-left flex flex-col justify-between gap-2 shadow-xs transition hover:scale-[1.02] active:scale-95 ${
+                active ? 'text-white shadow-md' : 'text-[#123A6F]'
+              }`}
             >
-              <div className="flex items-center gap-3.5">
-                <div
-                  className="w-20 h-20 rounded-2xl border-2 border-slate-100 bg-white p-1.5 flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: song.softBg }}
-                >
+              <div className="flex items-center gap-2.5">
+                <div className="w-12 h-12 rounded-2xl bg-white/95 p-1 flex items-center justify-center shrink-0 shadow-2xs">
                   <img
                     src={wordImageUrl(song.coverWord)}
                     alt={song.titleEn}
-                    className="w-full h-full object-contain rounded-xl bg-white p-1"
+                    className="w-full h-full object-contain"
                   />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-extrabold text-slate-900 text-base leading-snug">
+                <div className="min-w-0">
+                  <div className="font-extrabold text-xs sm:text-sm leading-tight line-clamp-2">
                     {song.titleEn}
-                  </h3>
-                  <div className="text-xs font-bold text-slate-500 mt-0.5">{song.titleVi}</div>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {song.keyWords.map((kw) => (
-                      <button
-                        key={kw}
-                        type="button"
-                        onClick={() => audio.speak(kw, 0.82)}
-                        className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-amber-100 text-[11px] font-bold text-slate-700"
-                      >
-                        {kw}
-                      </button>
-                    ))}
+                  </div>
+                  <div
+                    className={`text-[11px] font-bold line-clamp-1 mt-0.5 ${
+                      active ? 'text-sky-100' : 'text-[#4B6F99]'
+                    }`}
+                  >
+                    {song.titleVi}
                   </div>
                 </div>
               </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] font-semibold text-slate-600">
-                🤸 {song.actionVi}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => togglePlay(song)}
-                style={{ backgroundColor: isPlaying ? '#EC4899' : song.color }}
-                className="w-full py-2.5 px-4 rounded-2xl text-white font-extrabold text-sm inline-flex items-center justify-center gap-2 shadow-xs transition active:scale-95"
+              <div
+                className={`text-[11px] font-extrabold inline-flex items-center gap-1 ${
+                  active ? 'text-[#FFF2A6]' : 'text-[#1674DA]'
+                }`}
               >
-                {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                <span>{isPlaying ? 'Đang phát — Bấm để dừng' : 'Nghe bài hát'}</span>
-              </button>
-            </div>
+                {active && isPlaying ? (
+                  <>
+                    <Pause className="w-3.5 h-3.5 fill-current" />
+                    <span>Đang phát nhạc...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Phát bài hát</span>
+                  </>
+                )}
+              </div>
+            </button>
           );
         })}
       </div>
@@ -350,24 +468,14 @@ export const LewPhonicsView: React.FC<LewPhonicsViewProps> = ({ audio }) => {
   const phonicsPagination = usePagination(PHONICS_LETTERS, 12, { activeIndex: selectedIdx });
 
   return (
-    <section className="space-y-5">
-      <div>
-        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-amber-500" />
-          <span>Góc Chữ Cái A–Z (26 Âm Phonics Kèm Flashcard)</span>
-        </h2>
-        <p className="text-xs font-bold text-slate-500 mt-0.5">
-          Chạm vào từng chữ cái để nghe phát âm, xem thẻ hình minh họa và làm động tác vui cùng cha mẹ (phù hợp nhất cho bé 3–6 tuổi).
-        </p>
-      </div>
-
+    <section className="space-y-4">
       {/* Featured Selected Phonics Flashcard */}
       {current && (
-        <div className="rounded-[32px] bg-white border-4 border-amber-100 p-5 sm:p-7 shadow-md flex flex-col md:flex-row items-center gap-6">
+        <div className="kids-glass-card rounded-[32px] p-5 sm:p-6 flex flex-col md:flex-row items-center gap-5">
           <button
             type="button"
             onClick={() => audio.speak(current.exampleWord, 0.85)}
-            className="w-56 h-56 sm:w-64 sm:h-64 rounded-[28px] bg-white p-3 border-2 border-slate-100 shadow-sm flex items-center justify-center shrink-0 hover:scale-[1.02] active:scale-95 transition"
+            className="w-48 h-48 sm:w-56 sm:h-56 rounded-[28px] bg-white p-3 border-2 border-[#DCEEFF] shadow-sm flex items-center justify-center shrink-0 hover:scale-[1.02] active:scale-95 transition"
           >
             <img
               src={wordImageUrl(current.exampleImage)}
@@ -378,14 +486,14 @@ export const LewPhonicsView: React.FC<LewPhonicsViewProps> = ({ audio }) => {
 
           <div className="flex-1 text-center md:text-left space-y-3">
             <div className="inline-flex items-center gap-3">
-              <span className="w-16 h-16 rounded-2xl bg-amber-400 text-slate-900 font-black text-3xl flex items-center justify-center shadow-xs">
+              <span className="kids-btn-orange w-16 h-16 rounded-2xl text-white font-black text-3xl flex items-center justify-center">
                 {current.letter.toUpperCase()}
               </span>
               <div>
-                <div className="text-xs font-extrabold uppercase text-amber-600">
+                <div className="text-xs font-extrabold uppercase text-[#1684F0]">
                   Âm /{current.sound}/
                 </div>
-                <div className="text-3xl sm:text-4xl font-extrabold text-slate-900">
+                <div className="text-3xl sm:text-4xl font-extrabold text-[#123A6F]">
                   {current.exampleWord}
                 </div>
               </div>
@@ -395,7 +503,7 @@ export const LewPhonicsView: React.FC<LewPhonicsViewProps> = ({ audio }) => {
               <button
                 type="button"
                 onClick={() => audio.speak(`${current.letter}. ${current.exampleWord}.`, 0.82)}
-                className="px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold text-sm inline-flex items-center gap-2 shadow-xs"
+                className="kids-btn-blue px-5 py-2.5 rounded-full text-white font-extrabold text-sm inline-flex items-center gap-2"
               >
                 <Volume2 className="w-4 h-4" />
                 <span>Nghe chữ & từ mẫu</span>
@@ -403,26 +511,27 @@ export const LewPhonicsView: React.FC<LewPhonicsViewProps> = ({ audio }) => {
               <button
                 type="button"
                 onClick={() => audio.speak(current.chant, 0.85)}
-                className="px-4 py-2.5 rounded-2xl bg-sky-100 hover:bg-sky-200 text-sky-900 font-extrabold text-sm inline-flex items-center gap-2"
+                className="px-4 py-2.5 rounded-full bg-[#FFF3B8] hover:bg-[#FFE680] border-2 border-[#FFE074] text-[#8A4F00] font-extrabold text-sm inline-flex items-center gap-2"
               >
-                <Volume2 className="w-4 h-4" />
-                <span>Đọc nhịp: &ldquo;{current.chant}&rdquo;</span>
+                <Sparkles className="w-4 h-4" />
+                <span>&ldquo;{current.chant}&rdquo;</span>
               </button>
             </div>
 
-            <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs font-bold text-emerald-900">
+            <div className="p-3 rounded-2xl bg-[#E8F8EE] border border-[#BDECC9] text-xs font-bold text-[#1B6B35]">
               👐 Động tác cùng bé: {current.actionVi}
             </div>
           </div>
         </div>
       )}
 
-      {/* Grid of Phonics Letters (12 per page) */}
+      {/* Grid of Phonics Letters (Pastel tiles) */}
       <div ref={phonicsGridRef} className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 sm:gap-3">
           {phonicsPagination.pageItems.map((item, localIdx) => {
             const idx = phonicsPagination.startIdx + localIdx;
             const active = idx === selectedIdx;
+            const tile = KIDS_PASTEL_TILES[idx % KIDS_PASTEL_TILES.length];
             return (
               <button
                 key={item.letter}
@@ -431,22 +540,34 @@ export const LewPhonicsView: React.FC<LewPhonicsViewProps> = ({ audio }) => {
                   setSelectedIdx(idx);
                   audio.speak(item.exampleWord, 0.85);
                 }}
-                className={`rounded-2xl bg-white p-3 border-2 flex flex-col items-center gap-2 transition ${
+                style={{
+                  backgroundColor: active ? '#1684F0' : tile.bg,
+                  borderColor: active ? '#0C5BB8' : tile.border,
+                }}
+                className={`rounded-[22px] p-3 border-2 flex flex-col items-center gap-1.5 transition ${
                   active
-                    ? 'border-amber-400 bg-amber-50/50 shadow-md scale-[1.03]'
-                    : 'border-slate-100 hover:border-amber-300 shadow-xs'
+                    ? 'text-white shadow-md scale-[1.04]'
+                    : 'text-[#123A6F] hover:scale-[1.03] shadow-2xs'
                 }`}
               >
-                <div className="w-16 h-16 rounded-xl bg-white p-1 border border-slate-100 flex items-center justify-center">
+                <div className="w-14 h-14 flex items-center justify-center">
                   <img
                     src={wordImageUrl(item.exampleImage)}
                     alt={item.exampleWord}
-                    className="w-full h-full object-contain"
+                    className={`w-full h-full object-contain ${
+                      active ? 'bg-white rounded-xl p-1' : 'mix-blend-multiply'
+                    }`}
                   />
                 </div>
-                <div className="text-center">
-                  <span className="text-lg font-black text-slate-900">{item.letter.toUpperCase()}</span>
-                  <span className="text-xs font-bold text-slate-500 block">{item.exampleWord}</span>
+                <div className="text-center leading-tight">
+                  <span className="text-lg font-black block">{item.letter.toUpperCase()}</span>
+                  <span
+                    className={`text-[11px] font-bold block ${
+                      active ? 'text-sky-100' : 'text-[#4B6F99]'
+                    }`}
+                  >
+                    {item.exampleWord}
+                  </span>
                 </div>
               </button>
             );

@@ -1,5 +1,9 @@
 export type LewAgeLevelId = 'level1' | 'level2' | 'level3' | 'level4' | 'level5';
 
+export type LewContentStatus = 'draft' | 'review' | 'published' | 'archived';
+
+export type LewCmsRole = 'admin' | 'editor' | 'viewer' | 'user';
+
 export type LewObservationCode =
   | 'recognized'
   | 'understood'
@@ -15,8 +19,11 @@ export interface LewChildProfile {
   name: string;
   ageLevelId: LewAgeLevelId;
   avatar: LewAvatarId;
+  birthMonth?: number;
   birthYear?: number;
+  familyLanguage?: string;
   interests?: string[];
+  skippedTopicIds?: string[];
 }
 
 export type LewCategoryTag =
@@ -66,6 +73,8 @@ export interface LewVocabItem {
   sampleEn: string;
   sampleVi: string;
   soundEffect?: string;
+  customImageUrl?: string;
+  customAudioUrl?: string;
 }
 
 export interface LewLevelVariant {
@@ -87,19 +96,36 @@ export interface LewParentGuide {
   offlineGameVi: string;
 }
 
+export interface LewActivityToggle {
+  warmup: boolean;
+  input: boolean;
+  listening: boolean;
+  games: boolean;
+  parentActivity: boolean;
+  story: boolean;
+  enabledGameModes?: ('listen' | 'match' | 'missing' | 'sort' | 'story_order' | 'move')[];
+}
+
 export interface LewTopic {
   id: string;
-  code: string; // '01' .. '12'
+  code: string; // '01' .. '36'
   order: number;
   titleEn: string;
   titleVi: string;
   subtitleVi: string;
   color: string;
   softBg: string;
-  coverSlug: string; // /preschool/img/units/<coverSlug>.webp
+  coverSlug: string; // /preschool/img/units/<coverSlug>.webp or custom URL
   words: LewVocabItem[];
   levels: Record<LewAgeLevelId, LewLevelVariant>;
   parentGuide: LewParentGuide;
+  status?: LewContentStatus;
+  version?: number;
+  estimatedMinutes?: number;
+  licenseNote?: string;
+  enabledActivities?: LewActivityToggle;
+  updatedBy?: string;
+  updatedAt?: string;
 }
 
 export interface LewObservationRecord {
@@ -112,11 +138,63 @@ export interface LewObservationRecord {
   createdAt: string;
 }
 
+export interface LewLessonProgressRecord {
+  id: string;
+  childId: string;
+  topicId: string;
+  levelId: LewAgeLevelId;
+  status: 'started' | 'completed' | 'skipped';
+  audioReplays: number;
+  gameAttempts: number;
+  activitiesTried: string[];
+  offlineActivityDone?: boolean;
+  startedAt: string;
+  completedAt?: string;
+  updatedAt: string;
+}
+
+export interface LewMediaAsset {
+  id: string;
+  type: 'image' | 'audio' | 'printable';
+  title: string;
+  storageKey: string;
+  url: string;
+  mimeType: string;
+  licenseNote: string;
+  status: 'active' | 'archived';
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface LewAuditLogEntry {
+  id: string;
+  actorEmail: string;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  summary: string;
+  createdAt: string;
+}
+
+export interface LewCmsDashboardStats {
+  totalParents: number;
+  totalChildren: number;
+  topicsByStatus: Record<LewContentStatus, number>;
+  totalVocabWords: number;
+  totalStories: number;
+  totalMediaAssets: number;
+  totalCompletedLessons: number;
+  totalObservations: number;
+  popularTopics: { topicId: string; titleEn: string; titleVi: string; count: number }[];
+}
+
 export interface LewStoreState {
   children: LewChildProfile[];
   activeChildId: string;
   completedKeys: Record<string, string[]>; // childId -> [`${topicId}:${levelId}`]
   stickersByChild: Record<string, string[]>; // childId -> topicId[]
   observations: LewObservationRecord[];
+  lessonProgress?: LewLessonProgressRecord[];
   lastTopicByChild?: Record<string, string>;
 }
