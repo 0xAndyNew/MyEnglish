@@ -166,6 +166,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
   onSaveWord,
   initialMode,
   allowAllOptions = false,
+  hideHeaderNav = false,
 }) => {
   // Top-level mode ('units' vs 'exams')
   const [mode, setMode] = useState<'units' | 'exams'>(() => initialMode || 'units');
@@ -180,8 +181,9 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
     () => getUnitsByGrade(getDefaultGradeFromProfile(profile))[0]?.id || SCHOOL_UNITS[0].id
   );
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
+  const [showUnitList, setShowUnitList] = useState<boolean>(false);
   const [unitSectionFilter, setUnitSectionFilter] = useState<'all' | 'vocab' | 'grammar' | 'quiz' | 'exercises'>(
-    'all'
+    hideHeaderNav ? 'vocab' : 'all'
   );
   const [semesterFilter, setSemesterFilter] = useState<'all' | 'hk1' | 'hk2'>('all');
   const [savedWordKeys, setSavedWordKeys] = useState<Record<string, boolean>>({});
@@ -475,8 +477,9 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
   }, [activeExam.questions, examSubmitted, reviewFilter, examAnswers]);
 
   return (
-    <div className="space-y-6">
-      {/* Top Hero Banner + 2 Major Mode Switcher */}
+    <div className="space-y-4">
+      {/* Top Hero Banner + 2 Major Mode Switcher (hidden when inside MobileAppShell) */}
+      {!hideHeaderNav && (
       <div className="rounded-3xl bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 text-white p-5 sm:p-7 shadow-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1.5">
@@ -579,11 +582,143 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
           </button>
         </div>
       </div>
+      )}
 
       {/* ==================== MODE 1: UNITS (LỚP 6–12) ==================== */}
       {mode === 'units' && (
-        <div className="space-y-6">
-          {/* Grade Picker (Admin sees all 6-12; student sees ONLY their registered grade) */}
+        <div className="space-y-4">
+          {hideHeaderNav ? (
+            /* Clean Mobile-First Bar: Grade + Unit Picker Toggle */
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {allowAllOptions ? (
+                    <select
+                      value={selectedGrade}
+                      onChange={(e) => handleSelectGrade(Number(e.target.value) as SchoolGrade)}
+                      className="min-h-[40px] px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800 text-xs sm:text-sm font-extrabold text-sky-800 dark:text-sky-200 outline-none cursor-pointer"
+                    >
+                      {[...thcsGrades, ...thptGrades].map((g) => (
+                        <option key={g.grade} value={g.grade}>
+                          {g.label} ({g.cefrRange})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 text-xs font-extrabold">
+                      {activeGradeMeta.label} · {activeGradeMeta.cefrRange}
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {completedUnitIds.length}/{gradeUnits.length} Unit
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowUnitList((v) => !v)}
+                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs font-extrabold hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                >
+                  {showUnitList ? 'Thu gọn Unit ▲' : `Đổi Unit (${gradeUnits.length}) ▾`}
+                </button>
+              </div>
+
+              {showUnitList && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 w-fit">
+                    {[
+                      { id: 'all' as const, label: 'Cả năm' },
+                      { id: 'hk1' as const, label: 'HK 1' },
+                      { id: 'hk2' as const, label: 'HK 2' },
+                    ].map((s) => (
+                      <button
+                        type="button"
+                        key={s.id}
+                        onClick={() => setSemesterFilter(s.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                          semesterFilter === s.id
+                            ? 'bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 shadow-xs'
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div ref={teenUnitsRef} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {unitPagination.pageItems.map((unit) => {
+                      const isActive = unit.id === activeUnit.id && !selectedReviewId;
+                      const isDone = completedUnitIds.includes(unit.id);
+                      return (
+                        <button
+                          type="button"
+                          key={unit.id}
+                          onClick={() => {
+                            handleSelectUnit(unit.id);
+                            setShowUnitList(false);
+                          }}
+                          className={`p-3 rounded-xl border text-left transition flex items-center justify-between gap-2 ${
+                            isActive
+                              ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-500 ring-1 ring-sky-500'
+                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-extrabold text-sky-600 dark:text-sky-400">
+                              Unit {unit.unitNumber}
+                            </div>
+                            <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                              {unit.title}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                              {unit.titleVi}
+                            </div>
+                          </div>
+                          {isDone && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <PaginationBar
+                    page={unitPagination.page}
+                    totalPages={unitPagination.totalPages}
+                    totalItems={unitPagination.totalItems}
+                    startIdx={unitPagination.startIdx}
+                    endIdx={unitPagination.endIdx}
+                    onPageChange={unitPagination.setPage}
+                    itemLabel="Unit"
+                    scrollTargetRef={teenUnitsRef}
+                  />
+
+                  {!hideHeaderNav && gradeReviews.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                      <div className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
+                        Ôn tập định kỳ ({gradeReviews.length} bài tổng hợp):
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {gradeReviews.map((rev) => (
+                          <button
+                            type="button"
+                            key={rev.id}
+                            onClick={() => {
+                              setSelectedReviewId(rev.id);
+                              setShowUnitList(false);
+                            }}
+                            className="p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/30 text-left text-xs font-bold text-indigo-900 dark:text-indigo-200"
+                          >
+                            {rev.title} · {rev.unitRange}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+          /* Grade Picker (Standalone mode) */
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
             {allowAllOptions ? (
               <>
@@ -653,7 +788,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                 <div className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-2">
                   Bậc THPT (Lớp 10 – 12)
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {thptGrades.map((g) => {
                     const isSelected = selectedGrade === g.grade;
                     const isUserGrade = profile?.teen?.grade === g.grade;
@@ -826,7 +961,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                           }`}
                         >
                           <div className="text-xs font-extrabold">{rev.title}</div>
-                          <div className={`text-[11px] ${isRevActive ? 'text-indigo-100' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                          <div className={`text-xs ${isRevActive ? 'text-indigo-100' : 'text-indigo-600 dark:text-indigo-400'}`}>
                             {rev.unitRange} • {rev.exercises.length} câu
                           </div>
                         </button>
@@ -837,6 +972,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
               )}
             </div>
           </div>
+          )}
 
           {selectedReviewId ? (
             (() => {
@@ -899,20 +1035,24 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                   </h2>
                 </div>
 
-                {/* Quick Filter inside Unit */}
-                <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 w-fit">
+                {/* Quick Filter inside Unit (when inside MobileAppShell, keep Học pure: Từ vựng + Ngữ pháp only; Quiz & Bài tập live in Bài tập tab) */}
+                <div className="flex overflow-x-auto no-scrollbar bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 w-full sm:w-fit">
                   {[
-                    { id: 'all' as const, label: 'Tất cả' },
+                    ...(!hideHeaderNav ? [{ id: 'all' as const, label: 'Tất cả' }] : []),
                     { id: 'vocab' as const, label: `Từ vựng (${activeUnit.vocabulary.length})` },
-                    { id: 'grammar' as const, label: 'Ngữ pháp & Bẫy' },
-                    { id: 'quiz' as const, label: `Quiz (${activeUnit.practiceQuiz.length})` },
-                    { id: 'exercises' as const, label: `📝 Bài tập (${activeUnit.exercises?.length || 0})` },
+                    { id: 'grammar' as const, label: 'Ngữ pháp' },
+                    ...(!hideHeaderNav
+                      ? [
+                          { id: 'quiz' as const, label: `Quiz (${activeUnit.practiceQuiz.length})` },
+                          { id: 'exercises' as const, label: `Bài tập (${activeUnit.exercises?.length || 0})` },
+                        ]
+                      : []),
                   ].map((tab) => (
                     <button
                       type="button"
                       key={tab.id}
                       onClick={() => setUnitSectionFilter(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      className={`min-h-[40px] px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold shrink-0 transition ${
                         unitSectionFilter === tab.id
                           ? 'bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 shadow-sm'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -924,7 +1064,8 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                 </div>
               </div>
 
-              {/* Objectives */}
+              {/* Objectives (hidden in mobile hideHeaderNav mode to reduce clutter) */}
+              {!hideHeaderNav && (
               <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-200/70 dark:border-slate-700/60">
                 <div className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-1.5">
                   <Target className="w-4 h-4 text-sky-600" />
@@ -942,6 +1083,7 @@ export const SchoolCurriculum: React.FC<SchoolCurriculumProps> = ({
                   ))}
                 </ul>
               </div>
+              )}
             </div>
 
             {/* Section A: Vocabulary */}

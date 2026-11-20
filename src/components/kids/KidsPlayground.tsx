@@ -152,6 +152,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
   onAddXp,
   initialTab,
   allowAllOptions = false,
+  hideHeaderNav = false,
 }) => {
   const showYleTab = allowAllOptions || profile?.kids?.goal === 'yle';
   const [activeTab, setActiveTab] = useState<KidsTab>(() => {
@@ -176,6 +177,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
 
   // Shared Unit selection for Vocab & Stories
   const [selectedUnitId, setSelectedUnitId] = useState<string>(KIDS_UNITS[0].id);
+  const [showUnitPicker, setShowUnitPicker] = useState<boolean>(false);
   const [vocabViewMode, setVocabViewMode] = useState<'3d' | 'grid'>('3d');
   const activeUnit: KidsUnit = useMemo(
     () => KIDS_UNITS.find((u) => u.id === selectedUnitId) || KIDS_UNITS[0],
@@ -789,88 +791,121 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Top Kid-Friendly Hero & Rewards Bar */}
-      <div className="rounded-3xl bg-gradient-to-br from-amber-400 via-orange-400 to-pink-500 p-5 sm:p-6 text-white shadow-lg">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/25 backdrop-blur-sm text-xs font-extrabold">
-              <span>🧸 Khu Vườn Tiếng Anh Nhí ({ageBandText})</span>
-              <span>•</span>
-              <span>{accent === 'en-GB' ? '🇬🇧 Giọng Anh' : '🇺🇸 Giọng Mỹ'}</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Chào Bé Yêu! Cùng Chơi &amp; Học Tiếng Anh Nhé! 🌈
-            </h2>
-            <p className="text-sm sm:text-base text-white/95 font-medium max-w-2xl">
-              Chạm vào hình để nghe phát âm, hát theo vè nhịp điệu, chơi ghép tranh và thu thập thật nhiều ngôi sao lấp lánh!
-            </p>
+    <div className="space-y-4">
+      {/* Compact Playful Status Strip when inside MobileAppShell (hideHeaderNav=true) */}
+      {hideHeaderNav ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-[22px] bg-white/95 border-2 border-[#DDF1FF] shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full bg-[#FFF7D1] border border-[#FFE074] text-[#9A5600] font-extrabold text-xs inline-flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+              {stars} Sao
+            </span>
+            {sessionXp > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-[#E3F4FF] text-[#1674DA] font-extrabold text-xs">
+                +{sessionXp} XP
+              </span>
+            )}
           </div>
 
-          {/* Star / Badge / XP / Speed controls */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="px-3.5 py-2 rounded-2xl bg-white text-amber-700 font-black text-sm shadow-sm flex items-center gap-1.5">
-              <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
-              <span>{stars} Sao</span>
-            </div>
-
-            <div className="px-3.5 py-2 rounded-2xl bg-white/95 text-orange-600 font-black text-sm shadow-sm flex items-center gap-1.5">
-              <Flame className="w-4 h-4 fill-orange-400 text-orange-500" />
-              <span>Combo {combo}</span>
-            </div>
-
-            <div className="px-3.5 py-2 rounded-2xl bg-white/95 text-violet-700 font-black text-sm shadow-sm flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-violet-500" />
-              <span>+{sessionXp} XP</span>
-            </div>
-
-            <div
-              className={`px-3.5 py-2 rounded-2xl border font-extrabold text-xs sm:text-sm shadow-sm flex items-center gap-1.5 ${currentBadge.colorClass}`}
-            >
-              <span>{currentBadge.emoji}</span>
-              <span>{currentBadge.title}</span>
-              {nextBadge && (
-                <span className="opacity-75 text-[11px]">
-                  (còn {nextBadge.minStars - stars}⭐ lên {nextBadge.emoji})
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Kid-friendly Audio Speed Selector */}
-        <div className="mt-4 pt-4 border-t border-white/25 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs sm:text-sm font-extrabold">🔊 Tốc độ đọc cho bé:</span>
+          <div className="inline-flex items-center gap-1 bg-[#F0F8FF] p-1 rounded-full border border-[#D6ECFF]">
             <button
               type="button"
               onClick={() => setSpeechRate(0.85)}
-              className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 ${
-                speechRate === 0.85
-                  ? 'bg-white text-orange-600 shadow-md scale-[1.03]'
-                  : 'bg-white/20 text-white hover:bg-white/30'
+              className={`min-h-[34px] px-3 py-1 rounded-full text-xs font-extrabold transition flex items-center gap-1 ${
+                speechRate === 0.85 ? 'bg-[#1684F0] text-white shadow-xs' : 'text-[#426996]'
               }`}
             >
-              <Turtle className="w-4 h-4" /> Chậm Rõ (0.85x)
+              <Turtle className="w-3.5 h-3.5" /> Chậm
             </button>
             <button
               type="button"
               onClick={() => setSpeechRate(1.0)}
-              className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 ${
-                speechRate === 1.0
-                  ? 'bg-white text-orange-600 shadow-md scale-[1.03]'
-                  : 'bg-white/20 text-white hover:bg-white/30'
+              className={`min-h-[34px] px-3 py-1 rounded-full text-xs font-extrabold transition flex items-center gap-1 ${
+                speechRate === 1.0 ? 'bg-[#1684F0] text-white shadow-xs' : 'text-[#426996]'
               }`}
             >
-              <Volume2 className="w-4 h-4" /> Tự Nhiên (1.0x)
+              <Volume2 className="w-3.5 h-3.5" /> Chuẩn
             </button>
           </div>
+        </div>
+      ) : (
+        /* Full Hero Banner for standalone usage */
+        <div className="rounded-3xl bg-gradient-to-br from-amber-400 via-orange-400 to-pink-500 p-5 sm:p-6 text-white shadow-lg">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/25 backdrop-blur-sm text-xs font-extrabold">
+                <span>🧸 Khu Vườn Tiếng Anh Nhí ({ageBandText})</span>
+                <span>•</span>
+                <span>{accent === 'en-GB' ? '🇬🇧 Giọng Anh' : '🇺🇸 Giọng Mỹ'}</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                Chào Bé Yêu! Cùng Chơi &amp; Học Tiếng Anh Nhé! 🌈
+              </h2>
+              <p className="text-sm sm:text-base text-white/95 font-medium max-w-2xl">
+                Chạm vào hình để nghe phát âm, hát theo vè nhịp điệu, chơi ghép tranh và thu thập thật nhiều ngôi sao lấp lánh!
+              </p>
+            </div>
 
-          <div className="text-xs font-bold bg-white/20 px-3 py-1.5 rounded-full">
-            ⭐ Đã thuộc {starredWordIds.length}/{ALL_KIDS_WORDS.length} từ vựng tranh
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="px-3.5 py-2 rounded-2xl bg-white text-amber-700 font-black text-sm shadow-sm flex items-center gap-1.5">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                <span>{stars} Sao</span>
+              </div>
+              <div className="px-3.5 py-2 rounded-2xl bg-white/95 text-orange-600 font-black text-sm shadow-sm flex items-center gap-1.5">
+                <Flame className="w-4 h-4 fill-orange-400 text-orange-500" />
+                <span>Combo {combo}</span>
+              </div>
+              <div className="px-3.5 py-2 rounded-2xl bg-white/95 text-violet-700 font-black text-sm shadow-sm flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-violet-500" />
+                <span>+{sessionXp} XP</span>
+              </div>
+              <div
+                className={`px-3.5 py-2 rounded-2xl border font-extrabold text-xs sm:text-sm shadow-sm flex items-center gap-1.5 ${currentBadge.colorClass}`}
+              >
+                <span>{currentBadge.emoji}</span>
+                <span>{currentBadge.title}</span>
+                {nextBadge && (
+                  <span className="opacity-75 text-xs">
+                    (còn {nextBadge.minStars - stars}⭐ lên {nextBadge.emoji})
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-white/25 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs sm:text-sm font-extrabold">🔊 Tốc độ đọc cho bé:</span>
+              <button
+                type="button"
+                onClick={() => setSpeechRate(0.85)}
+                className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 ${
+                  speechRate === 0.85
+                    ? 'bg-white text-orange-600 shadow-md scale-[1.03]'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+              >
+                <Turtle className="w-4 h-4" /> Chậm Rõ (0.85x)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpeechRate(1.0)}
+                className={`px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 ${
+                  speechRate === 1.0
+                    ? 'bg-white text-orange-600 shadow-md scale-[1.03]'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+              >
+                <Volume2 className="w-4 h-4" /> Tự Nhiên (1.0x)
+              </button>
+            </div>
+
+            <div className="text-xs font-bold bg-white/20 px-3 py-1.5 rounded-full">
+              ⭐ Đã thuộc {starredWordIds.length}/{ALL_KIDS_WORDS.length} từ vựng tranh
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Cheerful Feedback Toast */}
       {celebrationBanner && (
@@ -889,32 +924,80 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
         </div>
       )}
 
-      {/* 5 Big Colorful Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`min-h-[56px] px-3.5 py-3 rounded-2xl font-extrabold text-xs sm:text-sm transition flex items-center justify-center gap-2 border-2 ${
-                isActive
-                  ? `bg-gradient-to-r ${tab.activeGradient} text-white border-transparent shadow-md scale-[1.02]`
-                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:border-amber-300'
-              }`}
-            >
-              <span className="text-xl leading-none">{tab.emoji}</span>
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* 5 Big Colorful Tabs (only shown in standalone mode) */}
+      {!hideHeaderNav && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`min-h-[56px] px-3.5 py-3 rounded-2xl font-extrabold text-xs sm:text-sm transition flex items-center justify-center gap-2 border-2 ${
+                  isActive
+                    ? `bg-gradient-to-r ${tab.activeGradient} text-white border-transparent shadow-md scale-[1.02]`
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:border-amber-300'
+                }`}
+              >
+                <span className="text-xl leading-none">{tab.emoji}</span>
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Compact K5 Switcher between Games & YLE when inside MobileAppShell */}
+      {hideHeaderNav && showYleTab && (activeTab === 'games' || activeTab === 'yle') && (
+        <div className="flex items-center gap-2 bg-white/90 p-1.5 rounded-full border-2 border-[#DDF1FF] w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('games')}
+            className={`min-h-[40px] px-4 py-1.5 rounded-full text-xs sm:text-sm font-extrabold transition ${
+              activeTab === 'games'
+                ? 'bg-[#1684F0] text-white shadow-xs'
+                : 'text-[#355C8A] hover:bg-[#EEF7FF]'
+            }`}
+          >
+            🎮 Trò chơi
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('yle')}
+            className={`min-h-[40px] px-4 py-1.5 rounded-full text-xs sm:text-sm font-extrabold transition ${
+              activeTab === 'yle'
+                ? 'bg-[#7C3AED] text-white shadow-xs'
+                : 'text-[#355C8A] hover:bg-[#EEF7FF]'
+            }`}
+          >
+            🏅 Cambridge YLE
+          </button>
+        </div>
+      )}
 
       {/* ==================== TAB 1: VOCAB ==================== */}
       {activeTab === 'vocab' && (
-        <div className="space-y-5">
+        <div className="space-y-4">
+          {/* Compact Unit Picker Toggle on mobile so Flashcard is immediately visible */}
+          {hideHeaderNav && (
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setShowUnitPicker((v) => !v)}
+                className="min-h-[44px] px-4 py-2 rounded-full bg-white border-2 border-[#D6ECFF] text-[#123A6F] text-sm font-extrabold inline-flex items-center gap-2 shadow-xs"
+              >
+                <Palette className="w-4 h-4 text-pink-500" />
+                <span>{showUnitPicker ? 'Thu gọn danh sách chủ đề' : `Đổi chủ đề (${KIDS_UNITS.length})`}</span>
+              </button>
+              <span className="text-xs font-extrabold text-[#486B94]">
+                ⭐ {starredWordIds.length}/{ALL_KIDS_WORDS.length} từ
+              </span>
+            </div>
+          )}
+
           {/* Units Selector (8 units per page) */}
+          {(!hideHeaderNav || showUnitPicker) && (
           <div ref={vocabUnitsRef} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-amber-200/80 dark:border-slate-800 p-4 sm:p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -922,7 +1005,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                 <span>Chọn 1 Trong {KIDS_UNITS.length} Chủ Đề Vui Nhộn</span>
               </h3>
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                Tổng cộng {KIDS_UNITS.length} chủ đề • {ALL_KIDS_WORDS.length} từ vựng hình ảnh
+                {KIDS_UNITS.length} chủ đề • {ALL_KIDS_WORDS.length} từ
               </span>
             </div>
 
@@ -936,7 +1019,10 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                   <button
                     key={unit.id}
                     type="button"
-                    onClick={() => setSelectedUnitId(unit.id)}
+                    onClick={() => {
+                      setSelectedUnitId(unit.id);
+                      if (hideHeaderNav) setShowUnitPicker(false);
+                    }}
                     className={`p-3 rounded-2xl border-2 text-left transition flex flex-col justify-between gap-1.5 ${
                       isSelected
                         ? `bg-gradient-to-br ${unit.color} text-white border-transparent shadow-md scale-[1.03]`
@@ -950,7 +1036,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                         className="w-10 h-10 rounded-xl bg-white p-1 border border-slate-100 object-contain shrink-0"
                       />
                       <span
-                        className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                        className={`text-xs font-black px-2 py-0.5 rounded-full ${
                           isSelected
                             ? 'bg-white/25 text-white'
                             : 'bg-amber-100 text-amber-800 dark:bg-slate-700 dark:text-amber-300'
@@ -964,7 +1050,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
                         Unit {unitNumber}: {unit.title}
                       </div>
                       <div
-                        className={`text-[11px] font-semibold mt-0.5 ${
+                        className={`text-xs font-semibold mt-0.5 ${
                           isSelected ? 'text-white/90' : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
@@ -988,6 +1074,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
               scrollTargetRef={vocabUnitsRef}
             />
           </div>
+          )}
 
           {/* Active Unit Banner */}
           <div className={`rounded-3xl bg-gradient-to-r ${activeUnit.color} p-5 text-white shadow-md flex flex-wrap items-center justify-between gap-3`}>
@@ -1225,7 +1312,7 @@ export const KidsPlayground: React.FC<KidsPlaygroundProps> = ({
             </div>
           )}
 
-          {activeUnit.exercises && activeUnit.exercises.length > 0 && (
+          {!hideHeaderNav && activeUnit.exercises && activeUnit.exercises.length > 0 && (
             <div className="mt-6">
               <ExerciseRunner
                 key={activeUnit.id}

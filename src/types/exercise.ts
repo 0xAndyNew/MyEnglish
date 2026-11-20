@@ -12,6 +12,7 @@ export interface McqExercise {
   skill?: ExerciseSkill;
   question: string;
   passage?: string;
+  audioScript?: string;
   options: string[];
   correctIndex: number;
   explanationVi: string;

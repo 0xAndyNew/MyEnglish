@@ -554,46 +554,32 @@ export const ListeningSpeakingLab: React.FC<ListeningSpeakingLabProps> = ({
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header + Sub-tabs */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase text-indigo-600 dark:text-indigo-400">
-            <Headphones className="w-4 h-4" /> Bước 3 • Luyện Nghe, Đọc & Nói Tích Hợp
-          </span>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">
-            Phòng Luyện Nghe – Đọc – Nói (British Council / VOA / BBC)
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Nghe audio chuẩn, đọc bài & tra từ trực tiếp, sau đó bật Mic đọc nhại (Shadowing) ngay tại chỗ.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: 'listen_read', label: `🎧 Nghe & Đọc Cơ Bản (${allLessons.length} bài)` },
-            { id: 'shadowing', label: `🎙️ Luyện Nói & Chấm Điểm (${allSentences.length})` },
-            { id: 'roleplay', label: `💬 Hội Thoại Tình Huống (${allScenarios.length})` },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => {
-                window.speechSynthesis?.cancel();
-                stopActiveMic();
-                setSubTab(t.id as 'listen_read' | 'shadowing' | 'roleplay');
-                setScoreResult(null);
-                setSpeechError(null);
-              }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                subTab === t.id
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-4">
+      {/* Clean Mobile Sub-tabs */}
+      <div className="flex overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 gap-1.5">
+        {[
+          { id: 'listen_read', label: `🎧 Nghe & Đọc (${allLessons.length})` },
+          { id: 'shadowing', label: `🎙️ Nói Shadowing (${allSentences.length})` },
+          { id: 'roleplay', label: `💬 Hội Thoại (${allScenarios.length})` },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => {
+              window.speechSynthesis?.cancel();
+              stopActiveMic();
+              setSubTab(t.id as 'listen_read' | 'shadowing' | 'roleplay');
+              setScoreResult(null);
+              setSpeechError(null);
+            }}
+            className={`min-h-[42px] px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold shrink-0 transition ${
+              subTab === t.id
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* TAB 1: LISTEN & READ + INLINE SHADOWING */}

@@ -9,7 +9,59 @@ export interface TrackStep {
   page: PageKey;
   subView?: string;
   autoSkipIfLevelAtLeast?: CefrLevel;
+  /** Short mobile-friendly title, e.g. "Từ vựng", "Thi thử" */
+  shortLabel?: string;
+  /** One-line mobile subtitle */
+  shortDesc?: string;
+  emoji?: string;
+  /** Illustration used on mobile tiles */
+  image?: string;
+  /** Shown in the "Ôn tập / Thi thử / Trò chơi" tab */
+  practice?: boolean;
+  /** Hidden from the main "Học" list (lives in Practice/Exam tab) */
+  practiceOnly?: boolean;
 }
+
+/** Mobile UI metadata per step code (merged in resolveTrack) */
+export const STEP_UI_META: Record<
+  string,
+  Pick<TrackStep, 'shortLabel' | 'shortDesc' | 'emoji' | 'image' | 'practice' | 'practiceOnly'>
+> = {
+  // Kids 6–10
+  K1: { shortLabel: 'Từ vựng qua tranh', shortDesc: '24 chủ đề có hình & giọng đọc', emoji: '🐶', image: '/preschool/img/kids-ui/dog-cutout.webp' },
+  K2: { shortLabel: 'Chữ cái & Phonics', shortDesc: 'A–Z, âm vui & tập viết', emoji: '🔤', image: '/preschool/img/kids-ui/robot-cutout.webp' },
+  K3: { shortLabel: 'Truyện & Bài hát', shortDesc: 'Nghe truyện, hát theo nhạc', emoji: '📖', image: '/preschool/img/kids-ui/rabbit-cutout.webp' },
+  K4: { shortLabel: 'Mẫu câu đầu tiên', shortDesc: 'Chào hỏi, xin phép, giới thiệu', emoji: '💬', image: '/preschool/img/kids-ui/girl-cutout.webp' },
+  K5: { shortLabel: 'Trò chơi & YLE', shortDesc: 'Ghép tranh, nghe chọn hình', emoji: '🎮', image: '/preschool/img/kids-ui/trophy-cutout.webp', practice: true, practiceOnly: true },
+  // Teen
+  T1: { shortLabel: 'Bài học SGK 6–12', shortDesc: 'Từ vựng, ngữ pháp & bài tập Unit', emoji: '📗', image: '/img/art/concept-writing.webp' },
+  T2: { shortLabel: 'Luyện đề 10 & THPT', shortDesc: 'Đề thi thử có giải thích chi tiết', emoji: '📝', image: '/img/art/concept-target.webp', practice: true, practiceOnly: true },
+  T3: { shortLabel: 'Ngữ pháp trọng tâm', shortDesc: '14 chuyên đề + bài tổng hợp', emoji: '📐', image: '/img/art/concept-lightbulb.webp' },
+  T4: { shortLabel: 'Ghép câu', shortDesc: 'Thực hành cấu trúc câu', emoji: '🧩', image: '/img/art/concept-tools.webp' },
+  T5: { shortLabel: 'Nghe & Nói', shortDesc: 'Shadowing, hội thoại trường học', emoji: '🎧', image: '/img/art/concept-headphones.webp' },
+  T6: { shortLabel: 'Phát âm IPA', shortDesc: '44 âm & quy tắc trọng âm', emoji: '🗣️', image: '/img/art/concept-speech.webp' },
+  // University
+  U1: { shortLabel: 'Từ vựng AWL', shortDesc: 'Academic Word List & collocations', emoji: '📚', image: '/img/art/concept-brain.webp' },
+  U2: { shortLabel: 'Thuyết trình & Seminar', shortDesc: 'Mẫu câu thuyết trình, phản biện', emoji: '🎤', image: '/img/art/concept-meeting.webp' },
+  U3: { shortLabel: 'Viết Email, Essay & CV', shortDesc: 'Viết học thuật & hồ sơ (AI chấm)', emoji: '✍️', image: '/img/art/concept-writing.webp' },
+  U4: { shortLabel: 'Chuẩn đầu ra ĐH', shortDesc: 'VSTEP/IELTS/TOEIC & CV ATS', emoji: '🎓', image: '/img/art/concept-graduation.webp', practice: true, practiceOnly: true },
+  U5: { shortLabel: 'Ngữ pháp học thuật', shortDesc: 'Câu phức, bị động, điều kiện', emoji: '📐', image: '/img/art/concept-lightbulb.webp' },
+  U6: { shortLabel: 'Đọc OCR & Ôn từ', shortDesc: 'Quét tài liệu, ôn SRS', emoji: '📷', image: '/img/art/concept-camera.webp' },
+  // Worker
+  W1: { shortLabel: 'Công sở thực chiến', shortDesc: 'Họp, Email/Slack, phỏng vấn STAR', emoji: '💼', image: '/img/art/concept-office.webp' },
+  W2: { shortLabel: 'Từ vựng cốt lõi', shortDesc: '133 bài theo chủ đề + kho 980 từ', emoji: '📚', image: '/img/art/concept-brain.webp' },
+  W3: { shortLabel: 'Ghép câu & Ngữ pháp', shortDesc: '360+ mẫu câu theo ngành', emoji: '🧩', image: '/img/art/concept-tools.webp' },
+  W4: { shortLabel: 'Nghe & Hội thoại', shortDesc: 'Shadowing & roleplay văn phòng', emoji: '🎧', image: '/img/art/concept-headphones.webp' },
+  W5: { shortLabel: 'Viết Email', shortDesc: 'Song ngữ, AI chấm & OCR', emoji: '✉️', image: '/img/art/concept-contract.webp' },
+  W6: { shortLabel: 'Phát âm chuẩn IPA', shortDesc: '44 âm, nói chuẩn trọng âm', emoji: '🗣️', image: '/img/art/concept-speech.webp' },
+  // Exam
+  E1: { shortLabel: 'Bản đồ đề thi & Tiêu chí', shortDesc: 'Cấu trúc các Part, CEFR & thang điểm', emoji: '🗺️', image: '/img/art/concept-search.webp' },
+  E2: { shortLabel: 'Chiến thuật từng Part', shortDesc: 'Quy trình làm bài, né bẫy & áp dụng', emoji: '🧭', image: '/img/art/concept-compass.webp', practiceOnly: true },
+  E3: { shortLabel: 'Luyện 4 kỹ năng', shortDesc: 'Nghe – Đọc – Viết – Nói & Lưu từ SRS', emoji: '🎯', image: '/img/art/concept-target.webp' },
+  E4: { shortLabel: 'Thi thử bấm giờ', shortDesc: 'Mock test bấm giờ thực tế', emoji: '⏱️', image: '/img/art/concept-clock.webp', practice: true, practiceOnly: true },
+  E5: { shortLabel: 'Chấm Rubric W&S', shortDesc: 'Chấm Writing & Speaking theo tiêu chí', emoji: '📊', image: '/img/art/concept-chart.webp', practice: true, practiceOnly: true },
+  E6: { shortLabel: 'Từ vựng & Ngữ pháp thi', shortDesc: 'Từ khóa theo chứng chỉ, ngữ pháp & SRS', emoji: '📚', image: '/img/art/concept-brain.webp' },
+};
 
 export interface AudienceTrackConfig {
   title: string;
@@ -152,20 +204,13 @@ export const AUDIENCE_TRACKS: Record<AudienceId, AudienceTrackConfig> = {
       },
       {
         idx: 3,
-        code: 'T4',
-        label: 'T4: Lab Ghép Câu Học Đường',
-        description: 'Thực hành ghép câu chuẩn cấu trúc theo trình độ và chủ đề học sinh.',
-        page: 'sentence',
-      },
-      {
-        idx: 4,
         code: 'T5',
         label: 'T5: Nghe & Nói Học Đường',
         description: 'Luyện nghe, đọc nhại Shadowing và hội thoại đời sống – trường học.',
         page: 'listenSpeak',
       },
       {
-        idx: 5,
+        idx: 4,
         code: 'T6',
         label: 'T6: Phát Âm & Trọng Âm IPA',
         description: 'Làm chủ 44 âm IPA & quy tắc trọng âm — nền tảng ăn điểm phần Ngữ âm đề thi.',
@@ -227,13 +272,6 @@ export const AUDIENCE_TRACKS: Record<AudienceId, AudienceTrackConfig> = {
         description: 'Cấu trúc câu phức, mệnh đề quan hệ, câu bị động & điều kiện cho viết luận.',
         page: 'grammar',
       },
-      {
-        idx: 5,
-        code: 'U6',
-        label: 'U6: Đọc Tài Liệu OCR & Ôn SRS',
-        description: 'Quét giáo trình tiếng Anh bằng OCR, tra cứu tức thì & ôn từ bằng SRS.',
-        page: 'ocr',
-      },
     ],
   },
 
@@ -260,33 +298,19 @@ export const AUDIENCE_TRACKS: Record<AudienceId, AudienceTrackConfig> = {
       {
         idx: 1,
         code: 'W2',
-        label: 'W2: Nạp Từ Vựng & SRS Công Việc',
-        description: '133 bài từ vựng cốt lõi + Kho 980+ từ & ôn tập ngắt quãng SRS 1-3-7-30 ngày.',
+        label: 'W2: Nạp Từ Vựng Công Việc',
+        description: '133 bài từ vựng cốt lõi + Kho 980+ từ thông dụng theo cấp độ.',
         page: 'roadmap',
       },
       {
         idx: 2,
-        code: 'W3',
-        label: 'W3: Ngữ Pháp & Lab Ghép Câu',
-        description: 'Luyện ghép 360+ mẫu câu thực tế ưu tiên theo ngành nghề đã chọn.',
-        page: 'sentence',
-      },
-      {
-        idx: 3,
         code: 'W4',
         label: 'W4: Nghe & Hội Thoại Công Việc',
         description: 'Luyện nghe-đọc, Shadowing & Roleplay hội thoại văn phòng, IT, kinh doanh, CSKH.',
         page: 'listenSpeak',
       },
       {
-        idx: 4,
-        code: 'W5',
-        label: 'W5: Viết Email Song Ngữ & OCR',
-        description: 'Luyện viết Email/báo cáo Việt ↔ Anh có AI chấm điểm & quét tài liệu OCR.',
-        page: 'writing',
-      },
-      {
-        idx: 5,
+        idx: 3,
         code: 'W6',
         label: 'W6: Chuẩn Hóa Phát Âm IPA',
         description: 'Chuẩn hóa 44 âm IPA để nghe rõ đối tác quốc tế & nói chuẩn trọng âm.',
@@ -298,37 +322,37 @@ export const AUDIENCE_TRACKS: Record<AudienceId, AudienceTrackConfig> = {
 
   exam: {
     title: 'Lộ Trình Luyện Thi Chứng Chỉ Quốc Tế & VSTEP',
-    subtitle: 'Chẩn đoán trình độ → Chiến thuật từng Part → Luyện kỹ năng → Thi thử bấm giờ & Chấm Rubric',
+    subtitle: 'Bản đồ đề thi & tiêu chí → Luyện 4 kỹ năng → Từ vựng & Ngữ pháp thi',
     theme: 'default',
     skillDistribution: [
       { skill: 'Luyện kỹ năng / Part', percent: 35, color: 'bg-rose-500' },
       { skill: 'Thi thử (Mock Test)', percent: 25, color: 'bg-amber-500' },
       { skill: 'Chiến thuật làm bài', percent: 20, color: 'bg-indigo-500' },
       { skill: 'Từ vựng & Collocations', percent: 10, color: 'bg-emerald-500' },
-      { skill: 'Chẩn đoán & Sửa lỗi', percent: 10, color: 'bg-violet-500' },
+      { skill: 'Bản đồ đề & Tiêu chí', percent: 10, color: 'bg-violet-500' },
     ],
     steps: [
       {
         idx: 0,
         code: 'E1',
-        label: 'E1: Chẩn Đoán & Cấu Trúc Đề Thi',
-        description: 'Nắm cấu trúc đề thi, thang điểm & làm bài test chẩn đoán điểm hiện tại.',
+        label: 'E1: Bản Đồ Đề Thi & Tiêu Chí Điểm',
+        description: 'Hiểu cấu trúc từng phần thi, thời lượng, thang quy đổi CEFR và tiêu chí chấm Rubric.',
         page: 'exam',
         subView: 'diagnostic',
       },
       {
         idx: 1,
         code: 'E2',
-        label: 'E2: Chiến Thuật & Mẹo Từng Part',
-        description: 'Chiến thuật làm bài, phân bổ thời gian & tránh bẫy cho từng Part của kỳ thi.',
+        label: 'E2: Chiến Thuật & Quy Trình Từng Part',
+        description: 'Quy trình làm bài, tránh bẫy theo từng Part và chuyển thẳng sang bài áp dụng.',
         page: 'exam',
         subView: 'strategies',
       },
       {
         idx: 2,
         code: 'E3',
-        label: 'E3: Luyện Tập 4 Kỹ Năng',
-        description: 'Ngân hàng câu hỏi luyện sâu từng kỹ năng Nghe – Đọc – Viết – Nói theo format.',
+        label: 'E3: Thư Viện 4 Kỹ Năng & Bài Mẫu',
+        description: 'Nghe – Đọc – Viết – Nói phân rõ chuẩn đề thi / bổ trợ, kèm nút lưu từ SRS.',
         page: 'exam',
         subView: 'practice',
       },
@@ -351,8 +375,8 @@ export const AUDIENCE_TRACKS: Record<AudienceId, AudienceTrackConfig> = {
       {
         idx: 5,
         code: 'E6',
-        label: 'E6: Bổ Trợ Từ Vựng & Ngữ Pháp Thi',
-        description: 'Kho từ vựng B1–C1 cốt lõi & sổ từ SRS để nâng band điểm nhanh chóng.',
+        label: 'E6: Từ Vựng & Ngữ Pháp Trọng Tâm Thi',
+        description: 'Từ khóa ăn điểm theo từng chứng chỉ, ngữ pháp trọng tâm ra thi & ôn SRS.',
         page: 'vocab',
       },
     ],
@@ -412,14 +436,17 @@ export function resolveTrack(profile?: LearnerProfile | null): TrackStep[] {
   const track = AUDIENCE_TRACKS[audience] || AUDIENCE_TRACKS.worker;
 
   return track.steps.map((step, idx) => {
+    const ui = STEP_UI_META[step.code] || {};
     if (audience === 'kids' && step.code === 'K5' && profile?.kids?.goal === 'yle') {
       return {
+        ...ui,
         ...step,
         idx,
         subView: 'yle',
       };
     }
     return {
+      ...ui,
       ...step,
       idx,
     };

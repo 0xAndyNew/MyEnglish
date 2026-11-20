@@ -39,8 +39,10 @@ export interface ExamReadingSet {
   partLabel: string;
   title: string;
   level: CefrLevel;
+  sourceGroup?: 'exam-format' | 'foundation';
   passage: string;
   viSummary: string;
+  keyPhrases?: { en: string; vi: string }[];
   questions: {
     id: string;
     questionType: string;
@@ -56,9 +58,11 @@ export interface ExamListeningSet {
   partLabel: string;
   title: string;
   level: CefrLevel;
+  sourceGroup?: 'exam-format' | 'foundation';
   speakerContext: string;
   audioScript: string;
   viSummary: string;
+  keyPhrases?: { en: string; vi: string }[];
   questions: {
     id: string;
     question: string;
@@ -72,6 +76,7 @@ export interface ExamWritingTask {
   id: string;
   taskLabel: string;
   title: string;
+  sourceGroup?: 'exam-format' | 'foundation';
   recommendedMinutes: number;
   wordCountRange: string;
   minWords: number;
@@ -88,6 +93,7 @@ export interface ExamSpeakingTask {
   id: string;
   partLabel: string;
   title: string;
+  sourceGroup?: 'exam-format' | 'foundation';
   prepTimeText: string;
   speakTimeText: string;
   prompt: string;

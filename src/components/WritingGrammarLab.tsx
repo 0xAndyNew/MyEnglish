@@ -472,36 +472,17 @@ Bài viết của học viên:
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <PenTool className="w-6 h-6 text-indigo-600" />
-            <span>
-              Ngữ Pháp Từng Bước &amp; Viết Văn
-              {learnerProfile ? ` (${getAudienceMeta(learnerProfile.audience).shortLabel})` : ''}
-            </span>
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            {learnerProfile?.audience === 'teen'
-              ? 'Hệ thống 14 chuyên đề ngữ pháp trọng tâm THCS/THPT & luyện viết đoạn văn học đường.'
-              : learnerProfile?.audience === 'university'
-              ? 'Ngữ pháp học thuật (câu phức, mệnh đề quan hệ, bị động) phục vụ viết Essay & nghiên cứu.'
-              : learnerProfile?.audience === 'exam'
-              ? 'Ôn chắc nền tảng ngữ pháp, tránh bẫy chia thì & cấu trúc câu ăn điểm thi chứng chỉ.'
-              : 'Học từng bài ngữ pháp + làm Quiz ngay cho từng bài, phục vụ giao tiếp & viết Email công việc.'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 w-full sm:w-fit">
           {[
-            { id: 'grammar', label: '📖 Học Ngữ Pháp Từng Bước', icon: BookOpen },
-            { id: 'studio', label: '✍️ Viết Hội thoại & Nhật ký', icon: PenTool },
+            { id: 'grammar', label: '📖 Ngữ pháp từng bước', icon: BookOpen },
+            { id: 'studio', label: '✍️ Luyện viết ngắn', icon: PenTool },
           ].map((t) => (
             <button
               key={t.id}
               onClick={() => setSubTab(t.id as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`flex-1 sm:flex-none min-h-[40px] px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition ${
                 subTab === t.id
                   ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400'

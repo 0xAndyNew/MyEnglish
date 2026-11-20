@@ -218,3 +218,157 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.7);
 }
+
+/* ==========================================================================
+   MOBILE APP SHELL — Age-tier design tokens (6 tuổi → Luyện thi)
+   Root element sets: data-tier="playful|bright|pro" + data-audience="kids|teen|..."
+   ========================================================================== */
+:root {
+  --brand: 79 70 229;
+  --brand-soft: 238 242 255;
+  --brand-ink: 55 48 163;
+  --brand-alt: 14 165 233;
+  --font-tier: Inter, system-ui, -apple-system, sans-serif;
+  --radius-card: 16px;
+  --radius-btn: 12px;
+  --nav-h: 4.75rem;
+}
+
+[data-tier='playful'] {
+  --font-tier: 'Baloo 2', Nunito, system-ui, sans-serif;
+  --radius-card: 26px;
+  --radius-btn: 9999px;
+}
+[data-tier='bright'] {
+  --font-tier: Nunito, system-ui, -apple-system, sans-serif;
+  --radius-card: 22px;
+  --radius-btn: 16px;
+}
+[data-tier='pro'] {
+  --font-tier: Inter, system-ui, -apple-system, sans-serif;
+  --radius-card: 18px;
+  --radius-btn: 14px;
+}
+
+[data-audience='kids'] {
+  --brand: 249 115 22;
+  --brand-soft: 255 237 213;
+  --brand-ink: 194 65 12;
+  --brand-alt: 22 132 240;
+}
+[data-audience='teen'] {
+  --brand: 14 132 233;
+  --brand-soft: 224 242 254;
+  --brand-ink: 3 105 161;
+  --brand-alt: 34 197 94;
+}
+[data-audience='university'] {
+  --brand: 124 58 237;
+  --brand-soft: 237 233 254;
+  --brand-ink: 91 33 182;
+  --brand-alt: 192 38 211;
+}
+[data-audience='worker'] {
+  --brand: 5 150 105;
+  --brand-soft: 209 250 229;
+  --brand-ink: 4 120 87;
+  --brand-alt: 13 148 136;
+}
+[data-audience='exam'] {
+  --brand: 225 29 72;
+  --brand-soft: 255 228 230;
+  --brand-ink: 190 18 60;
+  --brand-alt: 245 158 11;
+}
+.dark [data-audience] {
+  --brand-soft: 30 41 59;
+}
+
+.app-shell {
+  font-family: var(--font-tier);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Reserve space for the fixed bottom nav + iOS home indicator */
+.pb-nav {
+  padding-bottom: calc(var(--nav-h) + 1.25rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .pb-nav {
+    padding-bottom: 2rem;
+  }
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Inputs >= 16px on phones to prevent iOS auto-zoom */
+@media (max-width: 640px) {
+  .app-shell input[type='text'],
+  .app-shell input[type='search'],
+  .app-shell input:not([type]),
+  .app-shell textarea,
+  .app-shell select {
+    font-size: 16px;
+  }
+}
+
+/* Tactile 3D button (Duolingo-like) using the audience brand color */
+.btn-3d {
+  box-shadow: 0 4px 0 rgb(var(--brand-ink));
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.15s ease;
+}
+.btn-3d:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.btn-3d:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgb(var(--brand-ink));
+}
+.card-3d {
+  box-shadow: 0 3px 0 rgba(15, 23, 42, 0.07), 0 10px 24px -14px rgba(15, 23, 42, 0.25);
+}
+.dark .card-3d {
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-sheet-up {
+  animation: sheetUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+.animate-screen-in {
+  animation: screenIn 0.24s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up,
+  .animate-fade-in,
+  .animate-screen-in {
+    animation: none !important;
+  }
+}

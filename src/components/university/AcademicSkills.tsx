@@ -29,6 +29,7 @@ import {
   Volume2,
   XCircle,
 } from 'lucide-react';
+import { BottomSheet } from '../app/ui/BottomSheet';
 import {
   ACADEMIC_ABSTRACTS,
   ACADEMIC_WRITING_PROMPTS,
@@ -375,6 +376,7 @@ export const AcademicSkills: React.FC<AcademicSkillsProps> = ({
   const [awlLevelFilter, setAwlLevelFilter] = useState<'ALL' | 'B1' | 'B2' | 'C1'>('ALL');
   const [awlQuery, setAwlQuery] = useState('');
   const [selectedAwlId, setSelectedAwlId] = useState<string>(AWL_WORDS[0].id);
+  const [mobileAwlSheetOpen, setMobileAwlSheetOpen] = useState(false);
   const [savedAwlIds, setSavedAwlIds] = useState<string[]>([]);
 
   // AWL Practice (Flashcard / Context Quiz)
@@ -747,8 +749,9 @@ ${draftText}
   ];
 
   return (
-    <div className="space-y-6">
-      {/* HERO BANNER */}
+    <div className="space-y-4">
+      {/* HERO BANNER + 4 MAIN TABS (hidden when inside MobileAppShell) */}
+      {!hideHeaderNav && (
       <div className="rounded-3xl bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 text-white p-6 shadow-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2">
@@ -824,6 +827,7 @@ ${draftText}
           })}
         </div>
       </div>
+      )}
 
       {/* ================================================================= */}
       {/* TAB 1: AWL ACADEMIC VOCABULARY                                    */}
@@ -927,21 +931,21 @@ ${draftText}
           </div>
 
           {awlMode === 'browse' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
               {/* Word List (10 words/page) */}
-              <div ref={awlListRef} className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col justify-between">
+              <div ref={awlListRef} className="md:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col justify-between">
                 <div>
                   <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
                       Danh sách từ ({filteredAwlWords.length})
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       Trang {awlPagination.page}/{awlPagination.totalPages}
                     </span>
                   </div>
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 divide-y sm:divide-y-0 md:divide-y divide-slate-100 dark:divide-slate-800 sm:gap-2 md:gap-0 sm:p-2 md:p-0">
                     {filteredAwlWords.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-slate-500">
+                      <div className="p-6 text-center text-xs text-slate-500 sm:col-span-2 md:col-span-1">
                         Không tìm thấy từ AWL phù hợp với bộ lọc hiện tại.
                       </div>
                     ) : (
@@ -949,25 +953,37 @@ ${draftText}
                         const isSelected = activeAwlWord.id === item.id;
                         const isSaved = savedAwlIds.includes(item.id);
                         return (
-                          <button
+                          <div
                             key={item.id}
-                            type="button"
+                            role="button"
+                            tabIndex={0}
                             onClick={() => {
                               setSelectedAwlId(item.id);
                               speakText(item.word, accent, 0.95);
+                              if (window.innerWidth < 768) {
+                                setMobileAwlSheetOpen(true);
+                              }
                             }}
-                            className={`w-full text-left px-4 py-3 transition flex items-start justify-between gap-3 ${
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedAwlId(item.id);
+                                speakText(item.word, accent, 0.95);
+                                if (window.innerWidth < 768) setMobileAwlSheetOpen(true);
+                              }
+                            }}
+                            className={`w-full text-left px-3.5 py-3 transition flex items-start justify-between gap-2.5 cursor-pointer sm:rounded-xl sm:border sm:border-slate-200 dark:sm:border-slate-800 md:rounded-none md:border-0 ${
                               isSelected
-                                ? 'bg-violet-50/90 dark:bg-violet-950/40 border-l-4 border-l-violet-600'
+                                ? 'bg-violet-50/90 dark:bg-violet-950/40 border-l-4 border-l-violet-600 md:border-l-4'
                                 : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
                             }`}
                           >
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-extrabold text-sm text-slate-900 dark:text-white">
                                   {item.word}
                                 </span>
-                                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
                                   ({item.pos}) {accent === 'en-US' ? item.ipa : item.ipaUK}
                                 </span>
                               </div>
@@ -978,12 +994,23 @@ ${draftText}
                             <div className="flex items-center gap-1.5 shrink-0">
                               {isSaved && <BookmarkCheck className="w-4 h-4 text-emerald-600" />}
                               <span
-                                className={`px-2 py-0.5 rounded-md border text-[10px] font-extrabold ${LEVEL_BADGE_CLASS[item.level]}`}
+                                className={`px-2 py-0.5 rounded-md border text-xs font-extrabold ${LEVEL_BADGE_CLASS[item.level]}`}
                               >
                                 {item.level}
                               </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  speakText(item.word, accent, 0.95);
+                                }}
+                                title="Nghe phát âm"
+                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-violet-600 dark:text-violet-300 hover:bg-violet-100"
+                              >
+                                <Volume2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                          </button>
+                          </div>
                         );
                       })
                     )}
@@ -1007,8 +1034,8 @@ ${draftText}
                 )}
               </div>
 
-              {/* Word Inspector */}
-              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
+              {/* Word Inspector (Right column on md+, BottomSheet on mobile) */}
+              <div className="hidden md:block md:col-span-7 md:sticky md:top-20 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -1228,6 +1255,96 @@ ${draftText}
                   </p>
                 </div>
               </div>
+
+              <BottomSheet
+                open={mobileAwlSheetOpen}
+                onClose={() => setMobileAwlSheetOpen(false)}
+                title={`${activeAwlWord.word} (${activeAwlWord.pos})`}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-sm font-bold text-violet-700 dark:text-violet-300">
+                        {accent === 'en-US' ? activeAwlWord.ipa : activeAwlWord.ipaUK}
+                      </span>
+                      <span className="ml-2 text-xs text-slate-500">
+                        ({activeAwlWord.vietPhonetic})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => speakText(activeAwlWord.word, accent, 0.95)}
+                        className="px-3 py-2 rounded-xl bg-violet-600 text-white text-xs font-extrabold inline-flex items-center gap-1"
+                      >
+                        <Volume2 className="w-4 h-4" /> Nghe
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveAwlWord(activeAwlWord)}
+                        className={`px-3 py-2 rounded-xl text-xs font-extrabold inline-flex items-center gap-1 ${
+                          savedAwlIds.includes(activeAwlWord.id)
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-500 text-white'
+                        }`}
+                      >
+                        {savedAwlIds.includes(activeAwlWord.id) ? 'Đã lưu' : 'Lưu SRS'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 space-y-1">
+                    <div className="text-xs font-extrabold uppercase text-slate-400">Nghĩa học thuật</div>
+                    <div className="text-base font-bold text-slate-900 dark:text-white">
+                      {activeAwlWord.meaningVi}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 pt-1">
+                      📌 {activeAwlWord.phonicsRule}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                    <div className="text-xs font-extrabold text-amber-700 dark:text-amber-300">
+                      💡 Mẹo nhớ: {activeAwlWord.mnemonic}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-extrabold uppercase text-slate-500">Collocations</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeAwlWord.collocations.map((col) => (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => speakText(col, accent, 0.9)}
+                          className="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950/50 text-violet-800 dark:text-violet-200 text-xs font-bold inline-flex items-center gap-1"
+                        >
+                          <Volume2 className="w-3 h-3" /> {col}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">Ví dụ</span>
+                      <button
+                        type="button"
+                        onClick={() => speakText(activeAwlWord.academicExampleEn, accent, 0.92)}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold inline-flex items-center gap-1"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" /> Nghe
+                      </button>
+                    </div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      “{activeAwlWord.academicExampleEn}”
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {activeAwlWord.academicExampleVi}
+                    </p>
+                  </div>
+                </div>
+              </BottomSheet>
             </div>
           ) : (
             /* AWL PRACTICE: FLASHCARD + MINI QUIZ */

@@ -26,7 +26,11 @@ export interface ExerciseRunnerProps {
   subtitle?: string;
   accent?: AccentMode;
   shuffleOptions?: boolean;
-  onComplete?: (correct: number, total: number) => void;
+  onComplete?: (
+    correct: number,
+    total: number,
+    details?: { skillStats?: Record<string, { correct: number; total: number }> }
+  ) => void;
 }
 
 function normalizeAnswer(str: string): string {
@@ -159,12 +163,19 @@ export const ExerciseRunner: React.FC<ExerciseRunnerProps> = ({
 
   const handleSubmitAll = () => {
     const allChecked: Record<string, boolean> = {};
+    const skillStats: Record<string, { correct: number; total: number }> = {};
     exercises.forEach((ex) => {
       allChecked[ex.id] = true;
+      if (ex.skill) {
+        const cur = skillStats[ex.skill] || { correct: 0, total: 0 };
+        cur.total += 1;
+        if (isExerciseCorrect(ex, answers[ex.id])) cur.correct += 1;
+        skillStats[ex.skill] = cur;
+      }
     });
     setCheckedIds(allChecked);
     setSubmittedAll(true);
-    onComplete?.(correctCount, exercises.length);
+    onComplete?.(correctCount, exercises.length, { skillStats });
   };
 
   const handleResetAll = () => {
@@ -259,6 +270,7 @@ export const ExerciseRunner: React.FC<ExerciseRunnerProps> = ({
               {ex.kind === 'mcq' && (
                 <McqView
                   ex={ex}
+                  accent={accent}
                   value={answers[ex.id] as number | undefined}
                   checked={isChecked}
                   shuffle={shuffleOptions}
@@ -415,12 +427,13 @@ function kindLabel(kind: Exercise['kind']): string {
 
 const McqView: React.FC<{
   ex: McqExercise;
+  accent: AccentMode;
   value: number | undefined;
   checked: boolean;
   shuffle: boolean;
   seed: number;
   onChange: (idx: number) => void;
-}> = ({ ex, value, checked, shuffle, seed, onChange }) => {
+}> = ({ ex, accent, value, checked, shuffle, seed, onChange }) => {
   const orderedIndices = useMemo(() => {
     const base = ex.options.map((_, i) => i);
     const hasPositionalRef = ex.options.some((o) =>
@@ -432,6 +445,27 @@ const McqView: React.FC<{
 
   return (
     <div className="space-y-3">
+      {ex.audioScript && (
+        <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-extrabold text-indigo-800 dark:text-indigo-200">
+              Nghe Audio câu hỏi (Transcript mở sau khi kiểm tra)
+            </span>
+            <button
+              type="button"
+              onClick={() => speakText(ex.audioScript!, accent, 0.92)}
+              className="min-h-[36px] px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+            >
+              <Volume2 className="w-3.5 h-3.5" /> Phát Audio
+            </button>
+          </div>
+          {checked && (
+            <p className="text-xs text-slate-700 dark:text-slate-200 bg-white/80 dark:bg-slate-900/70 p-2.5 rounded-lg leading-relaxed">
+              <strong>Transcript:</strong> {ex.audioScript}
+            </p>
+          )}
+        </div>
+      )}
       {ex.passage && (
         <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
           {ex.passage}

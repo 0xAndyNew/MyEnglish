@@ -150,23 +150,17 @@ export const IpaPhonicsLab: React.FC<IpaPhonicsLabProps> = ({
   const isMastered = masteredPhonemes.includes(selected.id);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-            Bước 1: Chữ Cái (A–Z) & 44 Âm IPA (20 Nguyên Âm + 24 Phụ Âm)
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Học đúng thứ tự: <strong>1. 26 Chữ cái A–Z</strong> → <strong>2. 20 Nguyên âm</strong> → <strong>3. 24 Phụ âm & Âm cuối</strong>. Đã thuộc:{' '}
-            <strong className="text-indigo-600 dark:text-indigo-400">{masteredPhonemes.length}/44 âm</strong>.
-          </p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold">
+          Đã thuộc {masteredPhonemes.length}/44 âm IPA
+        </span>
 
-        <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1">
+        <div className="flex overflow-x-auto no-scrollbar bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 w-full sm:w-auto">
           {[
-            { id: 'vowels', label: '20 Nguyên Âm IPA' },
-            { id: 'consonants', label: '24 Phụ Âm & Âm Cuối' },
-            { id: 'all', label: 'Xem tất cả 44 IPA' },
+            { id: 'vowels', label: '20 Nguyên âm' },
+            { id: 'consonants', label: '24 Phụ âm' },
+            { id: 'all', label: 'Tất cả 44' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -175,7 +169,7 @@ export const IpaPhonicsLab: React.FC<IpaPhonicsLabProps> = ({
                 if (tab.id === 'vowels') setSelected(IPA_PHONEMES[0]);
                 if (tab.id === 'consonants') setSelected(IPA_PHONEMES[20]);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`min-h-[40px] px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition ${
                 subStep === tab.id
                   ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400'

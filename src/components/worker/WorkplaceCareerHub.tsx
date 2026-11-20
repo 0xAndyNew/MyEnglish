@@ -323,6 +323,8 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
     WORKPLACE_STAR_QUESTIONS.length +
     WORKPLACE_CASE_SITUATIONS.length;
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const tabs = [
     {
       id: 'meetings' as const,
@@ -348,12 +350,16 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
       count: filteredCases.length,
       icon: ShieldCheck,
     },
-    {
-      id: 'drills' as const,
-      label: '5. Drill Từ Vựng Ngành',
-      count: filteredDrills.length,
-      icon: Award,
-    },
+    ...(!hideHeaderNav || initialTab === 'drills'
+      ? [
+          {
+            id: 'drills' as const,
+            label: '5. Drill Từ Vựng Ngành',
+            count: filteredDrills.length,
+            icon: Award,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -401,67 +407,58 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
         </div>
       )}
 
-      {/* 4 Clear Skill Tabs + Compact Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 sm:p-4 space-y-3 shadow-sm">
-        {/* Compact status strip when Hero is hidden */}
-        {hideHeaderNav && (
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 font-extrabold text-slate-800 dark:text-slate-100">
-                <Briefcase className="w-4 h-4 text-emerald-600" />
-                Tiếng Anh Công Sở Thực Chiến
-              </span>
-              {profile?.worker && (
-                <span className="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold">
-                  🎯 {GOAL_LABEL_MAP[profile.worker.goal] || 'Giao tiếp công việc'}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-bold inline-flex items-center gap-1">
-                <Award className="w-3.5 h-3.5 text-amber-500" />
-                Đã luyện: {completedIds.length}/{totalItemsCount}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* 5 Tabs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-between gap-2 transition border ${
-                  active
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                    : 'bg-slate-50 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
-                }`}
-              >
-                <span className="inline-flex items-center gap-2 truncate">
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{tab.label}</span>
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-black shrink-0 ${
+      {/* Clean Horizontal Tabs + Collapsible Filter Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 space-y-3 shadow-xs">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`min-h-[42px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-1.5 shrink-0 transition border ${
                     active
-                      ? 'bg-white/20 text-white'
-                      : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
                   }`}
                 >
-                  {tab.count}
-                </span>
-              </button>
-            );
-          })}
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-xs font-black ${
+                      active
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className={`min-h-[42px] px-3 py-2 rounded-xl border text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 transition ${
+              showFilters || industryFilter !== 'ALL' || levelFilter !== 'ALL' || searchQuery
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+            }`}
+            title="Lọc theo ngành, cấp độ hoặc tìm kiếm"
+          >
+            <Filter className="w-4 h-4" />
+            <span className="hidden sm:inline">Lọc</span>
+          </button>
         </div>
 
-        {/* One-Row Filter Bar: Industry <select> + Search Input + Level <select> */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 pt-1">
+        {/* Filter Bar (collapsible on mobile so content appears immediately) */}
+        {(!hideHeaderNav || showFilters) && (
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
           {/* Industry Select with optgroup (Learner's industries listed first) */}
           <div className="md:col-span-5 flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5">
             <Filter className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -561,6 +558,7 @@ export const WorkplaceCareerHub: React.FC<WorkplaceCareerHubProps> = ({
             </select>
           </div>
         </div>
+        )}
       </div>
 
       {/* TAB 1: 1. HỌP & ĐÀM PHÁN (2-Column Master-Detail) */}

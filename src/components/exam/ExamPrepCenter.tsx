@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowRight,
   Award,
   BarChart3,
+  BookmarkCheck,
+  BookmarkPlus,
   BookOpen,
   Bot,
   Calendar,
@@ -25,6 +28,7 @@ import {
   PenTool,
   Play,
   RotateCcw,
+  Search,
   ShieldAlert,
   Sparkles,
   Square,
@@ -42,8 +46,27 @@ import {
   ExamSpeakingTask,
   ExamWritingTask,
 } from '../../data/exam/examPrepData';
+import {
+  getExpandedListeningLessons,
+  getExpandedReadingLessons,
+  getExpandedSpeakingLessons,
+  getExpandedWritingLessons,
+} from '../../data/exam/examSkillLessons';
+import { PaginationBar, usePagination } from '../common/PaginationBar';
 import { ExamType, getExamMeta, LearnerProfile } from '../../types/audience';
-import { AccentMode } from '../../types/learning';
+import { AccentMode, CefrLevel, WordEntry } from '../../types/learning';
+import type { AppRoute } from '../app/useHashRoute';
+import {
+  buildExamWordEntry,
+  EXAM_PREF_EVENT,
+  EXAM_TARGET_PRESETS,
+  getExamDiagnosticSummary,
+  getExamTargetScore,
+  getPreferredExam,
+  setExamTargetScore,
+  setPreferredExam,
+  type ExamDiagnosticSummary,
+} from './examPreferences';
 import { EXAM_IMAGE_MAP } from '../../utils/flashcardMedia';
 import { callGeminiText } from '../../utils/geminiClient';
 import {
@@ -57,9 +80,15 @@ export interface ExamPrepCenterProps {
   geminiApiKey?: string;
   profile?: LearnerProfile | null;
   onAddXp: (amount: number) => void;
+  onSaveWord?: (word: WordEntry) => void;
+  savedWords?: WordEntry[];
   initialTab?: 'diagnostic' | 'strategies' | 'practice' | 'mock' | 'rubric';
+  initialPracticeSkill?: PracticeSkill;
+  initialRubricTask?: { mode: 'writing' | 'speaking'; taskId?: string };
   allowAllOptions?: boolean;
   hideHeaderNav?: boolean;
+  hideExamBar?: boolean;
+  onNavigate?: (route: AppRoute) => void;
 }
 
 type ExamCenterTab = 'diagnostic' | 'strategies' | 'practice' | 'mock' | 'rubric';
@@ -390,27 +419,200 @@ function evaluateOfflineByRubric(
   };
 }
 
+interface SkillLessonPickerItem {
+  id: string;
+  title: string;
+  tag: string;
+}
+
+const SkillLessonPicker: React.FC<{
+  items: SkillLessonPickerItem[];
+  activeIdx: number;
+  onSelect: (idx: number) => void;
+  unitLabel?: string;
+  sourceFilter?: 'all' | 'exam-format' | 'foundation';
+  onSourceFilterChange?: (next: 'all' | 'exam-format' | 'foundation') => void;
+  examShortLabel?: string;
+}> = ({
+  items,
+  activeIdx,
+  onSelect,
+  unitLabel = 'bài',
+  sourceFilter,
+  onSourceFilterChange,
+  examShortLabel = 'Đề thi',
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items
+      .map((it, idx) => ({ ...it, origIdx: idx }))
+      .filter((it) => !q || it.title.toLowerCase().includes(q) || it.tag.toLowerCase().includes(q));
+  }, [items, search]);
+
+  const pagination = usePagination(filtered, 8, { resetKey: `${items.length}-${search}` });
+  const current = items[activeIdx];
+
+  return (
+    <div ref={boxRef} className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-extrabold shrink-0">
+            Bài {activeIdx + 1}/{items.length}
+          </span>
+          {current && (
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold truncate">
+              {current.tag}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            disabled={activeIdx <= 0}
+            onClick={() => onSelect(Math.max(0, activeIdx - 1))}
+            className="min-h-[38px] px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1"
+          >
+            <ChevronLeft className="w-4 h-4" /> Trước
+          </button>
+          <button
+            type="button"
+            disabled={activeIdx >= items.length - 1}
+            onClick={() => onSelect(Math.min(items.length - 1, activeIdx + 1))}
+            className="min-h-[38px] px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold disabled:opacity-40 inline-flex items-center gap-1"
+          >
+            Sau <ChevronRight className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs font-extrabold inline-flex items-center gap-1"
+          >
+            <span>{open ? 'Thu gọn' : `Chọn bài (${items.length})`}</span>
+            {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+          {sourceFilter && onSourceFilterChange && (
+            <div className="inline-flex p-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 gap-1">
+              {(
+                [
+                  { id: 'all', label: 'Tất cả bài' },
+                  { id: 'exam-format', label: `Chuẩn ${examShortLabel}` },
+                  { id: 'foundation', label: 'Mở rộng nền tảng' },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => onSourceFilterChange(f.id)}
+                  className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                    sourceFilter === f.id
+                      ? 'bg-rose-600 text-white'
+                      : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Tìm theo tên ${unitLabel} hoặc chủ đề...`}
+              className="w-full min-h-[40px] pl-9 pr-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {pagination.pageItems.map((it) => {
+              const active = it.origIdx === activeIdx;
+              return (
+                <button
+                  key={it.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(it.origIdx);
+                    setOpen(false);
+                  }}
+                  className={`p-3 rounded-xl border text-left transition ${
+                    active
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                      : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 hover:border-rose-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs font-extrabold mb-0.5">
+                    <span>Bài {it.origIdx + 1}</span>
+                    <span className={active ? 'text-rose-100' : 'text-slate-400'}>{it.tag}</span>
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold line-clamp-1">{it.title}</div>
+                </button>
+              );
+            })}
+          </div>
+
+          <PaginationBar
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            startIdx={pagination.startIdx}
+            endIdx={pagination.endIdx}
+            onPageChange={pagination.setPage}
+            itemLabel={unitLabel}
+            compact
+            scrollTargetRef={boxRef}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   accent,
   geminiApiKey,
   profile,
   onAddXp,
+  onSaveWord,
+  savedWords = [],
   initialTab,
+  initialPracticeSkill,
+  initialRubricTask,
   allowAllOptions = false,
+  hideHeaderNav = false,
+  hideExamBar = false,
+  onNavigate,
 }) => {
-  const defaultExamFromProfile: ExamType =
-    profile?.exam?.examType || profile?.university?.graduationExam || 'ielts';
-
-  const [selectedExam, setSelectedExam] = useState<ExamType>(defaultExamFromProfile);
+  const [selectedExam, setSelectedExam] = useState<ExamType>(() =>
+    getPreferredExam(profile)
+  );
+  const [targetScoreState, setTargetScoreState] = useState<string>(() =>
+    getExamTargetScore(getPreferredExam(profile), profile)
+  );
+  const [diagSummary, setDiagSummary] = useState<ExamDiagnosticSummary | null>(() =>
+    getExamDiagnosticSummary(getPreferredExam(profile))
+  );
   const [activeTab, setActiveTab] = useState<ExamCenterTab>(initialTab || 'diagnostic');
+  const [lessonSourceFilter, setLessonSourceFilter] = useState<
+    'all' | 'exam-format' | 'foundation'
+  >('all');
+  const [e1Section, setE1Section] = useState<'blueprint' | 'scoring'>('blueprint');
+  const [rubricFilterTab, setRubricFilterTab] = useState<'writing' | 'speaking'>('writing');
 
   // Audio playback speed
   const [ttsRate, setTtsRate] = useState<number>(0.95);
-
-  // Tab 1: Diagnostic state (scoped per exam)
-  const [diagAnswersByExam, setDiagAnswersByExam] = useState<Record<string, Record<string, number>>>({});
-  const [diagSubmittedByExam, setDiagSubmittedByExam] = useState<Record<string, boolean>>({});
-  const [diagXpAwarded, setDiagXpAwarded] = useState<Record<string, boolean>>({});
 
   // Tab 2: Strategies filter
   const [strategySkillFilter, setStrategySkillFilter] = useState<string>('ALL');
@@ -418,13 +620,15 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   // Tab 3: 4-Skill Practice state
   const [practiceSkill, setPracticeSkill] = useState<PracticeSkill>('listening');
   const [listeningIdx, setListeningIdx] = useState(0);
-  const [showListeningTranscript, setShowListeningTranscript] = useState(false);
+  const [showListeningTranscript, setShowListeningTranscript] = useState(true);
   const [showListeningSummary, setShowListeningSummary] = useState(false);
+  const [showListeningQuiz, setShowListeningQuiz] = useState(false);
   const [listeningAnswers, setListeningAnswers] = useState<Record<string, number>>({});
   const [listeningChecked, setListeningChecked] = useState<Record<string, boolean>>({});
 
   const [readingIdx, setReadingIdx] = useState(0);
   const [showReadingSummary, setShowReadingSummary] = useState(false);
+  const [showReadingQuiz, setShowReadingQuiz] = useState(false);
   const [readingAnswers, setReadingAnswers] = useState<Record<string, number>>({});
   const [readingChecked, setReadingChecked] = useState<Record<string, boolean>>({});
 
@@ -477,13 +681,50 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     }
   }, [initialTab]);
 
-  // Sync exam selection from profile
+  // Sync initialPracticeSkill prop changes
   useEffect(() => {
-    const preferred = profile?.exam?.examType || profile?.university?.graduationExam;
-    if (preferred) {
-      setSelectedExam(preferred);
+    if (initialPracticeSkill) {
+      setPracticeSkill(initialPracticeSkill);
     }
-  }, [profile?.exam?.examType, profile?.university?.graduationExam]);
+  }, [initialPracticeSkill]);
+
+  // Sync initialRubricTask prop changes
+  useEffect(() => {
+    if (initialRubricTask) {
+      setRubricMode(initialRubricTask.mode);
+      if (initialRubricTask.taskId) {
+        setRubricTaskId(initialRubricTask.taskId);
+      }
+      setOfflineEvaluation(null);
+      setAiEvaluation(null);
+      setAiGradingError(null);
+    }
+  }, [initialRubricTask?.mode, initialRubricTask?.taskId]);
+
+  // Sync exam selection & diagnostic summary from examPreferences
+  useEffect(() => {
+    const syncPrefs = () => {
+      const ex = getPreferredExam(profile);
+      setSelectedExam(ex);
+      setTargetScoreState(getExamTargetScore(ex, profile));
+      setDiagSummary(getExamDiagnosticSummary(ex));
+    };
+    syncPrefs();
+    window.addEventListener(EXAM_PREF_EVENT, syncPrefs);
+    return () => window.removeEventListener(EXAM_PREF_EVENT, syncPrefs);
+  }, [profile?.exam?.examType, profile?.exam?.targetScore, profile?.university?.graduationExam]);
+
+  const handleSelectExam = (nextExam: ExamType) => {
+    setSelectedExam(nextExam);
+    setPreferredExam(nextExam);
+    setTargetScoreState(getExamTargetScore(nextExam, profile));
+    setDiagSummary(getExamDiagnosticSummary(nextExam));
+  };
+
+  const handleSelectTargetScore = (nextTarget: string) => {
+    setTargetScoreState(nextTarget);
+    setExamTargetScore(selectedExam, nextTarget);
+  };
 
   // Cleanup speech synthesis & mic on unmount
   useEffect(() => {
@@ -509,10 +750,12 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     setIsRecordingSpeech(false);
     setStrategySkillFilter('ALL');
     setListeningIdx(0);
-    setShowListeningTranscript(false);
+    setShowListeningTranscript(true);
     setShowListeningSummary(false);
+    setShowListeningQuiz(false);
     setReadingIdx(0);
     setShowReadingSummary(false);
+    setShowReadingQuiz(false);
     setWritingIdx(0);
     setShowWritingModel(false);
     setSpeakingIdx(0);
@@ -578,50 +821,31 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     profile?.exam?.examType === selectedExam ||
     (!profile?.exam?.examType && profile?.university?.graduationExam === selectedExam);
 
-  const activeTargetScore = isUsersPrimaryExam && profile?.exam?.targetScore
-    ? profile.exam.targetScore
-    : examMeta.defaultScore;
+  const activeTargetScore = targetScoreState || examMeta.defaultScore;
 
   const countdown = isUsersPrimaryExam ? computeDaysUntilExam(profile?.exam?.examDate) : null;
 
-  // Diagnostic computed values
-  const diagAnswers = diagAnswersByExam[selectedExam] || {};
-  const diagSubmitted = Boolean(diagSubmittedByExam[selectedExam]);
-  const diagCorrectCount = useMemo(
-    () =>
-      examData.diagnosticQuestions.reduce(
-        (acc, q) => (diagAnswers[q.id] === q.correctIdx ? acc + 1 : acc),
-        0
-      ),
-    [examData.diagnosticQuestions, diagAnswers]
-  );
-  const diagEstimation = useMemo(
-    () => estimateExamScore(selectedExam, diagCorrectCount, examData.diagnosticQuestions.length),
-    [selectedExam, diagCorrectCount, examData.diagnosticQuestions.length]
+  const savedWordSet = useMemo(
+    () => new Set(savedWords.map((w) => w.word.trim().toLowerCase())),
+    [savedWords]
   );
 
-  const handleSelectDiagOption = (qId: string, optIdx: number) => {
-    if (diagSubmitted) return;
-    setDiagAnswersByExam((prev) => ({
-      ...prev,
-      [selectedExam]: {
-        ...(prev[selectedExam] || {}),
-        [qId]: optIdx,
-      },
-    }));
-  };
-
-  const handleSubmitDiagnostic = () => {
-    setDiagSubmittedByExam((prev) => ({ ...prev, [selectedExam]: true }));
-    if (!diagXpAwarded[selectedExam]) {
-      setDiagXpAwarded((prev) => ({ ...prev, [selectedExam]: true }));
-      onAddXp(25);
-    }
-  };
-
-  const handleResetDiagnostic = () => {
-    setDiagAnswersByExam((prev) => ({ ...prev, [selectedExam]: {} }));
-    setDiagSubmittedByExam((prev) => ({ ...prev, [selectedExam]: false }));
+  const handleSaveExamPhrase = (opts: {
+    phrase: string;
+    meaningVi: string;
+    level?: CefrLevel;
+    note?: string;
+  }) => {
+    if (!onSaveWord) return;
+    onSaveWord(
+      buildExamWordEntry({
+        phrase: opts.phrase,
+        meaningVi: opts.meaningVi,
+        examType: selectedExam,
+        level: opts.level,
+        note: opts.note,
+      })
+    );
   };
 
   // Strategies filtered
@@ -635,14 +859,51 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     return examData.sections.filter((s) => s.skill === strategySkillFilter);
   }, [examData.sections, strategySkillFilter]);
 
-  // Practice current items
-  const listeningTracks = examData.skillPractice.listening;
+  // Practice current items (expanded with rich learning lessons from repo banks)
+  const allListeningTracks = useMemo(
+    () => getExpandedListeningLessons(selectedExam, examData.skillPractice.listening),
+    [selectedExam, examData.skillPractice.listening]
+  );
+  const allReadingPassages = useMemo(
+    () => getExpandedReadingLessons(selectedExam, examData.skillPractice.reading),
+    [selectedExam, examData.skillPractice.reading]
+  );
+  const allWritingTasks = useMemo(
+    () => getExpandedWritingLessons(selectedExam, examData.skillPractice.writing),
+    [selectedExam, examData.skillPractice.writing]
+  );
+  const allSpeakingTasks = useMemo(
+    () => getExpandedSpeakingLessons(selectedExam, examData.skillPractice.speaking),
+    [selectedExam, examData.skillPractice.speaking]
+  );
+
+  const filterBySourceGroup = <T extends { sourceGroup?: 'exam-format' | 'foundation' }>(
+    list: T[]
+  ): T[] => {
+    if (lessonSourceFilter === 'all') return list;
+    return list.filter((it) => (it.sourceGroup || 'exam-format') === lessonSourceFilter);
+  };
+
+  const listeningTracks = useMemo(
+    () => filterBySourceGroup(allListeningTracks),
+    [allListeningTracks, lessonSourceFilter]
+  );
+  const readingPassages = useMemo(
+    () => filterBySourceGroup(allReadingPassages),
+    [allReadingPassages, lessonSourceFilter]
+  );
+  const writingTasks = useMemo(
+    () => filterBySourceGroup(allWritingTasks),
+    [allWritingTasks, lessonSourceFilter]
+  );
+  const speakingTasks = useMemo(
+    () => filterBySourceGroup(allSpeakingTasks),
+    [allSpeakingTasks, lessonSourceFilter]
+  );
+
   const currentListening = listeningTracks[listeningIdx % Math.max(1, listeningTracks.length)];
-  const readingPassages = examData.skillPractice.reading;
   const currentReading = readingPassages[readingIdx % Math.max(1, readingPassages.length)];
-  const writingTasks = examData.skillPractice.writing;
   const currentWriting = writingTasks[writingIdx % Math.max(1, writingTasks.length)];
-  const speakingTasks = examData.skillPractice.speaking;
   const currentSpeaking = speakingTasks[speakingIdx % Math.max(1, speakingTasks.length)];
 
   const handleCheckListeningSet = () => {
@@ -664,6 +925,10 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   };
 
   const jumpToRubricWithTask = (mode: 'writing' | 'speaking', taskId: string) => {
+    if (hideHeaderNav && onNavigate) {
+      onNavigate({ tab: 'practice', stepCode: 'rubric', sub: `${mode}:${taskId}` });
+      return;
+    }
     setRubricMode(mode);
     setRubricTaskId(taskId);
     setRubricDraftText('');
@@ -671,6 +936,14 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
     setAiEvaluation(null);
     setAiGradingError(null);
     setActiveTab('rubric');
+  };
+
+  const handleSourceFilterChange = (next: 'all' | 'exam-format' | 'foundation') => {
+    setLessonSourceFilter(next);
+    setListeningIdx(0);
+    setReadingIdx(0);
+    setWritingIdx(0);
+    setSpeakingIdx(0);
   };
 
   // Mock Test handlers
@@ -742,17 +1015,17 @@ export const ExamPrepCenter: React.FC<ExamPrepCenterProps> = ({
   const activeRubricWritingTask: ExamWritingTask | undefined = useMemo(
     () =>
       rubricMode === 'writing'
-        ? writingTasks.find((t) => t.id === rubricTaskId) || writingTasks[0]
+        ? allWritingTasks.find((t) => t.id === rubricTaskId) || allWritingTasks[0]
         : undefined,
-    [rubricMode, rubricTaskId, writingTasks]
+    [rubricMode, rubricTaskId, allWritingTasks]
   );
 
   const activeRubricSpeakingTask: ExamSpeakingTask | undefined = useMemo(
     () =>
       rubricMode === 'speaking'
-        ? speakingTasks.find((t) => t.id === rubricTaskId) || speakingTasks[0]
+        ? allSpeakingTasks.find((t) => t.id === rubricTaskId) || allSpeakingTasks[0]
         : undefined,
-    [rubricMode, rubricTaskId, speakingTasks]
+    [rubricMode, rubricTaskId, allSpeakingTasks]
   );
 
   const isCustomRubricPrompt = rubricTaskId === 'custom';
@@ -914,8 +1187,11 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
     [rubricDraftText]
   );
 
+  const currentTab: ExamCenterTab =
+    hideHeaderNav && initialTab ? initialTab : activeTab;
+
   const tabsConfig: { id: ExamCenterTab; icon: string; label: string }[] = [
-    { id: 'diagnostic', icon: '🎯', label: 'Chẩn Đoán & Format' },
+    { id: 'diagnostic', icon: '🗺️', label: 'Bản đồ đề & Tiêu chí' },
     { id: 'strategies', icon: '🧭', label: 'Chiến Thuật & Bẫy' },
     { id: 'practice', icon: '📝', label: 'Luyện 4 Kỹ Năng' },
     { id: 'mock', icon: '⏱️', label: 'Thi Thử Bấm Giờ' },
@@ -923,7 +1199,65 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      {hideHeaderNav ? (
+        !hideExamBar && (
+          /* Clean Mobile-First Exam Profile Bar (all learners can switch exam & target) */
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <img
+                src={EXAM_IMAGE_MAP[selectedExam] || '/img/art/exam-ielts.webp'}
+                alt={examData.title}
+                className="w-8 h-8 rounded-lg bg-slate-50 p-0.5 object-contain shrink-0"
+              />
+              <select
+                value={selectedExam}
+                onChange={(e) => handleSelectExam(e.target.value as ExamType)}
+                aria-label="Chọn kỳ thi chứng chỉ"
+                className="min-h-[40px] px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs sm:text-sm font-extrabold text-rose-700 dark:text-rose-300 outline-none cursor-pointer"
+              >
+                {EXAM_ORDER.map((exId) => (
+                  <option key={exId} value={exId}>
+                    {getExamMeta(exId).shortLabel}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={activeTargetScore}
+                onChange={(e) => handleSelectTargetScore(e.target.value)}
+                aria-label="Chọn mục tiêu điểm"
+                className="min-h-[38px] px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-extrabold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+              >
+                {Array.from(
+                  new Set([activeTargetScore, ...(EXAM_TARGET_PRESETS[selectedExam] || [])])
+                ).map((sc) => (
+                  <option key={sc} value={sc}>
+                    Mục tiêu {sc}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {currentTab === 'diagnostic' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {diagSummary && (
+                  <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold">
+                    Chẩn đoán: {diagSummary.estimatedScore} ({diagSummary.cefr})
+                  </span>
+                )}
+                {countdown && (
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 inline-flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {countdown.daysLeft >= 0 ? `Còn ${countdown.daysLeft} ngày` : countdown.formattedDate}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      ) : (
+      <>
       {/* Top Hero & Target Goal Banner */}
       <div className="bg-gradient-to-br from-rose-600 via-pink-600 to-indigo-700 text-white rounded-3xl p-5 sm:p-6 shadow-lg">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1042,284 +1376,139 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
           );
         })}
       </div>
+      </>
+      )}
 
-      {/* ================= TAB 1: DIAGNOSTIC & FORMAT OVERVIEW ================= */}
-      {activeTab === 'diagnostic' && (
-        <div className="space-y-5">
-          {/* Format Quick Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
-              <div className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-rose-500" /> Tổng thời lượng thi
+      {/* ================= TAB 1: EXAM BLUEPRINT, CEFR & RUBRIC CRITERIA (E1) ================= */}
+      {currentTab === 'diagnostic' && (
+        <div className="space-y-4">
+          {/* Compact Overview Strip + Section Switch */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>
+                  ⏱️ <strong className="text-slate-900 dark:text-white">{examData.totalDurationText}</strong>
+                </span>
+                <span>
+                  📊 <strong className="text-slate-900 dark:text-white">{examData.scoreScale}</strong>
+                </span>
               </div>
-              <div className="text-sm font-extrabold text-slate-900 dark:text-white mt-1.5">
-                {examData.totalDurationText}
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  onNavigate
+                    ? onNavigate({ tab: 'learn', stepCode: 'E3' })
+                    : setActiveTab('practice')
+                }
+                className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-extrabold inline-flex items-center gap-1 shrink-0"
+              >
+                Vào học 4 kỹ năng (E3) <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
-              <div className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
-                <BarChart3 className="w-3.5 h-3.5 text-indigo-500" /> Thang điểm chính thức
-              </div>
-              <div className="text-sm font-extrabold text-slate-900 dark:text-white mt-1.5">
-                {examData.scoreScale}
-              </div>
-            </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between gap-2">
-              <div className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
-                <Compass className="w-3.5 h-3.5 text-emerald-500" /> Điều hướng nhanh
-              </div>
-              <div className="flex flex-wrap gap-2">
+
+            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {(
+                [
+                  { id: 'blueprint', label: `Cấu trúc đề (${examData.sections.length} phần)` },
+                  { id: 'scoring', label: 'Thang điểm CEFR & Tiêu chí chấm' },
+                ] as const
+              ).map((tb) => (
                 <button
+                  key={tb.id}
                   type="button"
-                  onClick={() => setActiveTab('strategies')}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200"
+                  onClick={() => setE1Section(tb.id)}
+                  className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition ${
+                    e1Section === tb.id
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
                 >
-                  Xem {examData.sections.length} phần thi →
+                  {tb.label}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('mock')}
-                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-[11px] font-bold text-rose-700 dark:text-rose-300"
-                >
-                  Thi thử 12 câu →
-                </button>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Diagnostic Assessment */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <Target className="w-5 h-5 text-rose-600" />
-                  Bài Test Chẩn Đoán Đầu Vào ({examData.diagnosticQuestions.length} câu chuẩn format {examMeta.shortLabel})
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Hoàn thành bài kiểm tra ngắn gồm Nghe, Đọc, Từ vựng & Ngữ pháp để ước lượng band/điểm hiện tại so với mục tiêu {activeTargetScore}.
-                </p>
-              </div>
+          {e1Section === 'blueprint' && (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3">
+            <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <Target className="w-5 h-5 text-rose-600" />
+              Sơ đồ cấu trúc đề thi {examMeta.shortLabel}
+            </h3>
 
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-500">Tốc độ Audio:</span>
-                {[0.85, 1.0, 1.15].map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setTtsRate(r)}
-                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border ${
-                      ttsRate === r
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {r}x
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Diagnostic Result Banner */}
-            {diagSubmitted && (
-              <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-50 via-rose-50 to-amber-50 dark:from-indigo-950/40 dark:via-rose-950/30 dark:to-amber-950/30 border border-indigo-200 dark:border-indigo-800 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <div className="text-xs font-extrabold uppercase text-indigo-700 dark:text-indigo-300">
-                      Kết quả ước lượng hiện tại
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">
-                      {diagEstimation.estimatedScore}{' '}
-                      <span className="text-sm font-bold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white ml-1">
-                        CEFR {diagEstimation.cefr}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <div className="text-xs text-slate-600 dark:text-slate-300">
-                      Độ chính xác: <strong>{diagCorrectCount}/{examData.diagnosticQuestions.length} câu ({diagEstimation.accuracyPercent}%)</strong>
-                    </div>
-                    <div className="text-xs text-rose-700 dark:text-rose-300 font-bold mt-0.5">
-                      Mục tiêu của bạn: {activeTargetScore}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
-                  {diagEstimation.commentVi}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleResetDiagnostic}
-                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5 hover:bg-slate-50"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" /> Làm lại Test Chẩn Đoán
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('practice')}
-                    className="px-3.5 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold inline-flex items-center gap-1.5 hover:bg-rose-700"
-                  >
-                    Luyện tập khắc phục điểm yếu →
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Questions List */}
-            <div className="space-y-4">
-              {examData.diagnosticQuestions.map((q, idx) => {
-                const chosen = diagAnswers[q.id];
-                const isCorrect = chosen === q.correctIdx;
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {examData.sections.map((sec) => {
+                const skillSlug = sec.skill.toLowerCase();
+                const isFourSkill =
+                  skillSlug === 'listening' ||
+                  skillSlug === 'reading' ||
+                  skillSlug === 'writing' ||
+                  skillSlug === 'speaking';
                 return (
                   <div
-                    key={q.id}
-                    className={`p-4 rounded-2xl border transition ${
-                      diagSubmitted
-                        ? isCorrect
-                          ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20'
-                          : 'border-rose-300 bg-rose-50/50 dark:border-rose-800 dark:bg-rose-950/20'
-                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'
-                    }`}
+                    key={sec.id}
+                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex flex-col justify-between gap-3"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-lg bg-slate-900 dark:bg-slate-700 text-white text-[11px] font-extrabold">
-                          Câu {idx + 1}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-extrabold">
+                          {sec.skill}
                         </span>
-                        <span className="px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold">
-                          {q.partLabel}
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                          ⏱️ {sec.duration}
                         </span>
                       </div>
-                      {diagSubmitted && (
-                        <span
-                          className={`text-xs font-extrabold inline-flex items-center gap-1 ${
-                            isCorrect ? 'text-emerald-600' : 'text-rose-600'
-                          }`}
+                      <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                        {sec.partName}
+                      </h4>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 font-semibold">
+                        {sec.tasksOrQuestions}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/70 dark:border-slate-700/70">
+                      {isFourSkill ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sk = skillSlug as PracticeSkill;
+                            setPracticeSkill(sk);
+                            if (onNavigate) {
+                              onNavigate({ tab: 'learn', stepCode: 'E3', sub: sk });
+                            } else {
+                              setActiveTab('practice');
+                            }
+                          }}
+                          className="min-h-[36px] px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-extrabold text-indigo-700 dark:text-indigo-300"
                         >
-                          {isCorrect ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4" /> Chính xác
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="w-4 h-4" /> Chưa đúng
-                            </>
-                          )}
-                        </span>
+                          Bài học {sec.skill} →
+                        </button>
+                      ) : (
+                        onNavigate && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onNavigate({ tab: 'learn', stepCode: 'E6', sub: 'grammar' })
+                            }
+                            className="min-h-[36px] px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-xs font-extrabold text-indigo-700 dark:text-indigo-300"
+                          >
+                            Ngữ pháp trọng tâm →
+                          </button>
+                        )
                       )}
                     </div>
-
-                    {q.audioScript && (
-                      <div className="mb-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200">
-                          <Headphones className="w-4 h-4 text-rose-600" />
-                          <span>Nghe đoạn audio mô phỏng ({ttsRate}x)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => speakText(q.audioScript!, accent, ttsRate)}
-                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-1.5"
-                          >
-                            <Play className="w-3.5 h-3.5" /> Nghe câu {idx + 1}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={stopAllAudio}
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold inline-flex items-center gap-1"
-                          >
-                            <Square className="w-3 h-3" /> Dừng
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {q.passage && (
-                      <div className="mb-3 p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line">
-                        {q.passage}
-                      </div>
-                    )}
-
-                    <p className="text-sm font-bold text-slate-900 dark:text-white mb-3">{q.question}</p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {q.options.map((opt, optIdx) => {
-                        const isPicked = chosen === optIdx;
-                        const isRightOpt = q.correctIdx === optIdx;
-                        let styleClass =
-                          'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-rose-400';
-                        if (!diagSubmitted && isPicked) {
-                          styleClass =
-                            'border-rose-600 bg-rose-50 dark:bg-rose-950/50 text-rose-900 dark:text-rose-200';
-                        } else if (diagSubmitted) {
-                          if (isRightOpt) {
-                            styleClass =
-                              'border-emerald-600 bg-emerald-100/70 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200';
-                          } else if (isPicked && !isRightOpt) {
-                            styleClass =
-                              'border-rose-600 bg-rose-100/70 dark:bg-rose-950/50 text-rose-900 dark:text-rose-200';
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={optIdx}
-                            type="button"
-                            disabled={diagSubmitted}
-                            onClick={() => handleSelectDiagOption(q.id, optIdx)}
-                            className={`p-3 rounded-xl border-2 text-left text-xs font-semibold transition flex items-start gap-2 ${styleClass}`}
-                          >
-                            <span className="font-black shrink-0">{String.fromCharCode(65 + optIdx)}.</span>
-                            <span>{opt}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {diagSubmitted && (
-                      <div className="mt-3 pt-3 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2 text-xs">
-                        {q.audioScript && (
-                          <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-900/70 text-slate-600 dark:text-slate-300 italic">
-                            <strong>Transcript:</strong> {q.audioScript}
-                          </div>
-                        )}
-                        <div className="text-slate-700 dark:text-slate-200 leading-relaxed">
-                          <strong className="text-indigo-600 dark:text-indigo-400">Giải thích:</strong>{' '}
-                          {q.explanation}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
-
-            {!diagSubmitted && (
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <span className="text-xs font-bold text-slate-500">
-                  Đã trả lời {Object.keys(diagAnswers).length}/{examData.diagnosticQuestions.length} câu
-                </span>
-                <button
-                  type="button"
-                  onClick={handleSubmitDiagnostic}
-                  disabled={Object.keys(diagAnswers).length === 0}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs sm:text-sm font-extrabold shadow-sm"
-                >
-                  Nộp Bài Chẩn Đoán & Ước Lượng Điểm
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+          )}
 
-      {/* ================= TAB 2: STRATEGIES & TRAPS ================= */}
-      {activeTab === 'strategies' && (
-        <div className="space-y-5">
+          {e1Section === 'scoring' && (
+          <>
           {/* CEFR Equivalence Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
-            <h3 className="text-base font-black text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3">
+            <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-indigo-600" />
               Bảng Quy Đổi Điểm {examMeta.shortLabel} Sang Khung CEFR (A2 – C1)
             </h3>
@@ -1345,6 +1534,102 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
             </div>
           </div>
 
+          {/* Rubric Reference Guide (Learn what examiners grade) */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-500" />
+                  Tiêu chí giám khảo chấm điểm ({examMeta.shortLabel})
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Hiểu rõ cách tính điểm Writing & Speaking để luyện đúng trọng tâm.
+                </p>
+              </div>
+              <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 gap-1">
+                {(
+                  [
+                    { id: 'writing', label: 'Writing' },
+                    { id: 'speaking', label: 'Speaking' },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setRubricFilterTab(t.id)}
+                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-extrabold transition ${
+                      rubricFilterTab === t.id
+                        ? 'bg-white dark:bg-slate-900 text-rose-600 shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {examData.rubricCriteria
+                .filter((c) => c.appliesTo === rubricFilterTab || c.appliesTo === 'both')
+                .map((crit) => (
+                  <div
+                    key={crit.id}
+                    className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-black text-slate-900 dark:text-white">
+                          {crit.name}
+                        </div>
+                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                          {crit.nameVi}
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-extrabold">
+                        {crit.weightText}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {crit.description}
+                    </p>
+                    <ul className="space-y-1 text-xs text-emerald-700 dark:text-emerald-300 list-disc pl-4">
+                      {crit.highScoreBenchmarks.map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+            </div>
+          </div>
+          </>
+          )}
+
+          {/* Compact link to Diagnostic Test inside Bài tập */}
+          <div className="px-4 py-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+              {diagSummary
+                ? `Band chẩn đoán gần nhất: ${diagSummary.estimatedScore} (${diagSummary.cefr}) · Đúng ${diagSummary.accuracyPercent}%`
+                : `Muốn đo trình độ ${examMeta.shortLabel} hiện tại? Làm Test Chẩn đoán ${examData.diagnosticQuestions.length} câu bên Bài tập.`}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                onNavigate
+                  ? onNavigate({ tab: 'practice', stepCode: 'diagnostic' })
+                  : setActiveTab('mock')
+              }
+              className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold shrink-0"
+            >
+              {diagSummary ? 'Làm lại Test chẩn đoán' : 'Làm Test chẩn đoán →'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= TAB 2: STRATEGIES & TRAPS (E2) ================= */}
+      {currentTab === 'strategies' && (
+        <div className="space-y-5">
           {/* Skill Filter */}
           <div className="flex flex-wrap items-center gap-2">
             {availableStrategySkills.map((sk) => (
@@ -1352,7 +1637,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                 key={sk}
                 type="button"
                 onClick={() => setStrategySkillFilter(sk)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition ${
+                className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-bold border transition ${
                   strategySkillFilter === sk
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800'
@@ -1365,66 +1650,137 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
 
           {/* Section Strategy Cards */}
           <div className="space-y-4">
-            {filteredSections.map((sec) => (
-              <div
-                key={sec.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-[11px] font-extrabold uppercase">
-                      {sec.skill}
+            {filteredSections.map((sec) => {
+              const skLower = sec.skill.toLowerCase();
+              const isFourSkill =
+                skLower === 'listening' ||
+                skLower === 'reading' ||
+                skLower === 'writing' ||
+                skLower === 'speaking';
+              const practiceStepSub =
+                skLower === 'listening' || skLower === 'reading'
+                  ? skLower
+                  : skLower === 'use of english'
+                  ? 'grammar'
+                  : undefined;
+
+              return (
+                <div
+                  key={sec.id}
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-extrabold uppercase">
+                        {sec.skill}
+                      </span>
+                      <h4 className="text-base font-black text-slate-900 dark:text-white mt-1">
+                        {sec.partName}
+                      </h4>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 text-left sm:text-right">
+                      <div className="font-bold text-slate-700 dark:text-slate-200">⏱️ {sec.duration}</div>
+                      <div>{sec.tasksOrQuestions}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 space-y-2.5">
+                      <div className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Quy trình & Chiến thuật làm bài
+                      </div>
+                      <ol className="space-y-2 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+                        {sec.strategies.map((st, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[11px] font-black shrink-0 mt-0.5">
+                              B{i + 1}
+                            </span>
+                            <span>{st}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 space-y-2.5">
+                      <div className="text-xs font-extrabold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                        <ShieldAlert className="w-4 h-4" /> Bẫy thường gặp & Cách né
+                      </div>
+                      <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-200 leading-relaxed list-disc pl-4">
+                        {sec.commonTraps.map((trap, i) => (
+                          <li key={i}>{trap}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Direct Action Bar: Apply immediately */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      Áp dụng ngay chiến thuật phần {sec.skill}:
                     </span>
-                    <h4 className="text-base font-black text-slate-900 dark:text-white mt-1">
-                      {sec.partName}
-                    </h4>
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 text-left sm:text-right">
-                    <div className="font-bold text-slate-700 dark:text-slate-200">⏱️ {sec.duration}</div>
-                    <div>{sec.tasksOrQuestions}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {isFourSkill && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sk = skLower as PracticeSkill;
+                            setPracticeSkill(sk);
+                            if (onNavigate) {
+                              onNavigate({ tab: 'learn', stepCode: 'E3', sub: sk });
+                            } else {
+                              setActiveTab('practice');
+                            }
+                          }}
+                          className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" /> Học bài mẫu {sec.skill} (E3)
+                        </button>
+                      )}
+                      {onNavigate && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (skLower === 'writing' || skLower === 'speaking') {
+                              onNavigate({ tab: 'practice', stepCode: 'rubric', sub: skLower });
+                            } else if (practiceStepSub === 'grammar') {
+                              onNavigate({ tab: 'practice', stepCode: 'skills', sub: 'grammar' });
+                            } else {
+                              onNavigate({
+                                tab: 'practice',
+                                stepCode: 'skills',
+                                sub: practiceStepSub,
+                              });
+                            }
+                          }}
+                          className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-extrabold inline-flex items-center gap-1.5"
+                        >
+                          <span>
+                            {skLower === 'writing' || skLower === 'speaking'
+                              ? `Thực hành & Chấm Rubric ${sec.skill} →`
+                              : 'Làm bài tập áp dụng →'}
+                          </span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 space-y-2">
-                    <div className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" /> Chiến thuật làm bài tối ưu
-                    </div>
-                    <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-200 leading-relaxed list-disc pl-4">
-                      {sec.strategies.map((st, i) => (
-                        <li key={i}>{st}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 space-y-2">
-                    <div className="text-xs font-extrabold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                      <ShieldAlert className="w-4 h-4" /> Bẫy thường gặp & Cách né
-                    </div>
-                    <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-200 leading-relaxed list-disc pl-4">
-                      {sec.commonTraps.map((trap, i) => (
-                        <li key={i}>{trap}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* ================= TAB 3: 4-SKILL PRACTICE ================= */}
-      {activeTab === 'practice' && (
+      {currentTab === 'practice' && (
         <div className="space-y-4">
-          {/* 4-Skill Sub-Tabs */}
-          <div className="flex flex-wrap gap-2">
+          {/* Single sleek 4-Skill Sub-Tab Row */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
             {(
               [
-                { id: 'listening', label: 'Listening (Nghe TTS)', icon: Headphones },
-                { id: 'reading', label: 'Reading (Đọc hiểu)', icon: BookOpen },
-                { id: 'writing', label: 'Writing (Đề & Bài mẫu)', icon: PenTool },
-                { id: 'speaking', label: 'Speaking (Mẫu & Từ vựng)', icon: Mic },
+                { id: 'listening', label: `Listening (${listeningTracks.length})`, icon: Headphones },
+                { id: 'reading', label: `Reading (${readingPassages.length})`, icon: BookOpen },
+                { id: 'writing', label: `Writing (${writingTasks.length})`, icon: PenTool },
+                { id: 'speaking', label: `Speaking (${speakingTasks.length})`, icon: Mic },
               ] as const
             ).map((sk) => {
               const Icon = sk.icon;
@@ -1434,7 +1790,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                   key={sk.id}
                   type="button"
                   onClick={() => setPracticeSkill(sk.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-extrabold border inline-flex items-center gap-1.5 transition ${
+                  className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-extrabold border inline-flex items-center gap-1.5 shrink-0 transition ${
                     active
                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                       : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-indigo-400'
@@ -1449,33 +1805,24 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
 
           {/* 3A: LISTENING */}
           {practiceSkill === 'listening' && currentListening && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {listeningTracks.map((tr, idx) => (
-                    <button
-                      key={tr.id}
-                      type="button"
-                      onClick={() => {
-                        stopAllAudio();
-                        setListeningIdx(idx);
-                        setShowListeningTranscript(false);
-                        setShowListeningSummary(false);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
-                        idx === listeningIdx
-                          ? 'bg-rose-600 text-white border-rose-600'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      Bài {idx + 1}: {tr.partLabel}
-                    </button>
-                  ))}
-                </div>
-                <span className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-black">
-                  Level {currentListening.level}
-                </span>
-              </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
+              <SkillLessonPicker
+                items={listeningTracks.map((tr) => ({
+                  id: tr.id,
+                  title: tr.title,
+                  tag: `${tr.partLabel} · ${tr.level}`,
+                }))}
+                activeIdx={listeningIdx}
+                onSelect={(idx) => {
+                  stopAllAudio();
+                  setListeningIdx(idx);
+                  setShowListeningQuiz(false);
+                }}
+                unitLabel="bài nghe"
+                sourceFilter={lessonSourceFilter}
+                onSourceFilterChange={handleSourceFilterChange}
+                examShortLabel={examMeta.shortLabel}
+              />
 
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
                 <div>
@@ -1547,13 +1894,90 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                 )}
 
                 {showListeningSummary && (
-                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200">
-                    <strong>Tóm tắt:</strong> {currentListening.viSummary}
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs sm:text-sm text-amber-900 dark:text-amber-200 leading-relaxed">
+                    <strong>Bản dịch / Tóm tắt:</strong> {currentListening.viSummary}
+                  </div>
+                )}
+
+                {currentListening.keyPhrases && currentListening.keyPhrases.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                    <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                      💎 Cụm từ cần học trong bài (bấm loa nghe hoặc lưu SRS):
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {currentListening.keyPhrases.map((kp, ki) => {
+                        const saved = savedWordSet.has(kp.en.trim().toLowerCase());
+                        return (
+                          <div
+                            key={ki}
+                            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs inline-flex items-center gap-2"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => speakText(kp.en, accent, 0.9)}
+                              className="inline-flex items-center gap-1.5 text-left hover:text-indigo-600 transition"
+                            >
+                              <Volume2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                              <span>
+                                <strong className="text-slate-900 dark:text-white">{kp.en}</strong>
+                                <span className="text-slate-500 dark:text-slate-400"> — {kp.vi}</span>
+                              </span>
+                            </button>
+                            {onSaveWord && (
+                              <button
+                                type="button"
+                                disabled={saved}
+                                onClick={() =>
+                                  handleSaveExamPhrase({
+                                    phrase: kp.en,
+                                    meaningVi: kp.vi,
+                                    level: currentListening.level,
+                                    note: currentListening.title,
+                                  })
+                                }
+                                title={saved ? 'Đã lưu vào Sổ từ SRS' : 'Lưu vào Sổ từ SRS'}
+                                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0 ${
+                                  saved
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
+                                }`}
+                              >
+                                {saved ? (
+                                  <>
+                                    <BookmarkCheck className="w-3 h-3" /> Đã lưu
+                                  </>
+                                ) : (
+                                  <>
+                                    <BookmarkPlus className="w-3 h-3" /> Lưu
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Listening Questions */}
+              {/* Optional quick comprehension check (collapsed by default so learner focuses on learning) */}
+              {currentListening.questions.length > 0 && (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowListeningQuiz((v) => !v)}
+                    className="min-h-[42px] px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold inline-flex items-center gap-2"
+                  >
+                    <ListChecks className="w-4 h-4" />
+                    <span>
+                      {showListeningQuiz
+                        ? 'Ẩn câu hỏi kiểm tra hiểu bài'
+                        : `Kiểm tra nhanh đã hiểu bài (${currentListening.questions.length} câu)`}
+                    </span>
+                  </button>
+
+                  {showListeningQuiz && (
               <div className="space-y-4">
                 {currentListening.questions.map((q, qIdx) => {
                   const chosen = listeningAnswers[q.id];
@@ -1626,40 +2050,35 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                   </button>
                 </div>
               </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* 3B: READING */}
           {practiceSkill === 'reading' && currentReading && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {readingPassages.map((rd, idx) => (
-                    <button
-                      key={rd.id}
-                      type="button"
-                      onClick={() => {
-                        setReadingIdx(idx);
-                        setShowReadingSummary(false);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
-                        idx === readingIdx
-                          ? 'bg-rose-600 text-white border-rose-600'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      Bài đọc {idx + 1}: {rd.partLabel}
-                    </button>
-                  ))}
-                </div>
-                <span className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-black">
-                  Level {currentReading.level}
-                </span>
-              </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
+              <SkillLessonPicker
+                items={readingPassages.map((rd) => ({
+                  id: rd.id,
+                  title: rd.title,
+                  tag: `${rd.partLabel} · ${rd.level}`,
+                }))}
+                activeIdx={readingIdx}
+                onSelect={(idx) => {
+                  setReadingIdx(idx);
+                  setShowReadingQuiz(false);
+                }}
+                unitLabel="bài đọc"
+                sourceFilter={lessonSourceFilter}
+                onSourceFilterChange={handleSourceFilterChange}
+                examShortLabel={examMeta.shortLabel}
+              />
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Passage Column */}
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-3 lg:max-h-[540px] lg:overflow-y-auto">
+              <div className="space-y-4">
+                {/* Passage & Key Vocab Learning Area */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="text-base font-black text-slate-900 dark:text-white">
                       {currentReading.title}
@@ -1667,30 +2086,109 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                     <button
                       type="button"
                       onClick={() => speakText(currentReading.passage, accent, ttsRate)}
-                      className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-indigo-600 hover:bg-indigo-50"
+                      className="min-h-[38px] px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-indigo-600 text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 hover:bg-indigo-50"
                       title="Đọc to đoạn văn"
                     >
-                      <Volume2 className="w-4 h-4" />
+                      <Volume2 className="w-4 h-4" /> Nghe đọc
                     </button>
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line">
+                  <div className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line">
                     {currentReading.passage}
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowReadingSummary((v) => !v)}
-                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 underline"
+                    className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 underline"
                   >
-                    {showReadingSummary ? 'Ẩn tóm tắt tiếng Việt' : 'Xem tóm tắt ý chính tiếng Việt'}
+                    {showReadingSummary ? 'Ẩn bản dịch / tóm tắt tiếng Việt' : 'Xem bản dịch / tóm tắt tiếng Việt'}
                   </button>
                   {showReadingSummary && (
-                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200">
+                    <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs sm:text-sm text-amber-900 dark:text-amber-200 leading-relaxed">
                       {currentReading.viSummary}
+                    </div>
+                  )}
+
+                  {currentReading.keyPhrases && currentReading.keyPhrases.length > 0 && (
+                    <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                      <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                        💎 Từ khóa & Thuật ngữ cần học (bấm loa nghe hoặc lưu SRS):
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {currentReading.keyPhrases.map((kp, ki) => {
+                          const saved = savedWordSet.has(kp.en.trim().toLowerCase());
+                          return (
+                            <div
+                              key={ki}
+                              className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs inline-flex items-center gap-2"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => speakText(kp.en, accent, 0.9)}
+                                className="inline-flex items-center gap-1.5 text-left hover:text-indigo-600 transition"
+                              >
+                                <Volume2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <span>
+                                  <strong className="text-slate-900 dark:text-white">{kp.en}</strong>
+                                  {kp.vi !== 'Thuật ngữ trọng tâm' && (
+                                    <span className="text-slate-500 dark:text-slate-400"> — {kp.vi}</span>
+                                  )}
+                                </span>
+                              </button>
+                              {onSaveWord && (
+                                <button
+                                  type="button"
+                                  disabled={saved}
+                                  onClick={() =>
+                                    handleSaveExamPhrase({
+                                      phrase: kp.en,
+                                      meaningVi: kp.vi,
+                                      level: currentReading.level,
+                                      note: currentReading.title,
+                                    })
+                                  }
+                                  title={saved ? 'Đã lưu vào Sổ từ SRS' : 'Lưu vào Sổ từ SRS'}
+                                  className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0 ${
+                                    saved
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
+                                  }`}
+                                >
+                                  {saved ? (
+                                    <>
+                                      <BookmarkCheck className="w-3 h-3" /> Đã lưu
+                                    </>
+                                  ) : (
+                                    <>
+                                      <BookmarkPlus className="w-3 h-3" /> Lưu
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Questions Column */}
+                {/* Collapsible Comprehension Check */}
+                {currentReading.questions.length > 0 && (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowReadingQuiz((v) => !v)}
+                      className="min-h-[42px] px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold inline-flex items-center gap-2"
+                    >
+                      <ListChecks className="w-4 h-4" />
+                      <span>
+                        {showReadingQuiz
+                          ? 'Ẩn câu hỏi kiểm tra hiểu bài'
+                          : `Kiểm tra nhanh đã hiểu bài (${currentReading.questions.length} câu)`}
+                      </span>
+                    </button>
+
+                    {showReadingQuiz && (
                 <div className="space-y-4">
                   {currentReading.questions.map((q, qIdx) => {
                     const chosen = readingAnswers[q.id];
@@ -1766,38 +2264,36 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                       : 'Kiểm tra đáp án & Xem giải thích'}
                   </button>
                 </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* 3C: WRITING */}
           {practiceSkill === 'writing' && currentWriting && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {writingTasks.map((wt, idx) => (
-                    <button
-                      key={wt.id}
-                      type="button"
-                      onClick={() => {
-                        setWritingIdx(idx);
-                        setShowWritingModel(false);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
-                        idx === writingIdx
-                          ? 'bg-rose-600 text-white border-rose-600'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {wt.taskLabel}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                  <span>⏱️ {currentWriting.recommendedMinutes} phút</span>
-                  <span>•</span>
-                  <span>📝 {currentWriting.wordCountRange}</span>
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
+              <SkillLessonPicker
+                items={writingTasks.map((wt) => ({
+                  id: wt.id,
+                  title: wt.title,
+                  tag: wt.taskLabel,
+                }))}
+                activeIdx={writingIdx}
+                onSelect={(idx) => {
+                  setWritingIdx(idx);
+                  setShowWritingModel(false);
+                }}
+                unitLabel="bài viết"
+                sourceFilter={lessonSourceFilter}
+                onSourceFilterChange={handleSourceFilterChange}
+                examShortLabel={examMeta.shortLabel}
+              />
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                <span>⏱️ {currentWriting.recommendedMinutes} phút</span>
+                <span>•</span>
+                <span>📝 {currentWriting.wordCountRange}</span>
               </div>
 
               <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-2">
@@ -1842,31 +2338,59 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                     💎 Từ khóa & Cụm ăn điểm cao (Bấm loa để nghe)
                   </div>
                   <div className="space-y-2">
-                    {currentWriting.highBandKeywords.map((kw, i) => (
-                      <div
-                        key={i}
-                        className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-2"
-                      >
-                        <div>
-                          <div className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
-                            {kw.phrase}
-                          </div>
-                          <div className="text-[11px] text-slate-600 dark:text-slate-300">
-                            {kw.meaningVi}
-                          </div>
-                          {kw.usageTip && (
-                            <div className="text-[11px] text-slate-400 italic mt-0.5">{kw.usageTip}</div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => speakText(kw.phrase, accent, 0.9)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 shrink-0"
+                    {currentWriting.highBandKeywords.map((kw, i) => {
+                      const saved = savedWordSet.has(kw.phrase.trim().toLowerCase());
+                      return (
+                        <div
+                          key={i}
+                          className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-2"
                         >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="min-w-0">
+                            <div className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
+                              {kw.phrase}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-300">
+                              {kw.meaningVi}
+                            </div>
+                            {kw.usageTip && (
+                              <div className="text-xs text-slate-400 italic mt-0.5">{kw.usageTip}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => speakText(kw.phrase, accent, 0.9)}
+                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                              title="Nghe phát âm"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                            </button>
+                            {onSaveWord && (
+                              <button
+                                type="button"
+                                disabled={saved}
+                                onClick={() =>
+                                  handleSaveExamPhrase({
+                                    phrase: kw.phrase,
+                                    meaningVi: kw.meaningVi,
+                                    level: 'B2',
+                                    note: kw.usageTip || currentWriting.title,
+                                  })
+                                }
+                                className={`px-2 py-1 rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 ${
+                                  saved
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
+                                }`}
+                              >
+                                {saved ? <BookmarkCheck className="w-3 h-3" /> : <BookmarkPlus className="w-3 h-3" />}
+                                <span>{saved ? 'Đã lưu' : 'Lưu'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1918,33 +2442,27 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
 
           {/* 3D: SPEAKING */}
           {practiceSkill === 'speaking' && currentSpeaking && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {speakingTasks.map((sp, idx) => (
-                    <button
-                      key={sp.id}
-                      type="button"
-                      onClick={() => {
-                        stopAllAudio();
-                        setSpeakingIdx(idx);
-                        setShowSpeakingSample(false);
-                        setSpeakingClockSec(null);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
-                        idx === speakingIdx
-                          ? 'bg-rose-600 text-white border-rose-600'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {sp.partLabel}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="text-xs font-bold text-slate-500">
-                  Chuẩn bị: {currentSpeaking.prepTimeText} • Nói: {currentSpeaking.speakTimeText}
-                </div>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4">
+              <SkillLessonPicker
+                items={speakingTasks.map((sp) => ({
+                  id: sp.id,
+                  title: sp.title,
+                  tag: sp.partLabel,
+                }))}
+                activeIdx={speakingIdx}
+                onSelect={(idx) => {
+                  stopAllAudio();
+                  setSpeakingIdx(idx);
+                  setShowSpeakingSample(false);
+                  setSpeakingClockSec(null);
+                }}
+                unitLabel="bài nói"
+                sourceFilter={lessonSourceFilter}
+                onSourceFilterChange={handleSourceFilterChange}
+                examShortLabel={examMeta.shortLabel}
+              />
+              <div className="text-xs font-bold text-slate-500">
+                Chuẩn bị: {currentSpeaking.prepTimeText} • Nói: {currentSpeaking.speakTimeText}
               </div>
 
               {/* Prompt + Cue Card */}
@@ -2023,26 +2541,54 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                     💎 Từ vựng & Cụm ăn điểm Speaking
                   </div>
                   <div className="space-y-2">
-                    {currentSpeaking.highScoreVocab.map((v, i) => (
-                      <div
-                        key={i}
-                        className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
-                      >
-                        <div>
-                          <div className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
-                            {v.phrase}
-                          </div>
-                          <div className="text-[11px] text-slate-600 dark:text-slate-300">{v.meaningVi}</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => speakText(v.phrase, accent, 0.9)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                    {currentSpeaking.highScoreVocab.map((v, i) => {
+                      const saved = savedWordSet.has(v.phrase.trim().toLowerCase());
+                      return (
+                        <div
+                          key={i}
+                          className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
                         >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="min-w-0">
+                            <div className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
+                              {v.phrase}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-300">{v.meaningVi}</div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => speakText(v.phrase, accent, 0.9)}
+                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                              title="Nghe phát âm"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                            </button>
+                            {onSaveWord && (
+                              <button
+                                type="button"
+                                disabled={saved}
+                                onClick={() =>
+                                  handleSaveExamPhrase({
+                                    phrase: v.phrase,
+                                    meaningVi: v.meaningVi,
+                                    level: 'B2',
+                                    note: currentSpeaking.title,
+                                  })
+                                }
+                                className={`px-2 py-1 rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 ${
+                                  saved
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
+                                }`}
+                              >
+                                {saved ? <BookmarkCheck className="w-3 h-3" /> : <BookmarkPlus className="w-3 h-3" />}
+                                <span>{saved ? 'Đã lưu' : 'Lưu'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2111,7 +2657,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
       )}
 
       {/* ================= TAB 4: TIMED MINI MOCK TEST ================= */}
-      {activeTab === 'mock' && (
+      {currentTab === 'mock' && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-5">
           {mockPhase === 'ready' && (
             <div className="max-w-2xl mx-auto py-6 text-center space-y-4">
@@ -2159,7 +2705,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                 {activeMockTest.description}
               </p>
 
-              <div className="grid grid-cols-3 gap-3 text-left max-w-md mx-auto pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left max-w-md mx-auto pt-2">
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <div className="text-[11px] text-slate-400 font-bold">Số câu</div>
                   <div className="text-base font-black text-slate-900 dark:text-white">
@@ -2398,7 +2944,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
                     <div className="px-3 py-2 rounded-xl bg-white/10">
                       <div className="text-[10px] text-slate-300 uppercase">Tổng đúng</div>
                       <div className="text-base font-black text-emerald-300">
@@ -2546,7 +3092,7 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
       )}
 
       {/* ================= TAB 5: WRITING & SPEAKING RUBRIC GRADER ================= */}
-      {activeTab === 'rubric' && (
+      {currentTab === 'rubric' && (
         <div className="space-y-5">
           {/* Mode Switch & Task Picker */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4">
@@ -2587,44 +3133,43 @@ Hãy trình bày ngắn gọn, rõ ràng theo 4 mục:
               </div>
             </div>
 
-            {/* Select Prompt */}
-            <div className="flex flex-wrap gap-2">
-              {(rubricMode === 'writing' ? writingTasks : speakingTasks).map((item) => {
-                const label =
-                  'taskLabel' in item ? `${item.taskLabel}: ${item.title}` : `${item.partLabel}: ${item.title}`;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setRubricTaskId(item.id);
-                      setOfflineEvaluation(null);
-                      setAiEvaluation(null);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border text-left ${
-                      rubricTaskId === item.id
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => {
-                  setRubricTaskId('custom');
+            {/* Select Prompt (compact dropdown + custom toggle so 46/37 prompts stay tidy on mobile) */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <select
+                value={isCustomRubricPrompt ? 'custom' : rubricTaskId}
+                onChange={(e) => {
+                  setRubricTaskId(e.target.value);
                   setOfflineEvaluation(null);
                   setAiEvaluation(null);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                aria-label="Chọn đề bài chấm Rubric"
+                className="flex-1 min-h-[42px] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {(rubricMode === 'writing' ? allWritingTasks : allSpeakingTasks).map((item, idx) => {
+                  const tag = 'taskLabel' in item ? item.taskLabel : item.partLabel;
+                  return (
+                    <option key={item.id} value={item.id}>
+                      Bài {idx + 1}: [{tag}] {item.title}
+                    </option>
+                  );
+                })}
+                <option value="custom">✍️ Tự nhập đề bài riêng</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRubricTaskId(isCustomRubricPrompt ? (rubricMode === 'writing' ? allWritingTasks[0]?.id || 'custom' : allSpeakingTasks[0]?.id || 'custom') : 'custom');
+                  setOfflineEvaluation(null);
+                  setAiEvaluation(null);
+                }}
+                className={`min-h-[42px] px-3.5 py-2 rounded-xl text-xs font-extrabold border shrink-0 ${
                   isCustomRubricPrompt
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                ✍️ Tự nhập đề bài riêng
+                {isCustomRubricPrompt ? 'Chọn đề có sẵn' : '✍️ Tự nhập đề riêng'}
               </button>
             </div>
 

@@ -366,9 +366,9 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
 
       {/* STEP 1: 2-COLUMN LAYOUT (LEFT = WORD LIST, RIGHT = WORD INFO) */}
       {lessonStep === 1 && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
           {/* Left Column: 10 Words List */}
-          <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 h-fit lg:sticky lg:top-28">
+          <div className="md:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 h-fit md:sticky md:top-20">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold uppercase text-slate-500">
                 Danh sách {totalLessonWords} từ trong bài
@@ -422,7 +422,7 @@ export const CurriculumRoadmap: React.FC<CurriculumRoadmapProps> = ({
           </div>
 
           {/* Right Column: Detailed Word Info */}
-          <div className="lg:col-span-8 space-y-3">
+          <div className="md:col-span-7 space-y-3">
             <WordAnatomyCard
               wordEntry={currentWord}
               accent={accent}

@@ -7,6 +7,7 @@ import { filterAndSortByProfile, getAllowedCategoriesForProfile } from '../utils
 import { analyzeWordFull } from '../utils/wordAnalyzer';
 import { speakText } from '../utils/speechEngine';
 import { WordAnatomyCard } from './WordAnatomyCard';
+import { BottomSheet } from './app/ui/BottomSheet';
 
 interface VocabularyLibraryProps {
   accent: AccentMode;
@@ -33,6 +34,7 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
 
   const [selectedWord, setSelectedWord] = useState<WordEntry | null>(null);
   const [loadingWord, setLoadingWord] = useState(false);
+  const [mobileWordSheetOpen, setMobileWordSheetOpen] = useState(false);
 
   const profileVocab = useMemo(
     () => filterAndSortByProfile(CORE_VOCABULARY, learnerProfile),
@@ -90,6 +92,9 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
   const handleSelectItem = async (item: CoreVocabItem) => {
     setLoadingWord(true);
     speakText(item.word, accent, 0.95);
+    if (window.innerWidth < 768) {
+      setMobileWordSheetOpen(true);
+    }
     try {
       const analyzed = await analyzeWordFull(item.word);
       setSelectedWord({
@@ -178,17 +183,17 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
         {/* Left: Word Grid */}
-        <div className="lg:col-span-5 space-y-3">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
+        <div className="md:col-span-5 space-y-3">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 divide-y sm:divide-y-0 md:divide-y divide-slate-100 dark:divide-slate-800 sm:gap-2 md:gap-0 sm:p-2 md:p-0 overflow-hidden">
             {pageItems.map((item) => {
               const active = selectedWord?.word.toLowerCase() === item.word.toLowerCase();
               return (
                 <div
                   key={item.word}
                   onClick={() => handleSelectItem(item)}
-                  className={`p-3.5 flex items-center justify-between gap-2 cursor-pointer transition ${
+                  className={`p-3.5 flex items-center justify-between gap-2 cursor-pointer transition sm:rounded-xl sm:border sm:border-slate-200 dark:sm:border-slate-800 md:rounded-none md:border-0 ${
                     active
                       ? 'bg-indigo-50 dark:bg-indigo-950/40'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
@@ -242,8 +247,8 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
           </div>
         </div>
 
-        {/* Right: Anatomy Card */}
-        <div className="lg:col-span-7">
+        {/* Right: Anatomy Card (sticky on md+, BottomSheet on mobile) */}
+        <div className="hidden md:block md:col-span-7 md:sticky md:top-20">
           {loadingWord ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 flex flex-col items-center justify-center text-slate-500">
               <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
@@ -270,6 +275,27 @@ export const VocabularyLibrary: React.FC<VocabularyLibraryProps> = ({
           )}
         </div>
       </div>
+
+      <BottomSheet
+        open={mobileWordSheetOpen}
+        onClose={() => setMobileWordSheetOpen(false)}
+        title={selectedWord ? selectedWord.word : 'Chi tiết từ vựng'}
+      >
+        {loadingWord ? (
+          <div className="py-12 flex flex-col items-center justify-center text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
+            <p className="text-sm font-medium">Đang giải phẫu mặt chữ...</p>
+          </div>
+        ) : selectedWord ? (
+          <WordAnatomyCard
+            wordEntry={selectedWord}
+            accent={accent}
+            isSaved={savedWords.some((w) => w.word.toLowerCase() === selectedWord.word.toLowerCase())}
+            onSaveWord={onSaveWord}
+            onPronunciationScore={onPronunciationScore}
+          />
+        ) : null}
+      </BottomSheet>
     </div>
   );
 };
